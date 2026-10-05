@@ -462,14 +462,15 @@ class EditorActivity : AppCompatActivity() {
                 toast(getString(R.string.editor_render_failed))
                 return@launch
             }
-            when ((result as SaveOutcome.Done).result) {
+            val res = (result as SaveOutcome.Done).result
+            when (res) {
                 is MediaSaver.Result.Success -> {
-                    toast(getString(R.string.editor_saved_copy, result.name))
+                    toast(getString(R.string.editor_saved_copy, res.name))
                     DataHub.requestRescan()
                     reportChanged()
                     finish()
                 }
-                is MediaSaver.Result.Failed -> toast(getString(R.string.editor_save_failed, result.message))
+                is MediaSaver.Result.Failed -> toast(getString(R.string.editor_save_failed, res.message))
                 else -> toast(getString(R.string.editor_save_failed, ""))
             }
         }
@@ -502,7 +503,8 @@ class EditorActivity : AppCompatActivity() {
                 toast(getString(R.string.editor_render_failed))
                 return@launch
             }
-            when ((result as SaveOutcome.Done).result) {
+            val res = (result as SaveOutcome.Done).result
+            when (res) {
                 is MediaSaver.Result.Success -> {
                     pendingOverwrite = false
                     com.n3vibecode.gallery.image.ImageLoader.clearAll(applicationContext)
@@ -514,7 +516,7 @@ class EditorActivity : AppCompatActivity() {
                 is MediaSaver.Result.NeedsPermission -> {
                     pendingOverwrite = true
                     try {
-                        permissionLauncher.launch(IntentSenderRequest.Builder(result.intentSender).build())
+                        permissionLauncher.launch(IntentSenderRequest.Builder(res.intentSender).build())
                     } catch (t: Throwable) {
                         pendingOverwrite = false
                         toast(getString(R.string.editor_save_failed, t.message ?: ""))
@@ -522,7 +524,7 @@ class EditorActivity : AppCompatActivity() {
                 }
                 is MediaSaver.Result.Failed -> {
                     pendingOverwrite = false
-                    toast(getString(R.string.editor_save_failed, result.message))
+                    toast(getString(R.string.editor_save_failed, res.message))
                 }
                 else -> {
                     pendingOverwrite = false
