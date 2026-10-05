@@ -9,7 +9,17 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kame
 
 ---
 
-## 🆕 Version 1.23 – Tippen repariert, Kacheln viel schneller gefüllt
+## 🆕 Version 1.24 – Mini-Vorschau, Apple-artiges Zuschneiden, robustes Speichern
+
+* **Mini-Vorschau (48 px) für jedes Foto:** wird immer zuerst gezeigt (weich hochgerechnet)
+  statt grauer Kacheln – bei weit herausgezoomtem Raster ist sie sogar die Zielgröße.
+* **Zuschneiden wie in der Apple-Fotos-App:** Rahmen steht fest, Foto wird darunter
+  verschoben/gezoomt, acht Griffe mit großer Trefferfläche, Seitenverhältnisse füllen den
+  Ausschnitt automatisch komplett.
+* **Speichern von bearbeiteten Fotos robust:** drei Speicherwege nacheinander, klare
+  Fehlermeldungen, Schreibfreigabe auf Android 8/9, höhere Auflösung der Vorlage (3600 px).
+
+## Version 1.23 – Tippen repariert, Kacheln viel schneller gefüllt
 
 * **Tippen auf ein Foto öffnet jetzt immer genau dieses Foto.** Vorher holte sich die
   Großansicht die Liste nur global aus dem Speicher; sobald eine andere Ansicht (Album,

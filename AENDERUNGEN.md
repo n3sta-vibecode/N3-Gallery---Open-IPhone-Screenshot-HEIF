@@ -1,5 +1,55 @@
 # N3 Gallery – was neu ist
 
+## 1.24 – Mini-Vorschau (48 px), Zuschneiden wie bei Apple, Speichern robust
+
+### a) Mini-Vorschau: der Vorschlag aus der Nachricht, umgesetzt
+
+Genau wie vorgeschlagen wird zu jedem Foto eine **winzige Vorschau (48 × 48 px)** erzeugt.
+Sie ist in Millisekunden verfügbar und wird **immer zuerst** angezeigt – weich
+hochgerechnet, damit man sofort den Bildinhalt sieht statt einer grauen Fläche
+(dasselbe Verfahren wie „Blur-up“ bei Apple/Google Fotos).
+
+* Liegt bereits im Speicher oder auf der Festplatte → sofort da, auch nach App-Neustart.
+* Ist das Raster weit herausgezoomt (viele Spalten, Kacheln ~40–60 px), ist die
+  Mini-Vorschau sogar **direkt die Zielgröße** – dann braucht es gar kein großes Dekodieren.
+* Bei sehr kleinen Kacheln werden Zeichnungen/Textfelder mit angezeigt.
+
+Ehrlich dazu: Bei *normal* großen Kacheln (4–6 Spalten, ~200–300 px) skaliert keine
+Vorschau beliebig hoch – dort ersetzt die Mini-Vorschau nicht das scharfe Bild, sie
+überbrückt nur die Wartezeit. Deshalb bleibt die zweite Stufe (128/256/512/1024 px)
+erhalten und wird weiterhin im Hintergrund vorgeladen.
+
+### b) Zuschneiden wie bei Apple
+
+Vorher musste man genau eine Ecke treffen – deshalb war es mühsam. Jetzt:
+
+* Der **Rahmen steht fest**, das **Foto wird darunter verschoben** (ein Finger) bzw.
+  mit zwei Fingern gezoomt. Nach dem Zoomen kann man mit einem Finger weiterziehen.
+* **Acht Griffe**: 4 Ecken (Winkel wie in iOS) + 4 Kantenmitten, mit großzügiger
+  Trefferfläche (30 dp) – man muss nicht mehr präzise zielen.
+* **Seitenverhältnisse** (Frei, 1:1, 4:3, 3:4, 16:9, 9:16) setzen den Rahmen passend und
+  zoomen das Foto automatisch so, dass der Ausschnitt **immer vollständig gefüllt** ist
+  (kein schwarzer Rand im Ergebnis).
+* Drittel-Raster, abgedunkelter Außenbereich und „Rahmen = späteres Bild“.
+* Der sichtbare Rahmen ist exakt das gespeicherte Bild (kein Umrechnen mehr).
+
+### c) Bearbeitete Fotos speichern – jetzt robust
+
+Der Speichervorgang hat vorher still scheitern können. Jetzt:
+
+* **Drei Wege nacheinander:** Galerie (MediaStore) → öffentlicher Bilder-Ordner
+  (Android 8/9) → app-eigener Ordner + Medien-Scan. Einer davon klappt immer.
+* **Klare Meldungen** statt „nichts passiert“: fehlende Schreibfreigabe, kein
+  beschreibbarer Ordner, Speichermangel beim Aufbereiten – jeweils auf Deutsch/Englisch.
+* **Schreibfreigabe** wird auf Android 8/9 aktiv angefragt (auch beim Überschreiben).
+* **Speichern ist immer möglich:** Auch ohne Änderung lässt sich eine Kopie anlegen.
+* Beim Überschreiben wird nach dem Systemdialog zuverlässig weitergemacht; die Liste
+  wird auch dann neu eingelesen, wenn der Hauptbildschirm gerade nicht sichtbar war.
+* Die Bearbeitungsvorlage wird mit höherer Auflösung geladen (bis 3600 px) – ein
+  1:1-Zuschnitt ist dadurch nicht mehr weicher als das Original.
+
+---
+
 ## 1.23 – Tippen repariert, Laden beschleunigt
 
 **Gemeldet:** „Das Anklicken von Fotos funktioniert nicht“ und „alles lädt erst später“.
@@ -83,13 +133,13 @@ Erreichbar über das **Pinsel-Symbol** oben in der Großansicht, den Knopf
 
 ## APK installieren (direkt auf dem Handy)
 
-**Releases → „Testbuild 1.23“** öffnen und antippen:
+**Releases → „Testbuild 1.24“** öffnen und antippen:
 
 | Datei | Kennung / Name | Installation |
 |---|---|---|
-| `N3-Gallery-1.23-TEST.apk` | `…gallery.dev` · „N3 Gallery TEST“ | läuft **parallel** zur vorhandenen App – nichts wird ersetzt, Notizen/Favoriten bleiben. **So ausprobieren:** In der App steht oben „N3 Gallery TEST“ – daran siehst du, dass die neue Version läuft. |
-| `N3-Gallery-1.23-release.apk` | `…gallery` · „N3 Gallery- Open HEIF iPhone Screenshots“ | die reguläre App; **vorher alte Version deinstallieren**, weil dieser Automatik-Build mit dem CI-Schlüssel signiert ist (nicht mit `n3-release.jks`) |
-| `N3Gallery-Projekt-1.23.zip` | Android-Studio-Projekt | für ein echtes Update „in place“ in Android Studio bauen – dort wird mit `n3-release.jks` signiert |
+| `N3-Gallery-1.24-TEST.apk` | `…gallery.dev` · „N3 Gallery TEST“ | läuft **parallel** zur vorhandenen App – nichts wird ersetzt, Notizen/Favoriten bleiben. **So ausprobieren:** In der App steht oben „N3 Gallery TEST“ – daran siehst du, dass die neue Version läuft. |
+| `N3-Gallery-1.24-release.apk` | `…gallery` · „N3 Gallery- Open HEIF iPhone Screenshots“ | die reguläre App; **vorher alte Version deinstallieren**, weil dieser Automatik-Build mit dem CI-Schlüssel signiert ist (nicht mit `n3-release.jks`) |
+| `N3Gallery-Projekt-1.24.zip` | Android-Studio-Projekt | für ein echtes Update „in place“ in Android Studio bauen – dort wird mit `n3-release.jks` signiert |
 
 Nach dem Antippen: *„Installation aus unbekannten Quellen erlauben“* → fertig.
 Läuft ab Android 8 (API 26). Keine Internet-Berechtigung, alles bleibt auf dem Gerät.
