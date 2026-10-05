@@ -105,9 +105,16 @@ jobs:
           {
             echo "### Build-Protokoll (${{ job.status }})"
             echo '```'
-            grep -nE "^(e: |w: |> Task|FAILURE|\* What went wrong|Caused by|Execution failed)|error:|Could not|Unresolved|ERROR" /tmp/build.log | tail -80 || true
+            grep -nE "^(e: |FAILURE|\* What went wrong|Caused by|Execution failed)|error:|Could not|Unresolved" /tmp/build.log | tail -40 || true
+            echo '--- APK-Daten ---'
+            AAPT="$SDK/build-tools/36.0.0/aapt2"
+            for apk in app/build/outputs/apk/release/N3-Gallery-1.22-release.apk app/build/outputs/apk/tryout/N3-Gallery-1.22-TEST.apk; do
+              [ -f "$apk" ] || continue
+              echo "$apk"
+              [ -x "$AAPT" ] && "$AAPT" dump badging "$apk" | grep -E "^package:|^application-label:|^launchable-activity:|^sdkVersion:|^targetSdkVersion:" || true
+            done
             echo '--- letzte Zeilen ---'
-            tail -25 /tmp/build.log || true
+            tail -12 /tmp/build.log || true
             echo '```'
           } > /tmp/report.md
           PR=$(gh pr list --head "${{ github.ref_name }}" --json number --jq '.[0].number' || true)
