@@ -133,7 +133,7 @@ class EditorActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.tvEditorTitle).text = media.name
 
         findViewById<ImageButton>(R.id.btnClose).setOnClickListener { confirmDiscard() }
-        findViewById<ImageButton>(R.id.btnSave).setOnClickListener { askSave() }
+        findViewById<View>(R.id.btnSave).setOnClickListener { askSave() }
         btnUndo.setOnClickListener { editor.undo(); syncButtons() }
         btnRedo.setOnClickListener { editor.redo(); syncButtons() }
         btnModeCrop.setOnClickListener { setMode(EditorMode.CROP) }
@@ -402,11 +402,6 @@ class EditorActivity : AppCompatActivity() {
         val media = item ?: return
         val changed = editor.hasChanges()
         val overwritePossible = changed && MediaSaver.canOverwrite(media)
-        val labels = if (overwritePossible) {
-            arrayOf(getString(R.string.editor_save_copy), getString(R.string.editor_save_overwrite))
-        } else {
-            arrayOf(getString(R.string.editor_save_copy))
-        }
         val message = buildString {
             if (!changed) {
                 append(getString(R.string.editor_nothing_to_save))
@@ -427,14 +422,17 @@ class EditorActivity : AppCompatActivity() {
                 }
             }
         }
-        MaterialAlertDialogBuilder(this)
+        // Als Dialog mit richtigen Knöpfen (vorher eine Liste – sah aus wie „kein
+        // Speichern-Knopf“, weil die Optionen wie Textzeilen wirkten).
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.editor_save_title)
             .setMessage(message)
-            .setItems(labels) { _, which ->
-                if (which == 0) doSaveCopy(media) else doOverwrite(media)
-            }
+            .setPositiveButton(R.string.editor_save_copy) { _, _ -> doSaveCopy(media) }
             .setNegativeButton(R.string.cancel, null)
-            .show()
+        if (overwritePossible) {
+            dialog.setNeutralButton(R.string.editor_save_overwrite) { _, _ -> doOverwrite(media) }
+        }
+        dialog.show()
     }
 
     private fun doSaveCopy(media: MediaItem) {

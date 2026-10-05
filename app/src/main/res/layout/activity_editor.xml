@@ -59,14 +59,29 @@
             android:src="@drawable/ic_redo"
             android:tint="#FFFFFFFF" />
 
-        <ImageButton
+        <!-- Deutlich sichtbar und beschriftet: Vorher war das Speichern nur ein kleines
+             lila Häkchen ohne Text – leicht zu übersehen. -->
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSave"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="2dp"
             android:contentDescription="@string/save"
-            android:src="@drawable/ic_check"
-            android:tint="@color/n3_accent" />
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="16dp"
+            android:text="@string/save"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFFFF"
+            android:textSize="14sp"
+            app:backgroundTint="@color/n3_accent"
+            app:cornerRadius="20dp"
+            app:icon="@drawable/ic_check"
+            app:iconGravity="textStart"
+            app:iconPadding="6dp"
+            app:iconTint="#FFFFFFFF" />
     </LinearLayout>
 
     <!-- Bildfläche -->

@@ -650,9 +650,17 @@ object ImageLoader {
 
         // Manche Geräte liefern für 10-Bit-/HDR-HEIFs eine (fast) schwarze Systemvorschau.
         // Dann lieber den eigenen Decoder fragen, statt schwarze Kacheln zu zeigen.
-        if (bmp != null && (item.isHeif || item.isAvif) && Decoder.looksUniformlyDark(bmp)) {
+        // Nur einmal pro Datei prüfen: Ist die Vorschau dunkel, obwohl das Bild dunkel IST
+        // (Nachtaufnahme), spart das bei jedem weiteren Aufruf einen kompletten Dekodiervorgang.
+        if (bmp != null && (item.isHeif || item.isAvif) &&
+            Decoder.looksUniformlyDark(bmp) && !Decoder.isDarkNormal(item.uri)
+        ) {
             val alternative = runCatching { Decoder.decode(ctx, item, bucket) }.getOrNull()
-            if (alternative != null && !Decoder.looksUniformlyDark(alternative)) bmp = alternative
+            if (alternative != null && !Decoder.looksUniformlyDark(alternative)) {
+                bmp = alternative
+            } else {
+                Decoder.markDarkNormal(item.uri)
+            }
         }
 
         // Eigener Dekoder

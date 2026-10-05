@@ -9,7 +9,19 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kame
 
 ---
 
-## 🆕 Version 1.26 – Speichern repariert, schneller öffnen, Vorschauen im RAM
+## 🆕 Version 1.27 – Speichern-Knopf sichtbar, HEIC viel schneller
+
+* **Klarer Speichern-Knopf:** oben rechts jetzt ein beschrifteter, gefüllter Knopf
+  „Speichern“ (vorher nur ein kleines lila Häkchen ohne Text), und der Speichern-Dialog
+  hat echte Knöpfe (Kopie speichern / Original überschreiben / Abbrechen).
+* **HEIC/HEIF öffnet deutlich schneller:** Der System-Decoder wird nicht mehr nach drei
+  Fehlversuchen für die ganze Sitzung abgeschaltet (das ließ danach alle HEICs über den
+  langsamen Software-Weg laufen), dunkle Hardware-Ergebnisse werden aufbewahrt statt
+  verworfen, und beim Antippen entfällt das zweite Dekodieren derselben Datei.
+* **In Anzeigegröße dekodieren** (exakte Zielgröße statt nur Zweier-Stufe) und pro Datei
+  merken, welcher Weg funktioniert.
+
+## Version 1.26 – Speichern repariert, schneller öffnen, Vorschauen im RAM
 
 * **Bearbeitete Fotos speichern funktioniert jetzt:** Es wird geprüft, ob wirklich Daten
   geschrieben wurden (keine leeren Bilder in der Galerie mehr), der unsichtbare

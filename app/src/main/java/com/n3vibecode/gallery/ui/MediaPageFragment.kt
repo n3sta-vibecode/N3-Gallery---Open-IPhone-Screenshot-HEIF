@@ -110,16 +110,23 @@ class MediaPageFragment : Fragment() {
         // Mini-Vorschau (48 px) wird hier absichtlich NICHT hochgezogen: auf
         // Bildschirmgröße wäre sie stark unscharf („lädt erst dann scharf“).
         // 1) Zuerst die schon geladene Raster-Kachel (scharf, ohne Wartezeit)
+        var cachedPx = 0
         ImageLoader.bestCached(media)?.let {
             image.setImageBitmap(it)
+            cachedPx = maxOf(it.width, it.height)
             progress.visibility = View.GONE
         }
-        // 2) Gleich danach: 1024-px-Vorschau (scharf genug), bis das Vollbild fertig ist
-        ImageLoader.loadPreview(requireContext(), media) { prev ->
-            if (isAdded && !fullShown && prev != null) {
-                image.setImageBitmap(prev)
-                progress.visibility = View.GONE
-                message.visibility = View.GONE
+        // 2) Zwischenbild (1024 px) nur, wenn noch nichts Brauchbares im Speicher liegt.
+        //    Liegt schon eine Kachel ab 256 px vor, wäre die Vorschau ein **zweiter voller
+        //    Dekodiervorgang für dasselbe Foto** – bei HEIC kostet genau das die Wartezeit
+        //    beim Öffnen. Dann lieber direkt das scharfe Vollbild.
+        if (cachedPx < 256) {
+            ImageLoader.loadPreview(requireContext(), media) { prev ->
+                if (isAdded && !fullShown && prev != null) {
+                    image.setImageBitmap(prev)
+                    progress.visibility = View.GONE
+                    message.visibility = View.GONE
+                }
             }
         }
         // 3) Vollbild in Bildschirmgröße – aber nur auf der gerade sichtbaren Seite

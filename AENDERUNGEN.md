@@ -1,5 +1,49 @@
 # N3 Gallery – was neu ist
 
+## 1.27 – Speichern-Knopf sichtbar, HEIC deutlich schneller
+
+### a) „Kein Speichern-Knopf“ – jetzt ist er unmissverständlich
+
+Der Speichern-Knopf war ein **kleines lila Häkchen ohne Beschriftung** oben rechts – auf
+einem dunklen Hintergrund leicht zu übersehen. Jetzt:
+
+* **Beschrifteter, gefüllter Knopf „Speichern“** (mit Häkchen-Symbol) oben rechts.
+* Der Speichern-Dialog hat **richtige Knöpfe** – „Als neue Kopie speichern“,
+  „Original überschreiben“ (nur wenn möglich) und „Abbrechen“. Vorher war das eine Liste
+  aus Textzeilen, die wie Fließtext wirkte.
+* Der Fehlergrund beim Speichern steht als Dialog da, nicht mehr als kurzer Hinweis.
+
+### b) HEIC/HEIF öffnet jetzt schnell
+
+Drei echte Bremsen, alle gefunden und behoben:
+
+* **Der System-Decoder schaltete sich nach 3 Fehlversuchen für die ganze Sitzung ab.**
+  Waren die ersten drei HEIFs problematisch (z. B. Apple-Screenshots mit Kachel-Raster),
+  liefen danach **alle** HEICs über den langsamen Software-Decoder – mehrere Sekunden pro
+  Bild. Jetzt wird das **pro Datei** gemerkt: ein normales Foto nimmt weiter den schnellen
+  Hardware-Weg.
+* **Dunkles Hardware-Ergebnis wurde verworfen.** Bei 10-Bit-/HDR-HEICs kann der
+  Hardware-Pfad ein (fast) schwarzes Bild liefern. Bisher wurde es weggeworfen und
+  zusätzlich der Software-Weg probiert – und wenn der auch dunkel war, landete die Datei
+  beim langsamsten Weg (libheif). Jetzt wird das Hardware-Ergebnis **aufbewahrt** und nur
+  durch ein sichtbares Bild ersetzt; ein schwarzes Bild gibt es nur noch, wenn wirklich
+  kein Weg etwas liefert.
+* **Kein zweites Dekodieren für dasselbe Foto.** Beim Antippen einer Kachel lief bisher
+  immer zusätzlich die 1024-px-Vorschau – also ein zweiter voller HEIC-Dekodiervorgang
+  parallel zum Vollbild. Liegt die Raster-Kachel schon im Speicher (ab 256 px), entfällt
+  die Vorschau jetzt komplett: direkt das scharfe Vollbild.
+* Zusätzlich wird die **exakte Zielgröße** vorgegeben (wie iOS: in Anzeigegröße dekodieren)
+  statt nur einer Zweier-Stufe – wieder weniger Pixel zu rechnen und weniger Speicher.
+* Und pro Datei wird gemerkt, welcher Weg zum Ziel geführt hat. Beim zweiten Öffnen wird
+  direkt dieser Weg genommen, ohne Fehlversuche.
+
+### c) Dunkle Vorschaubilder kosten nicht mehr doppelt
+
+Bei Nachtaufnahmen prüfte die App bisher **jedes Mal** erneut, ob das dunkle Vorschaubild
+vielleicht ein Dekodierfehler ist – und dekodierte dafür ein zweites Mal. Jetzt wird das
+pro Datei einmal geprüft und gemerkt. Das beschleunigt den Hintergrund-Aufbau bei
+Nachtaufnahmen spürbar.
+
 ## 1.26 – Speichern repariert, schnelleres Öffnen, Vorschauen bleiben im Speicher
 
 ### a) Bearbeitete Fotos speichern – jetzt wirklich

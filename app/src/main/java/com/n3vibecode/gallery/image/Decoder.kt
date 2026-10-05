@@ -36,10 +36,34 @@ object Decoder {
     private val platformWins = java.util.concurrent.atomic.AtomicInteger(0)
     private val platformFails = java.util.concurrent.atomic.AtomicInteger(0)
 
-    @Volatile private var skipPlatformForHeif = false
+    /**
+     * Dateien, bei denen der System-Dekoder nichts Brauchbares liefert. **Pro Datei**,
+     * nicht global: Vorher schaltete sich der System-Weg nach drei Fehlversuchen für die
+     * ganze Sitzung ab – dadurch liefen danach auch **normale** HEICs über den langsamen
+     * Software-Decoder (mehrere Sekunden pro Bild). Jetzt wird nur die betroffene Datei
+     * gemerkt.
+     */
+    private val platformFailed = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
-    /** Diagrose: nutzt das Gerät den System-Decoder für HEIFs? */
-    fun usesSystemDecoderForHeif(): Boolean = !skipPlatformForHeif
+    /** Diagnose: nutzt das Gerät den System-Decoder für HEIFs? */
+    fun usesSystemDecoderForHeif(): Boolean = platformWins.get() > 0 || platformFails.get() < 3
+
+    // Welcher Weg hat für diese Datei funktioniert? (spart Wiederholungen)
+    private const val PATH_HARDWARE = 1
+    private const val PATH_SYSTEM = 2
+    private const val PATH_LIBHEIF = 3
+    private const val PATH_DARK_OK = 4
+
+    private val goodPath = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    /** Dateien, bei denen ein dunkles Vorschaubild normal ist (z. B. Nachtaufnahmen). */
+    private val darkNormal = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+    fun isDarkNormal(uri: String): Boolean = darkNormal.containsKey(uri)
+
+    fun markDarkNormal(uri: String) {
+        darkNormal[uri] = true
+    }
 
     /**
      * Erkennt (fast) einfarbig schwarze Bilder. Solche Ergebnisse entstehen bei manchen
@@ -110,17 +134,34 @@ object Decoder {
             //    10-Bit) nicht über den System-Decoder öffnen, wird das gemerkt – sonst kostet
             //    jeder einzelne Fehlversuch bei jedem Foto wieder Zeit.
             if (isHeifFamily) {
-                if (!skipPlatformForHeif) {
-                    val viaSystem = platformDecode(ctx, item, maxPx)
+                // Schon bekannt, welcher Weg bei dieser Datei funktioniert? Dann direkt
+                // dorthin – kein zweiter Fehlversuch bei jedem Anzeigen.
+                when (goodPath[item.uri]) {
+                    PATH_HARDWARE -> hardwareDecode(ctx, Uri.parse(item.uri), maxPx)
+                        ?.let { return DecodeResult(it, DecodePath.NATIVE) }
+                    PATH_SYSTEM, PATH_DARK_OK -> platformDecodeDetailed(ctx, item, maxPx)
+                        ?.let { return DecodeResult(it.bitmap, DecodePath.NATIVE) }
+                    PATH_LIBHEIF -> heifDecode(ctx, item, maxPx)
+                        ?.let { return DecodeResult(it, DecodePath.HEIF_LIB) }
+                }
+                if (!platformFailed.containsKey(item.uri)) {
+                    val viaSystem = platformDecodeDetailed(ctx, item, maxPx)
                     if (viaSystem != null) {
                         platformWins.incrementAndGet()
-                        return DecodeResult(viaSystem, DecodePath.NATIVE)
+                        goodPath[item.uri] = when {
+                            viaSystem.hardware && looksUniformlyDark(viaSystem.bitmap) -> PATH_DARK_OK
+                            viaSystem.hardware -> PATH_HARDWARE
+                            else -> PATH_SYSTEM
+                        }
+                        return DecodeResult(viaSystem.bitmap, DecodePath.NATIVE)
                     }
-                    if (platformWins.get() == 0 && platformFails.incrementAndGet() >= 3) {
-                        skipPlatformForHeif = true
-                    }
+                    platformFails.incrementAndGet()
+                    platformFailed[item.uri] = true
                 }
-                heifDecode(ctx, item, maxPx)?.let { return DecodeResult(it, DecodePath.HEIF_LIB) }
+                heifDecode(ctx, item, maxPx)?.let {
+                    goodPath[item.uri] = PATH_LIBHEIF
+                    return DecodeResult(it, DecodePath.HEIF_LIB)
+                }
                 embeddedJpeg(ctx, item, maxPx)?.let { return DecodeResult(it, DecodePath.EMBEDDED_JPEG) }
                 return DecodeResult(null, DecodePath.NONE)
             }
@@ -164,31 +205,71 @@ object Decoder {
 
     // ------------------------------------------------------------------ Systemdekoder
 
-    fun platformDecode(ctx: Context, item: MediaItem, maxPx: Int): Bitmap? {
+    /** Ergebnis des System-Dekoders samt Angabe, ob der Hardware-Weg beteiligt war. */
+    private class PlatformResult(val bitmap: Bitmap, val hardware: Boolean)
+
+    fun platformDecode(ctx: Context, item: MediaItem, maxPx: Int): Bitmap? =
+        platformDecodeDetailed(ctx, item, maxPx)?.bitmap
+
+    /**
+     * System-Dekoder, Hardware zuerst (wie iOS).
+     *
+     * Wichtig: Liefert der Hardware-Weg ein (fast) schwarzes Bild – das passiert bei
+     * 10-Bit-/HDR-HEICs auf manchen Geräten –, wird dieses Ergebnis **aufbewahrt** und nur
+     * dann ersetzt, wenn ein anderer Weg ein sichtbares Bild liefert. Früher wurde es
+     * verworfen; dadurch musste die App für solche Fotos jedes Mal zusätzlich den langsamen
+     * Software-Weg gehen (und am Ende teils libheif) – das war die Wartezeit bei HEIC.
+     */
+    private fun platformDecodeDetailed(ctx: Context, item: MediaItem, maxPx: Int): PlatformResult? {
         val uri = Uri.parse(item.uri)
-        // Zuerst der Hardware-Weg (ab Android 10): für HEVC/HEIF deutlich schneller als
-        // Software – so wie Apple es macht. Ergebnis wird geprüft (HDR kann sonst schwarz werden).
+        var darkHardware: Bitmap? = null
         if (Build.VERSION.SDK_INT >= 29 && (item.isHeif || item.isAvif)) {
             hardwareDecode(ctx, uri, maxPx)?.let { hw ->
-                if (!looksUniformlyDark(hw)) return hw
+                if (!looksUniformlyDark(hw)) return PlatformResult(hw, true)
+                darkHardware = hw
             }
         }
         if (Build.VERSION.SDK_INT >= 28) {
-            try {
-                val source = ImageDecoder.createSource(ctx.contentResolver, uri)
-                val bmp = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                    val sample = sampleSize(info.size.width, info.size.height, maxPx)
-                    if (sample > 1) decoder.setTargetSampleSize(sample)
-                    if (Build.VERSION.SDK_INT >= 29) decoder.isUnpremultipliedRequired = false
-                }
-                if (bmp != null) return bmp
-            } catch (_: Throwable) {
-                // weiter mit BitmapFactory
-            } catch (_: OutOfMemoryError) {
-            }
+            imageDecoderSoftware(ctx, uri, maxPx)?.let { return PlatformResult(it, false) }
         }
-        return bitmapFactoryDecode(ctx, uri, maxPx)
+        bitmapFactoryDecode(ctx, uri, maxPx)?.let { return PlatformResult(it, false) }
+        // Lieber ein dunkles Bild als gar keins – und vor allem ohne den Umweg über libheif.
+        darkHardware?.let { return PlatformResult(it, true) }
+        return null
+    }
+
+    private fun imageDecoderSoftware(ctx: Context, uri: Uri, maxPx: Int): Bitmap? = try {
+        val source = ImageDecoder.createSource(ctx.contentResolver, uri)
+        ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            configureSize(decoder, info.size.width, info.size.height, maxPx)
+            if (Build.VERSION.SDK_INT >= 29) decoder.isUnpremultipliedRequired = false
+        }
+    } catch (_: Throwable) {
+        null
+    } catch (_: OutOfMemoryError) {
+        null
+    }
+
+    /**
+     * Zielgröße möglichst genau vorgeben – „in Anzeigegröße dekodieren“ wie iOS.
+     * Die Zweier-Stufe ist immer möglich; die exakte Zielgröße wird zusätzlich versucht
+     * und still verworfen, wenn ein Gerät sie nicht unterstützt.
+     */
+    private fun configureSize(decoder: ImageDecoder, w: Int, h: Int, maxPx: Int) {
+        if (w <= 0 || h <= 0 || maxPx <= 0) return
+        val sample = sampleSize(w, h, maxPx)
+        if (sample > 1) decoder.setTargetSampleSize(sample)
+        val sw = (w / sample).coerceAtLeast(1)
+        val sh = (h / sample).coerceAtLeast(1)
+        val longest = maxOf(sw, sh)
+        if (longest <= maxPx) return
+        val scale = maxPx.toFloat() / longest
+        if (scale > 0.9f) return
+        val tw = (sw * scale).toInt().coerceAtLeast(1)
+        val th = (sh * scale).toInt().coerceAtLeast(1)
+        // Nicht jede Bildart erlaubt eine freie Zielgröße – dann bleibt es bei der Zweier-Stufe.
+        runCatching { decoder.setTargetSize(tw, th) }
     }
 
     /**
@@ -202,8 +283,7 @@ object Decoder {
             val source = ImageDecoder.createSource(ctx.contentResolver, uri)
             val hw = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                 decoder.allocator = ImageDecoder.ALLOCATOR_HARDWARE
-                val sample = sampleSize(info.size.width, info.size.height, maxPx)
-                if (sample > 1) decoder.setTargetSampleSize(sample)
+                configureSize(decoder, info.size.width, info.size.height, maxPx)
             }
             if (hw == null) return null
             val software = Bitmap.createBitmap(hw.width, hw.height, Bitmap.Config.ARGB_8888)
