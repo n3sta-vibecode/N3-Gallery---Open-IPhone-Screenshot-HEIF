@@ -155,7 +155,10 @@ object ImageLoader {
         val bucket: Int,
         val key: String,
         target: ImageView?,
-        val onDone: ((Bitmap?) -> Unit)?
+        val onDone: ((Bitmap?) -> Unit)?,
+        /** Vorlade-Aufgaben legen das Ergebnis nur auf die Festplatte, nicht in den
+         *  Speicher-Cache – dort bleibt Platz für die wirklich sichtbaren Kacheln. */
+        val keepInMemory: Boolean = true
     ) {
         val targetRef: WeakReference<ImageView>? = target?.let { WeakReference(it) }
         @Volatile var cancelled = false
@@ -169,7 +172,7 @@ object ImageLoader {
 
         fun run() {
             if (cancelled) { finished = true; return }
-            val bmp = obtainThumb(appCtx, item, bucket, signal)
+            val bmp = obtainThumb(appCtx, item, bucket, signal, keepInMemory)
             if (cancelled) {
                 // Ergebnis liegt im Cache – wird beim nächsten Binden sofort gezeigt
                 finished = true
@@ -291,7 +294,7 @@ object ImageLoader {
             if (!prefetched.add(key)) continue
             if (diskFile(app, item, bucket).exists()) continue
             ensureWorkers()
-            queue.addLast(Task(app, item, bucket, key, null, null))
+            queue.addLast(Task(app, item, bucket, key, null, null, keepInMemory = false))
             queued++
         }
     }
@@ -375,7 +378,13 @@ object ImageLoader {
     // ------------------------------------------------------------------ Vorschau erzeugen
 
     /** Speicher → Festplatte → Systemvorschau → eigener Dekoder. */
-    private fun obtainThumb(ctx: Context, item: MediaItem, bucket: Int, signal: CancellationSignal?): Bitmap? {
+    private fun obtainThumb(
+        ctx: Context,
+        item: MediaItem,
+        bucket: Int,
+        signal: CancellationSignal?,
+        keepInMemory: Boolean = true
+    ): Bitmap? {
         val key = keyFor(item, bucket)
         cache.get(key)?.let { return it }
 
@@ -384,7 +393,7 @@ object ImageLoader {
         if (file.exists()) {
             val bmp = runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
             if (bmp != null) {
-                cache.put(key, bmp)
+                if (keepInMemory) cache.put(key, bmp)
                 return bmp
             }
             runCatching { file.delete() }
@@ -395,7 +404,7 @@ object ImageLoader {
         // neu zu dekodieren. Das ist der Unterschied zwischen „Bild ist sofort da“ und
         // mehreren Sekunden Wartezeit – besonders bei HEIC/RAW, wo Dekodieren teuer ist.
         cachedThumbAnySize(ctx, item, bucket)?.let { reuse ->
-            cache.put(key, reuse)
+            if (keepInMemory) cache.put(key, reuse)
             writeDisk(ctx, file, reuse)
             return reuse
         }
@@ -416,7 +425,7 @@ object ImageLoader {
         }
 
         if (bmp != null) {
-            cache.put(key, bmp)
+            if (keepInMemory) cache.put(key, bmp)
             writeDisk(ctx, file, bmp)
         }
         return bmp

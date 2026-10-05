@@ -1,4 +1,45 @@
-# N3 Gallery 1.22 – was neu ist
+# N3 Gallery – was neu ist
+
+## 1.23 – Tippen repariert, Laden beschleunigt
+
+**Gemeldet:** „Das Anklicken von Fotos funktioniert nicht“ und „alles lädt erst später“.
+Die Ursachen waren klar zu finden:
+
+### a) Tippen: das falsche Foto (oder gar keins)
+
+Die Detailansicht hat sich die Liste, zu der eine Position gehört, nur **global** aus dem
+Speicher geholt. Sobald irgendeine andere Ansicht diese Liste überschrieb (Album, Tag,
+Ordner, Sammlung, „Öffnen mit“), gehörte die Position zu einer anderen Liste – dann öffnete
+ein Tipp ein **anderes Foto** oder, wenn die Position nicht existierte, **gar nichts**.
+
+Jetzt:
+* Beim Öffnen werden **Position und Bild-URI gemeinsam** übergeben.
+* Die Detailansicht prüft die URI und bestimmt die Position daraus – es kann also nie
+  mehr das falsche Bild erscheinen.
+* Kachel-Klick kommt über eine Zuordnung „URI → Position“ aus genau der Liste, die das
+  Raster gerade anzeigt (kein Suchen in fremden Listen).
+
+### b) Laden: schneller gefüllte Kacheln
+
+* **Vorwärmen im Hintergrund:** Nach dem Aufbau werden bis zu **600 Kacheln in
+  Listenreihenfolge** fertiggestellt (also genau die, die beim Weiterscrollen drankommen).
+  Diese Aufgaben liegen **hinter** den sichtbaren Bildern in der Warteschlange – Wischen
+  und Tippen bleiben reaktionsschnell.
+* **Vorschauen werden über Größenstufen hinweg wiederverwendet:** War schon eine andere
+  Größe im Festplatten-Cache, wird sie passend skaliert statt neu dekodiert (bei HEIC/RAW
+  ist Dekodieren der teuerste Schritt).
+* **3–6 Dekodier-Threads** (statt 2–5), weiter mit Hintergrund-Priorität: Die Oberfläche
+  verliert keine Reaktionszeit, die Kacheln füllen sich aber spürbar schneller.
+* **Wischen lädt mehr vor** (60 statt 40 Kacheln je Schwung).
+* Vorlade-Aufgaben legen ihre Bilder **nur auf die Festplatte**, nicht in den
+  Speicher-Cache – dadurch bleiben die sichtbaren Kacheln im schnellen Speicher.
+* Die Kachelgröße wird beim Spaltenwechsel neu berechnet (`requestLayout`), und die
+  starre „feste Größe“ des Rasters ist entfernt – das vermeidet falsch vermessene Kacheln
+  nach dem Zoomen.
+
+---
+
+## 1.22 – Scrollen flüssig, Foto-Editor neu
 
 **Zwei Wünsche, zwei Baustellen – beide erledigt.**
 
@@ -42,13 +83,13 @@ Erreichbar über das **Pinsel-Symbol** oben in der Großansicht, den Knopf
 
 ## APK installieren (direkt auf dem Handy)
 
-**Releases → „Testbuild 1.22“** öffnen und antippen:
+**Releases → „Testbuild 1.23“** öffnen und antippen:
 
 | Datei | Kennung / Name | Installation |
 |---|---|---|
-| `N3-Gallery-1.22-TEST.apk` | `…gallery.dev` · „N3 Gallery TEST“ | läuft **parallel** zur vorhandenen App – nichts wird ersetzt, Notizen/Favoriten bleiben |
-| `N3-Gallery-1.22-release.apk` | `…gallery` · „N3 Gallery- Open HEIF iPhone Screenshots“ | die reguläre App; **vorher alte Version deinstallieren**, weil dieser Automatik-Build mit dem CI-Schlüssel signiert ist (nicht mit `n3-release.jks`) |
-| `N3Gallery-Projekt-1.22.zip` | Android-Studio-Projekt | für ein echtes Update „in place“ in Android Studio bauen – dort wird mit `n3-release.jks` signiert |
+| `N3-Gallery-1.23-TEST.apk` | `…gallery.dev` · „N3 Gallery TEST“ | läuft **parallel** zur vorhandenen App – nichts wird ersetzt, Notizen/Favoriten bleiben. **So ausprobieren:** In der App steht oben „N3 Gallery TEST“ – daran siehst du, dass die neue Version läuft. |
+| `N3-Gallery-1.23-release.apk` | `…gallery` · „N3 Gallery- Open HEIF iPhone Screenshots“ | die reguläre App; **vorher alte Version deinstallieren**, weil dieser Automatik-Build mit dem CI-Schlüssel signiert ist (nicht mit `n3-release.jks`) |
+| `N3Gallery-Projekt-1.23.zip` | Android-Studio-Projekt | für ein echtes Update „in place“ in Android Studio bauen – dort wird mit `n3-release.jks` signiert |
 
 Nach dem Antippen: *„Installation aus unbekannten Quellen erlauben“* → fertig.
 Läuft ab Android 8 (API 26). Keine Internet-Berechtigung, alles bleibt auf dem Gerät.

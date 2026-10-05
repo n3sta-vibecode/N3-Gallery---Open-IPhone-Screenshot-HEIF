@@ -9,7 +9,20 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kame
 
 ---
 
-## 🆕 Version 1.22 – flüssiges Scrollen + Foto-Editor
+## 🆕 Version 1.23 – Tippen repariert, Kacheln viel schneller gefüllt
+
+* **Tippen auf ein Foto öffnet jetzt immer genau dieses Foto.** Vorher holte sich die
+  Großansicht die Liste nur global aus dem Speicher; sobald eine andere Ansicht (Album,
+  Tag, Ordner, Sammlung) sie überschrieben hatte, öffnete ein Tipp das falsche Foto oder
+  gar keins. Position und Bild-URI werden jetzt gemeinsam übergeben und geprüft.
+* **Kacheln füllen sich deutlich schneller:** bis zu 600 Kacheln werden nach dem Aufbau
+  im Hintergrund in Listenreihenfolge fertiggestellt (hinter den sichtbaren, damit Wischen
+  und Tippen Vorrang behalten), Vorschauen werden über alle Größenstufen hinweg
+  wiederverwendet statt neu dekodiert, und es dekodieren 3–6 Threads mit
+  Hintergrund-Priorität.
+* Details und ältere Versionen: `AENDERUNGEN.md`
+
+## Version 1.22 – flüssiges Scrollen + Foto-Editor
 
 **Zwei Dinge, die vorher gefehlt haben:**
 
@@ -43,12 +56,12 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kame
 
 ### APK herunterladen (direkt auf dem Handy)
 
-**Releases → „Testbuild 1.22“** öffnen, dann eine der beiden Dateien antippen:
+**Releases → „Testbuild 1.23“** öffnen, dann eine der beiden Dateien antippen:
 
 | Datei | Was | Installation |
 |---|---|---|
-| `N3-Gallery-1.22-TEST.apk` | identische App, aber als zweite App „N3 Gallery TEST“ | **parallel** installierbar – die vorhandene App und alle Notizen/Favoriten bleiben unangetastet |
-| `N3-Gallery-1.22-release.apk` | die reguläre App (gleiche Kennung) | nur nach Deinstallieren der alten Version – dieser Automatik-Build ist mit dem CI-Schlüssel signiert, nicht mit `n3-release.jks` |
+| `N3-Gallery-1.23-TEST.apk` | identische App, aber als zweite App „N3 Gallery TEST“ | **parallel** installierbar – die vorhandene App und alle Notizen/Favoriten bleiben unangetastet |
+| `N3-Gallery-1.23-release.apk` | die reguläre App (gleiche Kennung) | nur nach Deinstallieren der alten Version – dieser Automatik-Build ist mit dem CI-Schlüssel signiert, nicht mit `n3-release.jks` |
 
 > Für ein echtes Update „in place“ (ohne Deinstallieren) das Projekt wie gewohnt in Android Studio
 > bauen – dann wird automatisch mit `n3-release.jks` (siehe `keystore.properties`) signiert.
