@@ -11,6 +11,9 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v5
 
@@ -39,10 +42,13 @@ jobs:
           ls "$SDK/platforms" || true
           ls "$SDK/build-tools" || true
 
+      # shell: bash setzt pipefail – sonst verschluckt "tee" einen Gradle-Fehler
       - name: Release-APK bauen
+        shell: bash
         run: ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
 
       - name: Test-APK bauen (installiert parallel zur normalen App)
+        shell: bash
         run: ./gradlew assembleTryout --no-daemon --stacktrace 2>&1 | tee -a /tmp/build.log
 
       - name: APK hochladen
