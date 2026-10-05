@@ -45,11 +45,11 @@ jobs:
       # shell: bash setzt pipefail – sonst verschluckt "tee" einen Gradle-Fehler
       - name: Release-APK bauen
         shell: bash
-        run: ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+        run: bash ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
 
       - name: Test-APK bauen (installiert parallel zur normalen App)
         shell: bash
-        run: ./gradlew assembleTryout --no-daemon --stacktrace 2>&1 | tee -a /tmp/build.log
+        run: bash ./gradlew assembleTryout --no-daemon --stacktrace 2>&1 | tee -a /tmp/build.log
 
       - name: APK hochladen
         if: always()
