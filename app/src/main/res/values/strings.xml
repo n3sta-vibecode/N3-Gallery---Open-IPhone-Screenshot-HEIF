@@ -272,6 +272,6 @@
     <string name="editor_no_write_permission">Without the storage permission the photo cannot be saved.</string>
     <string name="editor_save_failed_title">Saving not possible</string>
     <string name="editor_save_heif_note">HEIC/HEIF cannot be overwritten – the copy is saved as JPEG.</string>
-    <string name="editor_share_only_msg">The gallery did not accept the file. The photo is therefore in the app's sharing folder – via “Share” you can keep it in Photos or send it. The original stays untouched.</string>
+    <string name="editor_share_only_msg">The gallery did not accept the file. The photo is therefore in the sharing folder of the app – via “Share” you can keep it in Photos or send it. The original stays untouched.</string>
     <string name="editor_render_failed">The edited photo could not be prepared (not enough memory?). Try a smaller crop.</string>
 </resources>
