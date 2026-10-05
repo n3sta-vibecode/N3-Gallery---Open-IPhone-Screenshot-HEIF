@@ -6,6 +6,8 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.AsyncListDiffer
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.n3vibecode.gallery.R
 import com.n3vibecode.gallery.data.MediaItem
@@ -29,18 +31,20 @@ sealed class ListEntry {
 class CollectionAdapter(private val onClick: (ListEntry.Row) -> Unit) :
     RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    private var entries: List<ListEntry> = emptyList()
+    private val differ = AsyncListDiffer(this, DIFF)
 
+    /** Nur die Unterschiede übernehmen – die Liste wird nicht mehr komplett neu gebaut. */
     fun submit(list: List<ListEntry>) {
-        entries = list
-        notifyDataSetChanged()
+        differ.submitList(list)
     }
 
-    override fun getItemCount(): Int = entries.size
+    private val entries: List<ListEntry> get() = differ.currentList
 
-    override fun getItemViewType(position: Int): Int = when (entries[position]) {
+    override fun getItemCount(): Int = differ.currentList.size
+
+    override fun getItemViewType(position: Int): Int = when (val e = entries[position]) {
         is ListEntry.Section -> T_SECTION
-        is ListEntry.Row -> if ((entries[position] as ListEntry.Row).isAdd || (entries[position] as ListEntry.Row).removable) T_FOLDER else T_ROW
+        is ListEntry.Row -> if (e.isAdd || e.removable) T_FOLDER else T_ROW
     }
 
     class SectionHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -98,5 +102,16 @@ class CollectionAdapter(private val onClick: (ListEntry.Row) -> Unit) :
         const val T_SECTION = 0
         const val T_ROW = 1
         const val T_FOLDER = 2
+
+        val DIFF = object : DiffUtil.ItemCallback<ListEntry>() {
+            override fun areItemsTheSame(oldItem: ListEntry, newItem: ListEntry): Boolean = when {
+                oldItem is ListEntry.Section && newItem is ListEntry.Section -> oldItem.title == newItem.title
+                oldItem is ListEntry.Row && newItem is ListEntry.Row ->
+                    oldItem.title == newItem.title && oldItem.treeUri == newItem.treeUri && oldItem.isAdd == newItem.isAdd
+                else -> false
+            }
+
+            override fun areContentsTheSame(oldItem: ListEntry, newItem: ListEntry): Boolean = oldItem == newItem
+        }
     }
 }

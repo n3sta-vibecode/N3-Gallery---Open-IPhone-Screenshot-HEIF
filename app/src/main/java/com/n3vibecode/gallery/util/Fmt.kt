@@ -19,6 +19,29 @@ object Fmt {
     private val loc: java.util.Locale get() =
         appContext?.resources?.configuration?.locales?.get(0) ?: java.util.Locale.getDefault()
 
+    // ---------------------------------------------------------------- Formatierer-Zwischenspeicher
+    //
+    // WICHTIG für das Scrollen: Vorher wurde für jedes einzelne Foto ein neuer
+    // SimpleDateFormat gebaut (und mehrfach Calendar.getInstance() aufgerufen).
+    // Bei 20 000 Fotos blockierte das den Haupt-Thread mehrere Sekunden.
+    // Jetzt: pro Muster genau ein Formatierer je Thread.
+
+    private val formats = java.util.concurrent.ConcurrentHashMap<String, ThreadLocal<SimpleDateFormat>>()
+
+    private fun sdf(pattern: String): SimpleDateFormat =
+        formats.getOrPut(pattern) { ThreadLocal.withInitial { SimpleDateFormat(pattern, Locale.GERMAN) } }.get()!!
+
+    private val calendars = ThreadLocal.withInitial { Calendar.getInstance() }
+
+    private fun calendar(ms: Long): Calendar = calendars.get()!!.apply { timeInMillis = if (ms > 0) ms else 0 }
+
+    /** „Heute“/„Gestern“/Datum nur einmal pro Tag berechnen – nicht pro Foto. */
+    private val dayTitleCache = object : android.util.LruCache<Long, String>(96) {}
+
+    private val monthTitleCache = object : android.util.LruCache<Long, String>(128) {}
+
+    private val yearTitleCache = object : android.util.LruCache<Long, String>(64) {}
+
     fun bytes(b: Long): String {
         if (b < 0) return "–"
         if (b < 1024) return "$b B"
@@ -31,19 +54,18 @@ object Fmt {
 
     fun dateTime(ms: Long): String {
         if (ms <= 0) return "–"
-        return SimpleDateFormat("dd.MM.yyyy, HH:mm", Locale.GERMAN).format(Date(ms))
+        return sdf("dd.MM.yyyy, HH:mm").format(Date(ms))
     }
 
     fun showDate(ms: Long): String {
         if (ms <= 0) return "–"
-        return SimpleDateFormat("d. MMM yyyy", Locale.GERMAN).format(Date(ms))
+        return sdf("d. MMM yyyy").format(Date(ms))
     }
 
-    fun timeOnly(ms: Long): String = SimpleDateFormat("HH:mm", Locale.GERMAN).format(Date(ms))
+    fun timeOnly(ms: Long): String = sdf("HH:mm").format(Date(ms))
 
     fun dayKey(ms: Long): Long {
-        val c = Calendar.getInstance()
-        c.timeInMillis = if (ms > 0) ms else 0
+        val c = calendar(ms)
         c.set(Calendar.HOUR_OF_DAY, 0)
         c.set(Calendar.MINUTE, 0)
         c.set(Calendar.SECOND, 0)
@@ -54,67 +76,70 @@ object Fmt {
     /** "Heute", "Gestern" oder ausgeschriebenes Datum – wie in der Apple-Fotos-App. */
     fun dayTitle(ms: Long): String {
         if (ms <= 0) return ctx(R.string.date_unknown, "Unknown date")
-        val today = dayKey(System.currentTimeMillis())
         val d = dayKey(ms)
+        dayTitleCache.get(d)?.let { return it }
+        val today = dayKey(System.currentTimeMillis())
         val oneDay = TimeUnit.DAYS.toMillis(1)
-        return when (d) {
+        val out = when (d) {
             today -> ctx(R.string.day_today, "Today")
             today - oneDay -> ctx(R.string.day_yesterday, "Yesterday")
             today - 2 * oneDay -> ctx(R.string.day_before_yesterday, "Day before yesterday")
             else -> {
-                val cal = Calendar.getInstance()
-                cal.timeInMillis = ms
-                val fmt = SimpleDateFormat(
-                    if (cal.get(Calendar.YEAR) == Calendar.getInstance().get(Calendar.YEAR)) "EEEE, d. MMMM" else "d. MMMM yyyy",
-                    Locale.GERMAN
-                )
-                fmt.format(Date(ms)).replaceFirstChar { it.uppercase() }
+                val cal = calendar(ms)
+                val pattern =
+                    if (cal.get(Calendar.YEAR) == calendar(System.currentTimeMillis()).get(Calendar.YEAR)) "EEEE, d. MMMM"
+                    else "d. MMMM yyyy"
+                sdf(pattern).format(Date(ms)).replaceFirstChar { it.uppercase() }
             }
         }
+        dayTitleCache.put(d, out)
+        return out
     }
 
     /** Schlüssel für die Gruppierung nach Monat (Jahr*12 + Monat) bzw. Jahr. */
     fun monthKey(ms: Long): Long {
-        val c = Calendar.getInstance()
-        c.timeInMillis = if (ms > 0) ms else 0
+        val c = calendar(ms)
         return c.get(Calendar.YEAR) * 12L + c.get(Calendar.MONTH)
     }
 
     fun yearKey(ms: Long): Long {
-        val c = Calendar.getInstance()
-        c.timeInMillis = if (ms > 0) ms else 0
+        val c = calendar(ms)
         return c.get(Calendar.YEAR).toLong()
     }
 
     /** "Oktober 2026" · "Unbekanntes Datum" */
     fun monthTitle(ms: Long): String {
         if (ms <= 0) return ctx(R.string.date_unknown, "Unknown date")
-        return SimpleDateFormat("LLLL yyyy", Locale.GERMAN)
-            .format(Date(ms)).replaceFirstChar { it.uppercase() }
+        val key = monthKey(ms)
+        monthTitleCache.get(key)?.let { return it }
+        val out = sdf("LLLL yyyy").format(Date(ms)).replaceFirstChar { it.uppercase() }
+        monthTitleCache.put(key, out)
+        return out
     }
 
     /** "2026" */
     fun yearTitle(ms: Long): String {
         if (ms <= 0) return ctx(R.string.year_unknown, "Unknown year")
-        return SimpleDateFormat("yyyy", Locale.GERMAN).format(Date(ms))
+        val key = yearKey(ms)
+        yearTitleCache.get(key)?.let { return it }
+        val out = sdf("yyyy").format(Date(ms))
+        yearTitleCache.put(key, out)
+        return out
     }
 
     /** "1.–31. Okt 2026" – Zeitraum eines Monats für die Unterzeile. */
     fun monthRange(ms: Long): String {
-        val c = Calendar.getInstance()
-        c.timeInMillis = ms
+        val c = calendar(ms)
         c.set(Calendar.DAY_OF_MONTH, 1)
         val start = Date(c.timeInMillis)
         c.add(Calendar.MONTH, 1)
         c.add(Calendar.DAY_OF_MONTH, -1)
         val end = Date(c.timeInMillis)
-        val f = SimpleDateFormat("d.", Locale.GERMAN)
-        val f2 = SimpleDateFormat("d. MMM yyyy", Locale.GERMAN)
-        return f.format(start) + "–" + f2.format(end)
+        return sdf("d.").format(start) + "–" + sdf("d. MMM yyyy").format(end)
     }
 
     fun weekday(ms: Long): String =
-        SimpleDateFormat("EEEE", Locale.GERMAN).format(Date(ms)).replaceFirstChar { it.uppercase() }
+        sdf("EEEE").format(Date(ms)).replaceFirstChar { it.uppercase() }
 
     fun duration(ms: Long): String {
         if (ms <= 0) return "–"

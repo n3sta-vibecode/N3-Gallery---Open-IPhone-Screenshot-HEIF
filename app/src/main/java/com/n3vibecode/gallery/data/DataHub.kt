@@ -22,6 +22,17 @@ object DataHub {
 
     private val listeners = mutableListOf<() -> Unit>()
 
+    /**
+     * Wird von Ansichten gesetzt, die einen Neuscan anstoßen können (Hauptbildschirm).
+     * So kann z. B. der Editor nach dem Speichern sagen: „Liste bitte neu einlesen“.
+     */
+    @Volatile
+    var rescanHandler: (() -> Unit)? = null
+
+    fun requestRescan() {
+        mainHandler.post { rescanHandler?.invoke() }
+    }
+
     fun setItems(items: List<MediaItem>, limited: Boolean) {
         all = items
         hiddenByUserSelection = limited

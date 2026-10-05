@@ -76,6 +76,13 @@ object ImageLoader {
         cache.evictAll()
     }
 
+    /** Zusätzlich alles vergessen (nach Bearbeiten/Überschreiben einer Datei). */
+    fun clearAll(ctx: Context) {
+        cache.evictAll()
+        prefetched.clear()
+        failed.clear()
+    }
+
     fun keyFor(item: MediaItem, sizePx: Int): String = item.uri + "#" + sizePx
 
     // ------------------------------------------------------------------ Thread-Pools
@@ -89,6 +96,10 @@ object ImageLoader {
         val n = AtomicInteger(1)
         repeat(WORKERS) {
             Thread({
+                // Dekodieren läuft bewusst mit Hintergrund-Priorität: Wischen und Scrollen
+                // fühlen sich dadurch sofort an, auch wenn im Hintergrund Vorschaubilder
+                // entstehen. Vorher haben sich Dekoder und Oberfläche die CPU geteilt.
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
                 while (true) {
                     val t = try {
                         queue.takeFirst()
@@ -99,8 +110,8 @@ object ImageLoader {
                         // Großansicht hat Vorrang: Raster-Kacheln warten kurz, solange ein
                         // angetipptes Foto lädt (sonst teilen sich beide CPU und Video-Decoder)
                         var waited = 0
-                        while (interactiveBusy.get() > 0 && waited < 400) {
-                            Thread.sleep(10)
+                        while (interactiveBusy.get() > 0 && waited < 12) {
+                            Thread.sleep(20)
                             waited++
                         }
                         t.run()
@@ -129,8 +140,12 @@ object ImageLoader {
             Thread(r, "n3-full-${n.getAndIncrement()}").apply { priority = Thread.NORM_PRIORITY }
     })
 
-    /** Threads passend zur CPU (8 Kerne beim Snapdragon 8 Elite → 8 Threads). */
-    val WORKERS: Int = Runtime.getRuntime().availableProcessors().coerceIn(4, 8)
+    /**
+     * Anzahl Dekodier-Threads: bewusst nur etwa die Hälfte der CPU-Kerne (2–5).
+     * Mehr Threads brachten keine spürbar schnelleren Vorschaubilder, aber deutlich
+     * ruckeligeres Scrollen, weil der Oberfläche CPU-Zeit fehlte.
+     */
+    val WORKERS: Int = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 5)
 
     // ------------------------------------------------------------------ Aufgaben
 
@@ -166,9 +181,16 @@ object ImageLoader {
                 val view = targetRef?.get()
                 if (view != null) {
                     if (view.tag == key && bmp != null) {
+                        val wasEmpty = view.drawable == null
                         view.setImageBitmap(bmp)
-                        view.alpha = 0f
-                        view.animate().alpha(1f).setDuration(110).start()
+                        // Nur beim allerersten Bild sanft einblenden – beim Scrollen wäre
+                        // eine Animation je Kachel nur zusätzliche Arbeit.
+                        if (wasEmpty) {
+                            view.alpha = 0f
+                            view.animate().alpha(1f).setDuration(90).start()
+                        } else {
+                            view.alpha = 1f
+                        }
                     }
                     pending.remove(view)
                 }
@@ -242,6 +264,40 @@ object ImageLoader {
         target.animate().cancel()
         target.alpha = 1f
     }
+
+    // ------------------------------------------------------------------ Vorladen (Prefetch)
+
+    /** Schon vorgeladene Kombinationen – verhindert doppelte Arbeit. */
+    private val prefetched = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Vorschaubilder im Voraus erzeugen (unterste Priorität, ohne Anzeige).
+     *
+     * Damit liegen die Bilder der nächsten Bildschirme schon im Speicher- bzw.
+     * Festplatten-Cache, wenn sie beim Scrollen sichtbar werden – statt erst dann
+     * dekodiert zu werden. Das ist der Unterschied zwischen „nicht alles sofort da“
+     * und einem Raster, das beim Wischen durchgehend gefüllt ist.
+     */
+    fun prefetch(ctx: Context, items: List<MediaItem>, sizePx: Int, limit: Int = 48) {
+        if (items.isEmpty()) return
+        val app = ctx.applicationContext
+        val bucket = bucketFor(sizePx)
+        var queued = 0
+        for (item in items) {
+            if (queued >= limit) break
+            val key = keyFor(item, bucket)
+            if (cache.get(key) != null) continue
+            if (failed.containsKey(item.uri)) continue
+            if (!prefetched.add(key)) continue
+            if (diskFile(app, item, bucket).exists()) continue
+            ensureWorkers()
+            queue.addLast(Task(app, item, bucket, key, null, null))
+            queued++
+        }
+    }
+
+    /** Nur zum Testen/Diagnose: wie viele Kacheln schon vorgeladen wurden. */
+    fun prefetchedCount(): Int = prefetched.size
 
     /**
      * Synchrone Vorschau für Hintergrund-Threads (z. B. Gesamtübersicht).

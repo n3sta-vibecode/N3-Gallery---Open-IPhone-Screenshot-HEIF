@@ -42,6 +42,9 @@ class MainActivity : AppCompatActivity() {
 
     private var loading = false
 
+    /** Gemappte Tabs: Position -> Fragment (für die „ist gerade sichtbar“-Info). */
+    private val pages = HashMap<Int, androidx.fragment.app.Fragment>()
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { reload() }
@@ -104,15 +107,28 @@ class MainActivity : AppCompatActivity() {
         )
         pager.adapter = object : FragmentStateAdapter(this) {
             override fun getItemCount(): Int = 4
-            override fun createFragment(position: Int) = when (position) {
-                0 -> TimelineFragment()
-                1 -> TagsFragment()
-                2 -> FormatsFragment()
-                else -> FoldersFragment()
+            override fun createFragment(position: Int): androidx.fragment.app.Fragment {
+                val fragment = when (position) {
+                    0 -> TimelineFragment()
+                    1 -> TagsFragment()
+                    2 -> FormatsFragment()
+                    else -> FoldersFragment()
+                }
+                pages[position] = fragment
+                return fragment
             }
         }
-        pager.offscreenPageLimit = 3
+        // Nur den aktuellen Tab und seinen Nachbarn vorhalten: Vorher waren alle vier
+        // Raster gleichzeitig aufgebaut, was beim Start und bei jedem Aktualisieren
+        // unnötig Rechenzeit gekostet hat.
+        pager.offscreenPageLimit = 1
+        pager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                applyPageVisibility(position)
+            }
+        })
         TabLayoutMediator(tabLayout, pager) { tab, position -> tab.text = titles[position] }.attach()
+        applyPageVisibility(pager.currentItem)
 
         ensurePermissionsThenLoad()
 
@@ -146,13 +162,37 @@ class MainActivity : AppCompatActivity() {
         else -> listOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
+    /** Nur der sichtbare Tab darf rechnen – das hält das Wischen und Scrollen flüssig. */
+    private fun applyPageVisibility(current: Int) {
+        pages.forEach { (position, fragment) ->
+            (fragment as? PageAware)?.setPageActive(position == current)
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Nach dem Speichern im Editor (oder anderen Änderungen) Liste neu einlesen
+        DataHub.rescanHandler = { reload() }
+    }
+
+    override fun onStop() {
+        if (DataHub.rescanHandler != null) DataHub.rescanHandler = null
+        super.onStop()
+    }
+
     /** Alle Medien neu einlesen (MediaStore + eigene Ordner). */
     fun reload() {
         if (loading) return
         loading = true
         progress.visibility = android.view.View.VISIBLE
         lifecycleScope.launch {
-            val lib = withContext(Dispatchers.IO) { Repository(applicationContext).loadAll() }
+            val lib = withContext(Dispatchers.IO) {
+                Repository(applicationContext).loadAll().also {
+                    // Favoriten/Notizen/Tags einmal im Hintergrund einlesen – danach ist
+                    // der Zugriff beim Bildaufbau rein speicherintern.
+                    com.n3vibecode.gallery.data.MetaStore.warmUp()
+                }
+            }
             DataHub.setItems(lib.items, lib.hiddenByUserSelection)
             progress.visibility = android.view.View.GONE
             loading = false

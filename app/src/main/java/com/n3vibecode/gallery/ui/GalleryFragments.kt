@@ -2,12 +2,14 @@ package com.n3vibecode.gallery.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
-import android.view.MotionEvent
-import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewGroup
+import android.view.ScaleGestureDetector
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,12 +25,43 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.n3vibecode.gallery.data.MediaItem
 import com.n3vibecode.gallery.data.MetaStore
+import com.n3vibecode.gallery.image.ImageLoader
 import com.n3vibecode.gallery.util.Fmt
+import java.util.concurrent.Executors
 
 private const val SPAN = GridPrefs.DEFAULT
 
+/**
+ * Hintergrund-Arbeiten für das Raster: Zeilenaufbau, Gruppierung, Filterung.
+ * Ein einzelner Thread genügt – so kann sich nie eine alte und eine neue
+ * Berechnung derselben Ansicht überschneiden, und die Oberfläche bleibt frei.
+ */
+object GridWork {
+    private val pool = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "n3-grid").apply {
+            priority = Thread.NORM_PRIORITY - 1
+            isDaemon = true
+        }
+    }
+
+    fun run(block: () -> Unit) {
+        pool.execute {
+            try {
+                block()
+            } catch (_: Throwable) {
+                // Ein Fehler in einer Berechnung darf die Ansicht nie leer lassen.
+            }
+        }
+    }
+}
+
+/** Tabs im Wisch-Navigator: informiert, ob der Tab gerade sichtbar ist. */
+interface PageAware {
+    fun setPageActive(active: Boolean)
+}
+
 /** Basis: Raster-RecyclerView mit Leerzustand und automatischer Aktualisierung. */
-abstract class BaseGridFragment : Fragment() {
+abstract class BaseGridFragment : Fragment(), PageAware {
 
     protected lateinit var recycler: RecyclerView
     protected lateinit var emptyView: View
@@ -45,12 +78,34 @@ abstract class BaseGridFragment : Fragment() {
     private lateinit var pinchDetector: ScaleGestureDetector
     private var pinchLabel: TextView? = null
 
+    private val main = Handler(Looper.getMainLooper())
+
+    /** Laufende Nummer der Aktualisierung – ältere Berechnungen werden verworfen. */
+    @Volatile
+    private var refreshToken = 0
+
+    /** Es gab Änderungen, während der Tab nicht sichtbar war. */
+    @Volatile
+    private var dirty = false
+
+    /** Nur sichtbare Tabs rechnen mit – spart beim Start viel Arbeit. */
+    @Volatile
+    private var pageActive = true
+
+    private var lastPrefetchAt = 0L
+    private var lastKnownSpan = 0
+
     protected abstract fun buildList(): List<MediaItem>
 
     /** Einmal pro Aktualisierung aufrufen – hier Gruppendaten vorberechnen (Performance). */
     protected open fun prepare(list: List<MediaItem>) {}
 
-    protected open fun groupOf(item: MediaItem): Pair<String, String>? = null
+    /**
+     * Gruppierung für Überschriften (Tag/Monat/Jahr). Wird im Hintergrund benutzt,
+     * darf also keine Views anfassen.
+     */
+    protected open fun grouper(): Grouper? = null
+
     protected open fun withHeaders(): Boolean = true
 
     /** Werbe-Banner oben einblenden (nur in der Zeitleiste). */
@@ -86,20 +141,24 @@ abstract class BaseGridFragment : Fragment() {
         }
 
         span = GridPrefs.span(requireContext())
-        adapter = GridAdapter(span, withHeaders(), ::openDetail)
+        adapter = GridAdapter(span, withHeaders(), ::openDetailFromItem, ::onItemLongPress)
         val lm = GridLayoutManager(requireContext(), span)
         lm.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
             // Überschriften/Banner über die ganze Zeile, Fotos je eine Spalte
             override fun getSpanSize(position: Int): Int =
                 if (adapter.isFullSpan(position)) lm.spanCount else 1
         }
+        // Damit beim Wischen schon die nächste Zeile vorbereitet wird
+        lm.initialPrefetchItemCount = span * 2
         recycler.layoutManager = lm
         recycler.adapter = adapter
+        recycler.setHasFixedSize(true)
         // Viele kleine Kacheln: großzügiger Kachel-Pool und Zwischenspeicher, damit beim
         // Scrollen und Zoomen kaum neue Views gebaut werden müssen
         recycler.recycledViewPool.setMaxRecycledViews(1, 400)
-        recycler.setItemViewCacheSize(40)
+        recycler.setItemViewCacheSize(48)
         recycler.itemAnimator = null
+        setupPrefetch()
         setupPinchZoom()
         maybeShowPinchHint()
         syncControls()
@@ -109,7 +168,23 @@ abstract class BaseGridFragment : Fragment() {
 
     override fun onDestroyView() {
         DataHub.removeListener(onHubChange)
+        // Laufende Berechnungen dieser Ansicht verwerfen
+        refreshToken++
         super.onDestroyView()
+    }
+
+    /**
+     * Wird vom Hauptbildschirm beim Tab-Wechsel aufgerufen. Unsichtbare Tabs bauen
+     * ihre Listen nicht neu auf – das war beim Start und beim Aktualisieren der
+     * Hauptgrund für hängende Bilder.
+     */
+    override fun setPageActive(active: Boolean) {
+        val becameActive = active && !pageActive
+        pageActive = active
+        if (becameActive && dirty) {
+            dirty = false
+            if (isAdded) refresh()
+        }
     }
 
     protected open fun openDetail(index: Int) {
@@ -119,18 +194,86 @@ abstract class BaseGridFragment : Fragment() {
         )
     }
 
+    private fun openDetailFromItem(item: MediaItem) {
+        val index = currentItems().indexOf(item)
+        if (index >= 0) openDetail(index)
+    }
+
+    /** Aktuell angezeigte Liste (für Index-Berechnung beim Antippen). */
+    private fun currentItems(): List<MediaItem> = ViewState.viewList
+
+    /** Langes Drücken: Bearbeiten (Zuschneiden/Zeichnen/Text), Teilen, Details. */
+    private fun onItemLongPress(item: MediaItem) {
+        val labels = arrayOf(
+            getString(R.string.editor_title),
+            getString(R.string.share),
+            getString(R.string.info)
+        )
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle(item.name)
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> EditorActivity.start(requireContext(), item.uri)
+                    1 -> share(item)
+                    else -> {
+                        val index = currentItems().indexOf(item)
+                        if (index >= 0) openDetail(index)
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun share(item: MediaItem) {
+        try {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = item.mime.ifBlank { "image/*" }
+                putExtra(Intent.EXTRA_STREAM, android.net.Uri.parse(item.uri))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, getString(R.string.share)))
+        } catch (_: Throwable) {
+            Toast.makeText(requireContext(), R.string.share_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * Raster aktualisieren. Der schwere Teil (Filtern, Gruppieren, Überschriften
+     * formatieren) läuft im Hintergrund; die Ansicht bekommt anschließend nur die
+     * Unterschiede – dadurch bleibt das Scrollen jederzeit flüssig.
+     */
     protected fun refresh() {
         if (!isAdded) return
+        if (!pageActive) {
+            dirty = true
+            return
+        }
         // Rastergröße kann in einer anderen Ansicht oder über das Menü geändert worden sein
         val pref = GridPrefs.span(requireContext())
         if (pref != span) {
             span = pref
             applySpan()
         }
-        val list = DataHub.visible(buildList())
-        prepare(list)
-        adapter.submit(list, ::groupOf, withBanner())
-        DataHubViewHelper.updateEmpty(emptyView, list.isEmpty(), emptyText())
+        val token = ++refreshToken
+        dirty = false
+        val base = buildList()
+        val showBanner = withBanner()
+        val headers = withHeaders()
+        val grouper = grouper()
+        GridWork.run {
+            if (token != refreshToken) return@run
+            val list = DataHub.visible(base)
+            if (token != refreshToken) return@run
+            prepare(list)
+            val rows = GridAdapter.buildRows(list, headers, grouper, showBanner)
+            if (token != refreshToken) return@run
+            main.post {
+                if (token != refreshToken || !isAdded) return@post
+                adapter.submitRows(rows)
+                DataHubViewHelper.updateEmpty(emptyView, list.isEmpty(), emptyText())
+                startPrefetch()
+            }
+        }
     }
 
     override fun onResume() {
@@ -143,6 +286,48 @@ abstract class BaseGridFragment : Fragment() {
             }
         }
     }
+
+    // ---------------------------------------------------------------- Vorladen
+
+    /**
+     * Die ersten Bildschirme im Voraus berechnen, damit beim ersten Wischen
+     * schon Bilder da sind statt grauer Kacheln.
+     */
+    private fun startPrefetch() {
+        if (!isAdded) return
+        val ctx = requireContext().applicationContext
+        val px = adapter.tilePx()
+        val first = adapter.itemsBetween(0, span * 6)
+        lastPrefetchAt = SystemClock.uptimeMillis()
+        GridWork.run { ImageLoader.prefetch(ctx, first, px, 60) }
+    }
+
+    /**
+     * Beim Wischen die nächsten Kacheln vorladen – die Anfragen landen hinter den
+     * sichtbaren Bildern in der Warteschlange und kosten daher keine Reaktionszeit.
+     */
+    private fun setupPrefetch() {
+        recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                if (dy == 0 || !isAdded) return
+                val now = SystemClock.uptimeMillis()
+                if (now - lastPrefetchAt < 220) return
+                lastPrefetchAt = now
+                val lm = rv.layoutManager as? LinearLayoutManager ?: return
+                val first = lm.findFirstVisibleItemPosition()
+                val last = lm.findLastVisibleItemPosition()
+                if (first < 0 || last < 0) return
+                val spread = currentSpanForPrefetch()
+                val forward = adapter.itemsBetween(last + 1, last + spread * 3)
+                val backward = if (dy < 0 && first > spread) adapter.itemsBetween(first - spread * 2, first - 1) else emptyList()
+                val ctx = requireContext().applicationContext
+                val px = adapter.tilePx()
+                GridWork.run { ImageLoader.prefetch(ctx, forward + backward, px, 40) }
+            }
+        })
+    }
+
+    private fun currentSpanForPrefetch(): Int = maxOf(1, currentSpan())
 
     // ---------------------------------------------------------------- Zoomen im Raster
 
@@ -281,8 +466,10 @@ class TimelineFragment : BaseGridFragment() {
     override fun showControlBar(): Boolean = true
 
     /** Gruppierung: nach Tag (Standard), Monat, Jahr oder eine durchgehende Liste. */
+    @Volatile
     private var mode: String = GridPrefs.MODE_DAY
 
+    /** Anzahl und Gesamtgröße je Gruppe – im Hintergrund berechnet. */
     private val info = HashMap<Long, Pair<Int, Long>>()
 
     override fun withHeaders(): Boolean = mode != GridPrefs.MODE_NONE
@@ -290,7 +477,6 @@ class TimelineFragment : BaseGridFragment() {
     override fun buildList(): List<MediaItem> = DataHub.all
 
     override fun prepare(list: List<MediaItem>) {
-        info.clear()
         val counts = HashMap<Long, Int>()
         val sizes = HashMap<Long, Long>()
         list.forEach { item ->
@@ -298,7 +484,10 @@ class TimelineFragment : BaseGridFragment() {
             counts[key] = (counts[key] ?: 0) + 1
             sizes[key] = (sizes[key] ?: 0L) + item.size
         }
-        counts.keys.forEach { k -> info[k] = (counts[k] ?: 0) to (sizes[k] ?: 0L) }
+        val fresh = HashMap<Long, Pair<Int, Long>>(counts.size)
+        counts.keys.forEach { k -> fresh[k] = (counts[k] ?: 0) to (sizes[k] ?: 0L) }
+        info.clear()
+        info.putAll(fresh)
     }
 
     private fun keyOf(item: MediaItem): Long = when (mode) {
@@ -307,25 +496,33 @@ class TimelineFragment : BaseGridFragment() {
         else -> Fmt.dayKey(item.time)
     }
 
-    override fun groupOf(item: MediaItem): Pair<String, String>? {
+    override fun grouper(): Grouper? {
         if (mode == GridPrefs.MODE_NONE) return null
-        val k = keyOf(item)
-        val i = info[k] ?: (1 to item.size)
-        val sub = buildString {
-            append(getString(R.string.count_files, i.first))
-            if (i.second > 0) append(" · ").append(Fmt.bytes(i.second))
-            when (mode) {
-                GridPrefs.MODE_MONTH -> if (item.time > 0) append(" · ").append(Fmt.monthRange(item.time))
-                GridPrefs.MODE_YEAR -> Unit
-                else -> if (item.time > 0) append(" · ").append(Fmt.weekday(item.time))
+        val currentMode = mode
+        return object : Grouper {
+            override fun keyOf(item: MediaItem): String? = keyOf(item).toString()
+
+            /** Wird nur einmal pro Gruppe aufgerufen (nicht pro Foto!). */
+            override fun headerOf(item: MediaItem): Pair<String, String> {
+                val k = keyOf(item)
+                val i = info[k] ?: (1 to item.size)
+                val sub = buildString {
+                    append(getString(R.string.count_files, i.first))
+                    if (i.second > 0) append(" · ").append(Fmt.bytes(i.second))
+                    when (currentMode) {
+                        GridPrefs.MODE_MONTH -> if (item.time > 0) append(" · ").append(Fmt.monthRange(item.time))
+                        GridPrefs.MODE_YEAR -> Unit
+                        else -> if (item.time > 0) append(" · ").append(Fmt.weekday(item.time))
+                    }
+                }
+                val title = when (currentMode) {
+                    GridPrefs.MODE_MONTH -> Fmt.monthTitle(item.time)
+                    GridPrefs.MODE_YEAR -> Fmt.yearTitle(item.time)
+                    else -> Fmt.dayTitle(item.time)
+                }
+                return title to sub
             }
         }
-        val title = when (mode) {
-            GridPrefs.MODE_MONTH -> Fmt.monthTitle(item.time)
-            GridPrefs.MODE_YEAR -> Fmt.yearTitle(item.time)
-            else -> Fmt.dayTitle(item.time)
-        }
-        return title to sub
     }
 
     override fun setupControlBar(root: View) {
@@ -379,17 +576,24 @@ class FormatsFragment : BaseGridFragment() {
     }
 
     override fun prepare(list: List<MediaItem>) {
-        familyInfo.clear()
+        val fresh = HashMap<String, Pair<Int, String>>()
         list.groupBy { it.family }.forEach { (family, items) ->
             val formats = items.map { it.format }.distinct().sorted()
             val shown = if (formats.size > 14) formats.take(14).joinToString(", ") + " …" else formats.joinToString(", ")
-            familyInfo[family] = items.size to shown
+            val count = items.size
+            fresh[family] = count to shown
         }
+        familyInfo.clear()
+        familyInfo.putAll(fresh)
     }
 
-    override fun groupOf(item: MediaItem): Pair<String, String>? {
-        val info = familyInfo[item.family] ?: return item.family to item.format
-        return item.family to "${getString(R.string.count_files, info.first)} · ${info.second}"
+    override fun grouper(): Grouper = object : Grouper {
+        override fun keyOf(item: MediaItem): String? = item.family
+
+        override fun headerOf(item: MediaItem): Pair<String, String> {
+            val info = familyInfo[item.family] ?: return item.family to item.format
+            return item.family to "${getString(R.string.count_files, info.first)} · ${info.second}"
+        }
     }
 }
 
@@ -399,6 +603,9 @@ class TagsFragment : Fragment() {
 
     private var adapter: CollectionAdapter? = null
     private val onHubChange: () -> Unit = { refresh() }
+    @Volatile
+    private var token = 0
+    private val main = Handler(Looper.getMainLooper())
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         inflater.inflate(R.layout.fragment_grid, container, false)
@@ -407,6 +614,8 @@ class TagsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val recycler = view.findViewById<RecyclerView>(R.id.recycler)
         val empty = view.findViewById<View>(R.id.emptyView)
+        recycler.setHasFixedSize(true)
+        recycler.itemAnimator = null
         adapter = CollectionAdapter { row -> onRow(row) }
         recycler.layoutManager = LinearLayoutManager(requireContext())
         recycler.adapter = adapter
@@ -417,6 +626,7 @@ class TagsFragment : Fragment() {
 
     override fun onDestroyView() {
         DataHub.removeListener(onHubChange)
+        token++
         adapter = null
         super.onDestroyView()
     }
@@ -439,53 +649,61 @@ class TagsFragment : Fragment() {
     }
 
     private fun refresh() {
-        val ad = adapter ?: return
-        val entries = mutableListOf<ListEntry>()
-        val favs = DataHub.all.filter { MetaStore.isFavorite(it.uri) }
-        entries += ListEntry.Section("Alben")
-        entries += ListEntry.Row(
-            title = "Favoriten",
-            sub = getString(R.string.count_files, favs.size),
-            formats = favs.map { it.format }.distinct().take(6).joinToString(", "),
-            cover = favs.firstOrNull(),
-            key = "favorites"
-        )
-        val noteItems = DataHub.all.filter { MetaStore.note(it.uri).isNotBlank() }
-        if (noteItems.isNotEmpty()) {
+        if (adapter == null || !isAdded) return
+        val myToken = ++token
+        val all = DataHub.all
+        val countFmt = getString(R.string.count_files, 0)
+        GridWork.run {
+            val entries = mutableListOf<ListEntry>()
+            val favs = all.filter { MetaStore.isFavorite(it.uri) }
+            entries += ListEntry.Section("Alben")
             entries += ListEntry.Row(
-                title = "Mit Notiz",
-                sub = getString(R.string.count_files, noteItems.size),
-                formats = "Notizen & Beschriftungen",
-                cover = noteItems.firstOrNull(),
-                key = "notes"
+                title = "Favoriten",
+                sub = countFmt.format(favs.size),
+                formats = favs.map { it.format }.distinct().take(6).joinToString(", "),
+                cover = favs.firstOrNull(),
+                key = "favorites"
             )
-        }
-
-        val tagNames = MetaStore.allTagNames()
-        if (tagNames.isNotEmpty()) {
-            entries += ListEntry.Section("Tags")
-            tagNames.forEach { tag ->
-                val uris = MetaStore.itemsForTag(tag)
-                val items = DataHub.all.filter { uris.contains(it.uri) }
+            val noteItems = all.filter { MetaStore.hasNote(it.uri) }
+            if (noteItems.isNotEmpty()) {
                 entries += ListEntry.Row(
-                    title = tag,
-                    sub = getString(R.string.count_files, items.size),
-                    formats = items.map { it.format }.distinct().take(6).joinToString(", "),
-                    cover = items.firstOrNull(),
-                    key = "tag:$tag"
+                    title = "Mit Notiz",
+                    sub = countFmt.format(noteItems.size),
+                    formats = "Notizen & Beschriftungen",
+                    cover = noteItems.firstOrNull(),
+                    key = "notes"
                 )
             }
-        } else {
-            entries += ListEntry.Section("Tags")
-            entries += ListEntry.Row(
-                title = "Noch keine Tags",
-                sub = "Vergib Tags über „Bearbeiten“ in der Detailansicht – sie erscheinen hier als Alben.",
-                formats = "",
-                cover = null,
-                key = ""
-            )
+
+            val tagNames = MetaStore.allTagNames()
+            if (tagNames.isNotEmpty()) {
+                entries += ListEntry.Section("Tags")
+                val byUri = all.associateBy { it.uri }
+                tagNames.forEach { tag ->
+                    val items = MetaStore.itemsForTag(tag).mapNotNull { byUri[it] }
+                    entries += ListEntry.Row(
+                        title = tag,
+                        sub = countFmt.format(items.size),
+                        formats = items.map { it.format }.distinct().take(6).joinToString(", "),
+                        cover = items.firstOrNull(),
+                        key = "tag:$tag"
+                    )
+                }
+            } else {
+                entries += ListEntry.Section("Tags")
+                entries += ListEntry.Row(
+                    title = "Noch keine Tags",
+                    sub = "Vergib Tags über „Bearbeiten“ in der Detailansicht – sie erscheinen hier als Alben.",
+                    formats = "",
+                    cover = null,
+                    key = ""
+                )
+            }
+            main.post {
+                if (myToken != token) return@post
+                adapter?.submit(entries)
+            }
         }
-        ad.submit(entries)
     }
 }
 
@@ -495,6 +713,9 @@ class FoldersFragment : Fragment() {
 
     private var adapter: CollectionAdapter? = null
     private val onHubChange: () -> Unit = { refresh() }
+    @Volatile
+    private var token = 0
+    private val main = Handler(Looper.getMainLooper())
 
     private val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -510,6 +731,8 @@ class FoldersFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val recycler = view.findViewById<RecyclerView>(R.id.recycler)
         val empty = view.findViewById<View>(R.id.emptyView)
+        recycler.setHasFixedSize(true)
+        recycler.itemAnimator = null
         adapter = CollectionAdapter { row ->
             when {
                 row.isAdd -> pickFolder.launch(null)
@@ -534,58 +757,82 @@ class FoldersFragment : Fragment() {
 
     override fun onDestroyView() {
         DataHub.removeListener(onHubChange)
+        token++
         adapter = null
         super.onDestroyView()
     }
 
     private fun refresh() {
-        val ad = adapter ?: return
+        if (adapter == null || !isAdded) return
+        val myToken = ++token
         val store = FolderStore(requireContext())
-        val entries = mutableListOf<ListEntry>()
-
-        entries += ListEntry.Section("Eigene Ordner (RAW, HEIC, AVIF …)")
-        entries += ListEntry.Row(
-            title = getString(R.string.add_folder),
-            sub = getString(R.string.folder_pick),
-            formats = "",
-            cover = null,
-            isAdd = true
-        )
+        val all = DataHub.all
         val treeUris = store.treeUris()
-        if (treeUris.isEmpty()) {
-            entries += ListEntry.Row(
-                title = getString(R.string.folders_empty),
-                sub = "Nützlich für Ordner außerhalb des Medienindex (SD-Karte, NAS-Sync, Download-Ordner).",
-                formats = "",
-                cover = null
-            )
-        } else {
-            treeUris.forEach { uriString ->
-                val items = DataHub.all.filter { it.uri.startsWith(uriString) || it.isSaf }
-                entries += ListEntry.Row(
-                    title = store.displayName(uriString),
-                    sub = getString(R.string.count_files, items.size),
-                    formats = "SAF-Ordner · dauerhafter Lesezugriff",
-                    cover = items.firstOrNull(),
-                    treeUri = uriString,
-                    removable = true
-                )
-            }
-        }
+        val names = treeUris.associateWith { runCatching { store.displayName(it) }.getOrElse { it } }
+        val countFmt = getString(R.string.count_files, 0)
+        val addTitle = getString(R.string.add_folder)
+        val pickHint = getString(R.string.folder_pick)
+        val emptyHint = getString(R.string.folders_empty)
 
-        val buckets = DataHub.all.groupBy { it.bucket }.toList().sortedByDescending { it.second.size }
-        if (buckets.isNotEmpty()) {
-            entries += ListEntry.Section("Geräteordner")
-            buckets.forEach { (name, items) ->
+        GridWork.run {
+            val entries = mutableListOf<ListEntry>()
+
+            entries += ListEntry.Section("Eigene Ordner (RAW, HEIC, AVIF …)")
+            entries += ListEntry.Row(
+                title = addTitle,
+                sub = pickHint,
+                formats = "",
+                cover = null,
+                isAdd = true
+            )
+            if (treeUris.isEmpty()) {
                 entries += ListEntry.Row(
-                    title = name.ifEmpty { "Unbekannt" },
-                    sub = getString(R.string.count_files, items.size) + " · " + Fmt.bytes(items.sumOf { it.size }),
-                    formats = items.map { it.format }.distinct().take(8).joinToString(", "),
-                    cover = items.firstOrNull(),
-                    key = "bucket:$name"
+                    title = emptyHint,
+                    sub = "Nützlich für Ordner außerhalb des Medienindex (SD-Karte, NAS-Sync, Download-Ordner).",
+                    formats = "",
+                    cover = null
                 )
+            } else {
+                // Ein Durchlauf statt pro Ordner über alle Fotos zu gehen
+                val safByTree = HashMap<String, MutableList<MediaItem>>()
+                treeUris.forEach { safByTree[it] = mutableListOf() }
+                val safAll = mutableListOf<MediaItem>()
+                all.forEach { item ->
+                    if (!item.isSaf) return@forEach
+                    safAll += item
+                    val key = treeUris.firstOrNull { item.uri.startsWith(it) }
+                    if (key != null) safByTree[key]?.add(item)
+                }
+                treeUris.forEach { uriString ->
+                    val items = safByTree[uriString].orEmpty().ifEmpty { safAll }
+                    entries += ListEntry.Row(
+                        title = names[uriString] ?: uriString,
+                        sub = countFmt.format(items.size),
+                        formats = "SAF-Ordner · dauerhafter Lesezugriff",
+                        cover = items.firstOrNull(),
+                        treeUri = uriString,
+                        removable = true
+                    )
+                }
+            }
+
+            val buckets = all.groupBy { it.bucket }.toList().sortedByDescending { it.second.size }
+            if (buckets.isNotEmpty()) {
+                entries += ListEntry.Section("Geräteordner")
+                buckets.forEach { (name, items) ->
+                    entries += ListEntry.Row(
+                        title = name.ifEmpty { "Unbekannt" },
+                        sub = countFmt.format(items.size) + " · " + Fmt.bytes(items.sumOf { it.size }),
+                        formats = items.map { it.format }.distinct().take(8).joinToString(", "),
+                        cover = items.firstOrNull(),
+                        key = "bucket:$name"
+                    )
+                }
+            }
+            main.post {
+                if (myToken != token) return@post
+                adapter?.submit(entries)
             }
         }
-        ad.submit(entries)
     }
 }

@@ -55,6 +55,13 @@
             android:theme="@style/Theme.N3Gallery.Detail" />
 
         <activity
+            android:name=".ui.EditorActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
+            android:label="@string/editor_title"
+            android:theme="@style/Theme.N3Gallery.Detail" />
+
+        <activity
             android:name=".ui.OverviewActivity"
             android:exported="false"
             android:label="@string/overview_title"

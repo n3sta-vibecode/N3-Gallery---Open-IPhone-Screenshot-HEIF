@@ -73,6 +73,17 @@ class DetailActivity : AppCompatActivity() {
         }
     }
 
+    /** Foto-Editor (Zuschneiden, Zeichnen, Text) – nach dem Speichern neu zeichnen. */
+    private val editorLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            com.n3vibecode.gallery.image.ImageLoader.clearAll(applicationContext)
+            currentMeta = null
+            onItemShown(pager.currentItem)
+        }
+    }
+
     private val createDocLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/rdf+xml")
     ) { uri ->
@@ -195,6 +206,9 @@ class DetailActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.btnShare).setOnClickListener { shareCurrent() }
         btnFav.setOnClickListener { toggleFavorite() }
         btnNote.setOnClickListener { openNoteDialog() }
+        // Foto bearbeiten: zuschneiden, zeichnen, Textfelder einfügen
+        findViewById<ImageButton>(R.id.btnEdit).setOnClickListener { openEditor() }
+        findViewById<MaterialButton>(R.id.btnPhotoEdit).setOnClickListener { openEditor() }
         // Vollbild-Metadaten-Seite (kein Bottom-Sheet) – dort ist garantiert alles scrollbar
         findViewById<MaterialButton>(R.id.btnMetaPage).setOnClickListener {
             startActivity(InfoActivity.intentFor(this, pager.currentItem, current?.uri))
@@ -308,6 +322,22 @@ class DetailActivity : AppCompatActivity() {
         val now = MetaStore.toggleFavorite(item.uri)
         btnFav.setImageResource(if (now) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline)
         Toast.makeText(this, if (now) R.string.fav_added else R.string.fav_removed, Toast.LENGTH_SHORT).show()
+    }
+
+    // ------------------------------------------------------------------ Foto-Editor
+
+    private fun openEditor() {
+        val item = current ?: return
+        if (item.isVideoFile) {
+            Toast.makeText(this, R.string.editor_video, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (behavior.state != BottomSheetBehavior.STATE_HIDDEN) {
+            behavior.state = BottomSheetBehavior.STATE_HIDDEN
+        }
+        editorLauncher.launch(
+            Intent(this, EditorActivity::class.java).putExtra(EditorActivity.EXTRA_URI, item.uri)
+        )
     }
 
     // ------------------------------------------------------------------ Notizen
