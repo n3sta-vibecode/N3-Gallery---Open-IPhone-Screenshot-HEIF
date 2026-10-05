@@ -285,12 +285,12 @@ abstract class BaseGridFragment : Fragment(), PageAware {
             val list = DataHub.visible(base)
             if (token != refreshToken) return@run
             prepare(list)
-            val rows = GridAdapter.buildRows(list, headers, grouper, showBanner)
+            val built = GridAdapter.buildRows(list, headers, grouper, showBanner)
             if (token != refreshToken) return@run
             main.post {
                 if (token != refreshToken || !isAdded) return@post
                 lastVisible = list
-                adapter.submitRows(rows, list)
+                adapter.submitRows(built)
                 DataHubViewHelper.updateEmpty(emptyView, list.isEmpty(), emptyText())
                 startPrefetch()
                 startWarmUp(list)

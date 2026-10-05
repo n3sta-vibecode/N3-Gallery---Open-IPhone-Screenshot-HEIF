@@ -128,17 +128,17 @@ class GridAdapter(
 
     private val differ = AsyncListDiffer(this, DIFF)
 
+    /** Fertig aufgebaute Zeilen inklusive „URI → Position“-Zuordnung (im Hintergrund erzeugt). */
+    class Built(val rows: List<Row>, val indexByUri: Map<String, Int>)
+
     /**
      * Zeilenliste im Hintergrund aufbauen (siehe [buildRows]) und hier übergeben.
-     * [items] ist die zugehörige Fotoliste – aus ihr stammt die Position beim Antippen.
+     * Die Zuordnung für das Antippen kommt fertig mit – der Haupt-Thread hat damit
+     * bei großen Sammlungen nichts mehr zu tun.
      */
-    fun submitRows(newRows: List<Row>, items: List<MediaItem> = emptyList()) {
-        if (items.isNotEmpty()) {
-            val map = HashMap<String, Int>(items.size * 2)
-            items.forEachIndexed { index, item -> map[item.uri] = index }
-            indexByUri = map
-        }
-        differ.submitList(newRows)
+    fun submitRows(built: Built) {
+        indexByUri = built.indexByUri
+        differ.submitList(built.rows)
     }
 
     /** Einfache Liste ohne Gruppierung setzen (Alben, Sammlungen). */
@@ -280,11 +280,12 @@ class GridAdapter(
             withHeaders: Boolean,
             grouper: Grouper?,
             banner: Boolean
-        ): List<Row> {
+        ): Built {
             val rows = ArrayList<Row>(list.size + 8)
+            val indexByUri = HashMap<String, Int>(list.size * 2)
             if (banner) rows += Row.Banner
             var currentKey: String? = null
-            for (item in list) {
+            list.forEachIndexed { index, item ->
                 if (withHeaders && grouper != null) {
                     val key = grouper.keyOf(item)
                     if (key != null && key != currentKey) {
@@ -294,9 +295,10 @@ class GridAdapter(
                     }
                 }
                 rows += Row.Entry(item)
+                indexByUri[item.uri] = index
             }
             ViewState.viewList = list
-            return rows
+            return Built(rows, indexByUri)
         }
     }
 }
