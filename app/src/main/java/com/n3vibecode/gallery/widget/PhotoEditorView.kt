@@ -159,9 +159,15 @@ class PhotoEditorView @JvmOverloads constructor(
 
     // ------------------------------------------------------------------ Öffentliche API
 
-    fun hasCrop(): Boolean = cropRect != null
+    /** true, wenn wirklich etwas weggeschnitten wird (nicht nur der Rahmen aufgezogen wurde). */
+    fun hasCrop(): Boolean {
+        val src = source ?: return false
+        val c = cropRect ?: return false
+        return c.left > 1f || c.top > 1f ||
+            src.width - c.right > 1f || src.height - c.bottom > 1f
+    }
 
-    fun hasChanges(): Boolean = annos.isNotEmpty() || cropRect != null
+    fun hasChanges(): Boolean = annos.isNotEmpty() || hasCrop()
 
     fun canUndo(): Boolean = undoStack.isNotEmpty()
 
@@ -240,7 +246,9 @@ class PhotoEditorView @JvmOverloads constructor(
         val bmp = source ?: return
         val full = RectF(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
         if (ratio == null) {
-            cropRect = null
+            // „Frei“ = kein Seitenverhältnis erzwingen; der Rahmen bleibt stehen und
+            // lässt sich an den Ecken beliebig ziehen.
+            if (cropRect == null) cropRect = RectF(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
             cropHandle = HANDLE_MOVE
             invalidate()
             onChanged?.invoke()

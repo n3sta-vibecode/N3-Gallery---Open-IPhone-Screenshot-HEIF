@@ -14,8 +14,10 @@ import androidx.recyclerview.widget.RecyclerView
  *  • Finger **auseinanderziehen** → Kacheln werden größer, es erscheinen **weniger Fotos**
  *
  * Technisch: Die Geste wird in [dispatchTouchEvent] abgefangen – also ganz früh, bevor
- * Kacheln, Scrollen oder die Tab-Wischgeste etwas davon merken. Solange zwei Finger
- * aufliegen, wird dem Elternteil (dem Wischen zwischen den Tabs) das Abfangen verboten.
+ * Kacheln, Scrollen oder die Tab-Wischgeste etwas davon merken. Die Kontrolle wird aber
+ * erst übernommen, wenn der Zoom wirklich beginnt: Ein nur kurz abgelegter zweiter Finger
+ * bricht das Scrollen dadurch nicht mehr ab (das fühlte sich vorher wie eine Verzögerung an).
+ * Während des Zoomens wird dem Elternteil (dem Wischen zwischen den Tabs) das Abfangen verboten.
  */
 class ZoomGridRecyclerView @JvmOverloads constructor(
     context: Context,
@@ -38,8 +40,10 @@ class ZoomGridRecyclerView @JvmOverloads constructor(
         context,
         object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                // Erst jetzt (echter Zoom) die Kontrolle übernehmen
                 gestureActive = true
                 disallowParent(true)
+                stopScroll()
                 onPinchStart?.invoke()
                 return true
             }
@@ -69,11 +73,11 @@ class ZoomGridRecyclerView @JvmOverloads constructor(
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         // Allererste Stelle im Ereignisweg: hier bekommt die Geste garantiert alles mit,
         // unabhängig davon, ob eine Kachel, das Scrollen oder ein Elternteil gerade "zuständig" ist.
-        if (ev.pointerCount >= 2) {
-            gestureActive = true
-            disallowParent(true)
-            scaleDetector.onTouchEvent(ev)
-        } else if (gestureActive || scaleDetector.isInProgress) {
+        //
+        // Wichtig: Übernommen wird erst, wenn der Zoom wirklich beginnt (onScaleBegin).
+        // Ein kurz abgelegter zweiter Finger hat vorher das Scrollen abgebrochen –
+        // genau das fühlte sich wie „es dauert, bis die App scrollt“ an.
+        if (ev.pointerCount >= 2 || scaleDetector.isInProgress || gestureActive) {
             scaleDetector.onTouchEvent(ev)
         }
 
@@ -86,19 +90,15 @@ class ZoomGridRecyclerView @JvmOverloads constructor(
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-        // Bei zwei Fingern übernimmt das Raster selbst: keine Kachel wird "gedrückt",
-        // kein Foto öffnet sich, das Scrollen pausiert.
-        if (ev.pointerCount >= 2) {
-            gestureActive = true
-            disallowParent(true)
-            return true
-        }
+        // Nur während eines echten Zwei-Finger-Zooms übernimmt das Raster selbst:
+        // dann wird keine Kachel „gedrückt“ und das Scrollen pausiert.
+        if (gestureActive) return true
         return super.onInterceptTouchEvent(ev)
     }
 
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         // Die Geste selbst wird schon in dispatchTouchEvent gefüttert – hier nur konsumieren.
-        if (gestureActive || ev.pointerCount >= 2) return true
+        if (gestureActive) return true
         return super.onTouchEvent(ev)
     }
 }

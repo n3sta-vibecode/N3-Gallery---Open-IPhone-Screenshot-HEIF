@@ -232,8 +232,12 @@ abstract class BaseGridFragment : Fragment(), PageAware {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             startActivity(Intent.createChooser(intent, getString(R.string.share)))
-        } catch (_: Throwable) {
-            Toast.makeText(requireContext(), R.string.share_failed, Toast.LENGTH_SHORT).show()
+        } catch (t: Throwable) {
+            Toast.makeText(
+                requireContext(),
+                getString(R.string.share_failed, t.message ?: ""),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
