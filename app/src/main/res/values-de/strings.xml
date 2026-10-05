@@ -245,12 +245,13 @@
     <string name="editor_reset">Zuschnitt zurücksetzen</string>
     <string name="editor_reset_all">Alles zurücksetzen</string>
     <string name="editor_crop_free">Frei</string>
+    <string name="editor_crop_hint_frame">Rahmen = späteres Bild</string>
     <string name="editor_stroke">Strichstärke</string>
     <string name="editor_text_size">Textgröße</string>
     <string name="editor_loading">Foto wird geladen …</string>
     <string name="editor_load_failed">Dieses Foto konnte zum Bearbeiten nicht geladen werden.</string>
     <string name="editor_hint_draw">Mit einem Finger zeichnen · zwei Finger = zoomen</string>
-    <string name="editor_hint_crop">An den Ecken ziehen · zwei Finger = zoomen</string>
+    <string name="editor_hint_crop">Foto mit einem Finger verschieben · an Ecken/Kanten ziehen = Ausschnitt · zwei Finger = zoomen</string>
     <string name="editor_hint_text">Tippen setzt Text · ziehen verschiebt · Doppeltipp ändert</string>
     <string name="editor_text_hint">Text …</string>
     <string name="editor_save_title">Änderungen speichern</string>
@@ -267,4 +268,6 @@
     <string name="editor_discard_msg">Die Änderungen sind nicht gespeichert.</string>
     <string name="editor_discard">Verwerfen</string>
     <string name="editor_nothing_to_save">Noch nichts zu speichern – erst zuschneiden, zeichnen oder Text einfügen.</string>
+    <string name="editor_no_write_permission">Ohne die Speicher-Berechtigung kann das Foto nicht gespeichert werden.</string>
+    <string name="editor_render_failed">Das bearbeitete Foto konnte nicht aufbereitet werden (zu wenig Speicher?). Versuche einen kleineren Zuschnitt.</string>
 </resources>

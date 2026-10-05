@@ -246,12 +246,13 @@
     <string name="editor_reset">Reset crop</string>
     <string name="editor_reset_all">Reset all</string>
     <string name="editor_crop_free">Free</string>
+    <string name="editor_crop_hint_frame">Frame = final photo</string>
     <string name="editor_stroke">Stroke width</string>
     <string name="editor_text_size">Text size</string>
     <string name="editor_loading">Loading photo …</string>
     <string name="editor_load_failed">This photo could not be loaded for editing.</string>
     <string name="editor_hint_draw">Draw with one finger · two fingers = zoom</string>
-    <string name="editor_hint_crop">Pull the corners · two fingers = zoom</string>
+    <string name="editor_hint_crop">Drag the photo with one finger · drag corners/edges for the crop · two fingers = zoom</string>
     <string name="editor_hint_text">Tap to place text · drag to move · double tap to change</string>
     <string name="editor_text_hint">Text …</string>
     <string name="editor_save_title">Save changes</string>
@@ -268,4 +269,6 @@
     <string name="editor_discard_msg">Your edits are not saved.</string>
     <string name="editor_discard">Discard</string>
     <string name="editor_nothing_to_save">Nothing to save yet – crop, draw or add text first.</string>
+    <string name="editor_no_write_permission">Without the storage permission the photo cannot be saved.</string>
+    <string name="editor_render_failed">The edited photo could not be prepared (not enough memory?). Try a smaller crop.</string>
 </resources>

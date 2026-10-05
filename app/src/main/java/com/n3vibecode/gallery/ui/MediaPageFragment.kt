@@ -71,7 +71,12 @@ class MediaPageFragment : Fragment() {
         val maxPx = ImageLoader.detailPx(requireContext())
         var fullShown = false
 
-        // 1) Sofort: die schon geladene Raster-Kachel (unscharf, aber ohne Wartezeit)
+        // 0) Ganz zuerst die Mini-Vorschau (48 px, weich hochgerechnet): sofort Bildinhalt,
+        //    während die scharfe Version noch dekodiert wird.
+        if (ImageLoader.showMicro(requireContext(), media, image)) {
+            progress.visibility = View.GONE
+        }
+        // 1) Dann die schon geladene Raster-Kachel (schärfer, aber ohne Wartezeit)
         ImageLoader.bestCached(media)?.let {
             image.setImageBitmap(it)
             progress.visibility = View.GONE

@@ -76,6 +76,18 @@ class EditorActivity : AppCompatActivity() {
         Color.parseColor("#FF8E8E93")
     )
 
+    /** Schreibberechtigung (nur Android 8/9 nötig) – danach wird direkt gespeichert. */
+    private val writePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val media = item ?: return@registerForActivityResult
+        if (granted) {
+            if (pendingOverwrite) doOverwrite(media) else doSaveCopy(media)
+        } else {
+            toast(getString(R.string.editor_no_write_permission))
+        }
+    }
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
@@ -153,7 +165,8 @@ class EditorActivity : AppCompatActivity() {
         hint.visibility = View.VISIBLE
         lifecycleScope.launch {
             val bmp = withContext(Dispatchers.IO) {
-                runCatching { Decoder.decodeDetailed(applicationContext, media, 2560).bitmap }.getOrNull()
+                // Möglichst hoch auflösen: ein 1:1-Zuschnitt ist sonst viel weicher als das Original
+                runCatching { Decoder.decodeDetailed(applicationContext, media, EDIT_PX).bitmap }.getOrNull()
             }
             progress.visibility = View.GONE
             if (bmp == null) {
@@ -387,22 +400,25 @@ class EditorActivity : AppCompatActivity() {
 
     private fun askSave() {
         val media = item ?: return
-        if (!editor.hasChanges()) {
-            toast(getString(R.string.editor_nothing_to_save))
-            return
-        }
-        val overwritePossible = MediaSaver.canOverwrite(media)
+        val changed = editor.hasChanges()
+        val overwritePossible = changed && MediaSaver.canOverwrite(media)
         val labels = if (overwritePossible) {
             arrayOf(getString(R.string.editor_save_copy), getString(R.string.editor_save_overwrite))
         } else {
             arrayOf(getString(R.string.editor_save_copy))
         }
         val message = buildString {
+            if (!changed) {
+                append(getString(R.string.editor_nothing_to_save))
+                append("\n\n")
+            }
             append(getString(R.string.editor_save_copy_hint))
             if (overwritePossible) {
                 append("\n\n")
                 append(getString(R.string.editor_save_overwrite_hint))
-            } else {
+            } else if (changed && !media.isVideoFile && media.ext.lowercase() !in
+                setOf("jpg", "jpeg", "jpe", "jfif", "png", "webp")
+            ) {
                 append("\n\n")
                 append(getString(R.string.editor_not_writable))
             }
@@ -418,18 +434,35 @@ class EditorActivity : AppCompatActivity() {
     }
 
     private fun doSaveCopy(media: MediaItem) {
+        // Android 8/9 braucht zum Schreiben in den öffentlichen Bilder-Ordner eine Freigabe.
+        if (android.os.Build.VERSION.SDK_INT < 29 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            writePermissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            return
+        }
         progress.visibility = View.VISIBLE
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                val bmp = editor.renderResult() ?: return@withContext null
-                // Fotos als JPEG (klein), Bilder mit Transparenz als PNG
-                val jpeg = !(editor.source?.hasAlpha() ?: false) && media.ext.lowercase() != "png"
-                val res = MediaSaver.saveCopy(applicationContext, bmp, media.name, jpeg)
-                bmp.recycle()
-                res
+                val bmp = editor.renderResult()
+                if (bmp == null) {
+                    SaveOutcome.RenderFailed
+                } else {
+                    // Fotos als JPEG (klein), PNG nur bei Original-PNG
+                    val jpeg = media.ext.lowercase() != "png"
+                    val res = MediaSaver.saveCopy(applicationContext, bmp, media.name, jpeg)
+                    bmp.recycle()
+                    SaveOutcome.Done(res)
+                }
             }
             progress.visibility = View.GONE
-            when (result) {
+            if (result is SaveOutcome.RenderFailed) {
+                toast(getString(R.string.editor_render_failed))
+                return@launch
+            }
+            when ((result as SaveOutcome.Done).result) {
                 is MediaSaver.Result.Success -> {
                     toast(getString(R.string.editor_saved_copy, result.name))
                     DataHub.requestRescan()
@@ -443,16 +476,33 @@ class EditorActivity : AppCompatActivity() {
     }
 
     private fun doOverwrite(media: MediaItem) {
+        if (android.os.Build.VERSION.SDK_INT < 29 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingOverwrite = true
+            writePermissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            return
+        }
         progress.visibility = View.VISIBLE
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                val bmp = editor.renderResult() ?: return@withContext null
-                val res = MediaSaver.overwrite(applicationContext, media, bmp)
-                bmp.recycle()
-                res
+                val bmp = editor.renderResult()
+                if (bmp == null) {
+                    SaveOutcome.RenderFailed
+                } else {
+                    val res = MediaSaver.overwrite(applicationContext, media, bmp)
+                    bmp.recycle()
+                    SaveOutcome.Done(res)
+                }
             }
             progress.visibility = View.GONE
-            when (result) {
+            if (result is SaveOutcome.RenderFailed) {
+                toast(getString(R.string.editor_render_failed))
+                return@launch
+            }
+            when ((result as SaveOutcome.Done).result) {
                 is MediaSaver.Result.Success -> {
                     pendingOverwrite = false
                     com.n3vibecode.gallery.image.ImageLoader.clearAll(applicationContext)
@@ -505,6 +555,12 @@ class EditorActivity : AppCompatActivity() {
             .show()
     }
 
+    /** Ergebnis eines Speicherversuchs (inkl. „Bild nicht aufbereitbar“). */
+    private sealed class SaveOutcome {
+        class Done(val result: MediaSaver.Result) : SaveOutcome()
+        object RenderFailed : SaveOutcome()
+    }
+
     private fun toast(text: String) {
         Toast.makeText(this, text, Toast.LENGTH_LONG).show()
     }
@@ -538,6 +594,9 @@ class EditorActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_URI = "edit_uri"
+
+        /** Auflösung der Bearbeitungsvorlage (lang genug für 1:1-Zuschnitte, klein genug für den Speicher). */
+        private const val EDIT_PX = 3600
 
         fun start(context: Context, uri: String) {
             context.startActivity(

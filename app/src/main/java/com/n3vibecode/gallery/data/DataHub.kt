@@ -29,8 +29,27 @@ object DataHub {
     @Volatile
     var rescanHandler: (() -> Unit)? = null
 
+    /** Merkt sich, dass neu eingelesen werden muss – auch wenn gerade kein Bildschirm aktiv ist. */
+    @Volatile
+    var rescanPending: Boolean = false
+        private set
+
     fun requestRescan() {
-        mainHandler.post { rescanHandler?.invoke() }
+        rescanPending = true
+        mainHandler.post {
+            val handler = rescanHandler
+            if (handler != null) {
+                rescanPending = false
+                handler.invoke()
+            }
+        }
+    }
+
+    /** Vom Hauptbildschirm aufgerufen, wenn er wieder sichtbar ist und etwas offen war. */
+    fun consumePendingRescan(): Boolean {
+        if (!rescanPending) return false
+        rescanPending = false
+        return true
     }
 
     fun setItems(items: List<MediaItem>, limited: Boolean) {

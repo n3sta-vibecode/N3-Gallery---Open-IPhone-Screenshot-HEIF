@@ -47,6 +47,13 @@ object ImageLoader {
 
     // ------------------------------------------------------------------ Größenstufen
 
+    /**
+     * Winzige Vorschau (48 px). Sie wird für jedes Foto einmal erzeugt, auf der Festplatte
+     * abgelegt und **immer zuerst** angezeigt – weich hochgerechnet, damit sofort etwas zu
+     * sehen ist. Beim weit herausgezoomten Raster ist sie sogar direkt die Zielgröße.
+     */
+    const val MICRO = 48
+
     private val BUCKETS = intArrayOf(128, 256, 512, 1024)
 
     private fun bucketFor(px: Int): Int {
@@ -170,8 +177,28 @@ object ImageLoader {
             runCatching { signal.cancel() }
         }
 
+        /** Wurde schon das scharfe Bild gezeigt? (dann darf die Mini-Vorschau nicht mehr kommen) */
+        @Volatile private var fullPosted = false
+
         fun run() {
             if (cancelled) { finished = true; return }
+
+            // 1) Zuerst eine winzige Vorschau (48 px): die ist in Millisekunden da und wird
+            //    weich auf die Kachelgröße gerechnet. Statt grauer Fläche sieht man sofort
+            //    den Bildinhalt – wie bei Apple/Google Fotos.
+            if (bucket != MICRO) {
+                val micro = obtainMicro(appCtx, item, signal)
+                if (cancelled) { finished = true; return }
+                if (micro != null) {
+                    main.post {
+                        if (cancelled || fullPosted) return@post
+                        val view = targetRef?.get() ?: return@post
+                        if (view.tag == key && view.drawable == null) applyScaled(view, micro)
+                    }
+                }
+            }
+
+            // 2) Dann die passende Größe
             val bmp = obtainThumb(appCtx, item, bucket, signal, keepInMemory)
             if (cancelled) {
                 // Ergebnis liegt im Cache – wird beim nächsten Binden sofort gezeigt
@@ -180,6 +207,7 @@ object ImageLoader {
             }
             main.post {
                 finished = true
+                fullPosted = true
                 if (cancelled) return@post
                 val view = targetRef?.get()
                 if (view != null) {
@@ -215,7 +243,7 @@ object ImageLoader {
      * Speicher, erscheint sie sofort; fehlt die passende, wird sie nachgeladen.
      */
     fun into(ctx: Context, item: MediaItem, sizePx: Int, target: ImageView, placeholder: Bitmap? = null) {
-        val bucket = bucketFor(sizePx)
+        val bucket = if (sizePx <= MICRO * 2) MICRO else bucketFor(sizePx)
         val key = keyFor(item, bucket)
         target.tag = key
 
@@ -251,6 +279,14 @@ object ImageLoader {
                 break
             }
         }
+        // Mini-Vorschau (48 px) aus Speicher/Festplatte: sofort Bildinhalt statt grauer Kachel
+        if (!shown && bucket != MICRO) {
+            val micro = cachedMicro(ctx.applicationContext, item, true)
+            if (micro != null) {
+                applyScaled(target, micro)
+                shown = true
+            }
+        }
         if (!shown) target.setImageBitmap(placeholder)
 
         if (failed.containsKey(item.uri)) return
@@ -284,7 +320,7 @@ object ImageLoader {
     fun prefetch(ctx: Context, items: List<MediaItem>, sizePx: Int, limit: Int = 48) {
         if (items.isEmpty()) return
         val app = ctx.applicationContext
-        val bucket = bucketFor(sizePx)
+        val bucket = if (sizePx <= MICRO * 2) MICRO else bucketFor(sizePx)
         var queued = 0
         for (item in items) {
             if (queued >= limit) break
@@ -301,6 +337,85 @@ object ImageLoader {
 
     /** Nur zum Testen/Diagnose: wie viele Kacheln schon vorgeladen wurden. */
     fun prefetchedCount(): Int = prefetched.size
+
+    // ------------------------------------------------------------------ Mini-Vorschau (48 px)
+
+    private fun microKey(item: MediaItem): String = item.uri + "#micro"
+
+    private fun microFile(ctx: Context, item: MediaItem): File =
+        File(cacheDir(ctx), hashName(item, "micro"))
+
+    /** Schon vorhandene Mini-Vorschau (Speicher → Festplatte). Ohne Erzeugen. */
+    fun cachedMicro(ctx: Context, item: MediaItem, includeDisk: Boolean = true): Bitmap? {
+        cache.get(microKey(item))?.let { return it }
+        if (!includeDisk) return null
+        return readDiskMicro(ctx, item)
+    }
+
+    private fun readDiskMicro(ctx: Context, item: MediaItem): Bitmap? {
+        val file = microFile(ctx, item)
+        if (!file.exists()) return null
+        val bmp = runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
+        if (bmp == null) {
+            runCatching { file.delete() }
+            return null
+        }
+        cache.put(microKey(item), bmp)
+        return bmp
+    }
+
+    /** Zeigt sofort eine vorhandene Mini-Vorschau (ohne Dekodieren). true = etwas gezeigt. */
+    fun showMicro(ctx: Context, item: MediaItem, target: ImageView): Boolean {
+        val micro = cachedMicro(ctx.applicationContext, item, true) ?: return false
+        applyScaled(target, micro)
+        return true
+    }
+
+    /**
+     * Mini-Vorschau erzeugen: Systemvorschau (sehr schnell) oder stark verkleinerter
+     * Dekodiervorgang. Ergebnis wird im Speicher und auf der Festplatte abgelegt.
+     */
+    private fun obtainMicro(ctx: Context, item: MediaItem, signal: CancellationSignal?): Bitmap? {
+        cache.get(microKey(item))?.let { return it }
+        readDiskMicro(ctx, item)?.let { return it }
+        if (signal?.isCanceled == true) return null
+        if (failed.containsKey(item.uri)) return null
+
+        var bmp = systemThumbnail(ctx, item, MICRO, signal)
+        if (bmp != null) bmp = scaleTo(bmp, MICRO)
+        if (bmp == null && signal?.isCanceled != true) {
+            bmp = try {
+                Decoder.decode(ctx, item, MICRO)
+            } catch (_: OutOfMemoryError) {
+                null
+            }
+        }
+        if (bmp != null) {
+            cache.put(microKey(item), bmp)
+            writeDisk(ctx, microFile(ctx, item), bmp)
+        }
+        return bmp
+    }
+
+    /** Verkleinern auf die Zielkante (vergrößert wird erst beim Zeichnen gefiltert). */
+    private fun scaleTo(bmp: Bitmap, target: Int): Bitmap {
+        val longest = maxOf(bmp.width, bmp.height)
+        if (longest <= 0 || longest <= target) return bmp
+        val scale = target.toFloat() / longest
+        val w = (bmp.width * scale).toInt().coerceAtLeast(1)
+        val h = (bmp.height * scale).toInt().coerceAtLeast(1)
+        return runCatching { Bitmap.createScaledBitmap(bmp, w, h, true) }.getOrElse { bmp }
+    }
+
+    /** Bild mit weicher Filterung setzen – sanftes Hochrechnen statt harter Pixel. */
+    private fun applyScaled(view: ImageView, bmp: Bitmap) {
+        val drawable = android.graphics.drawable.BitmapDrawable(view.resources, bmp).apply {
+            setFilterBitmap(true)
+            setDither(true)
+        }
+        view.setImageDrawable(drawable)
+        view.alpha = 1f
+    }
 
     /**
      * Synchrone Vorschau für Hintergrund-Threads (z. B. Gesamtübersicht).
@@ -385,6 +500,9 @@ object ImageLoader {
         signal: CancellationSignal?,
         keepInMemory: Boolean = true
     ): Bitmap? {
+        // Für sehr kleine Kacheln (weit herausgezoomt) ist die Mini-Vorschau die Zielgröße
+        if (bucket == MICRO) return obtainMicro(ctx, item, signal)
+
         val key = keyFor(item, bucket)
         cache.get(key)?.let { return it }
 
@@ -485,12 +603,14 @@ object ImageLoader {
     private fun cacheDir(ctx: Context): File =
         File(ctx.cacheDir, "thumbs").also { if (!it.exists()) it.mkdirs() }
 
-    private fun diskFile(ctx: Context, item: MediaItem, bucket: Int): File {
-        val raw = "${item.uri}|${item.size}|${item.modifiedAt}|$bucket"
+    private fun hashName(item: MediaItem, tag: Any): String {
+        val raw = "${item.uri}|${item.size}|${item.modifiedAt}|$tag"
         val md = MessageDigest.getInstance("MD5").digest(raw.toByteArray())
-        val name = md.joinToString("") { "%02x".format(it) }
-        return File(cacheDir(ctx), "$name.img")
+        return md.joinToString("") { "%02x".format(it) } + ".img"
     }
+
+    private fun diskFile(ctx: Context, item: MediaItem, bucket: Int): File =
+        File(cacheDir(ctx), hashName(item, bucket))
 
     private val writes = AtomicInteger(0)
 

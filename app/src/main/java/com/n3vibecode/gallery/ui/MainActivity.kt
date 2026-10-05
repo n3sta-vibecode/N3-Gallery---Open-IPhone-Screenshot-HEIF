@@ -159,7 +159,11 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.READ_MEDIA_IMAGES,
             Manifest.permission.READ_MEDIA_VIDEO
         )
-        else -> listOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        else -> listOf(
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            // Android 8/9: wird gebraucht, um bearbeitete Fotos in „Bilder“ zu speichern
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        )
     }
 
     /** Nur der sichtbare Tab darf rechnen – das hält das Wischen und Scrollen flüssig. */
@@ -173,11 +177,13 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         // Nach dem Speichern im Editor (oder anderen Änderungen) Liste neu einlesen
         DataHub.rescanHandler = { reload() }
+        // Wurde gespeichert, während die Liste nicht sichtbar war? Jetzt nachziehen.
+        if (DataHub.consumePendingRescan()) reload()
     }
 
-    override fun onStop() {
+    override fun onDestroy() {
         if (DataHub.rescanHandler != null) DataHub.rescanHandler = null
-        super.onStop()
+        super.onDestroy()
     }
 
     /** Alle Medien neu einlesen (MediaStore + eigene Ordner). */

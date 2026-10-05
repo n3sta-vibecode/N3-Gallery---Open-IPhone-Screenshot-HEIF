@@ -78,46 +78,102 @@ object MediaSaver {
     fun saveCopy(ctx: Context, bitmap: Bitmap, baseName: String, jpeg: Boolean = true): Result {
         val fmt = format(bitmap, jpeg, "")
         val name = fileName(baseName, extension(fmt))
+        // Erst Galerie (MediaStore), sonst öffentlicher Bilder-Ordner bzw. app-eigener Ordner.
+        val viaStore = saveViaMediaStore(ctx, bitmap, fmt, name)
+        if (viaStore is Result.Success) return viaStore
+        val viaFile = saveViaFile(ctx, bitmap, fmt, name)
+        if (viaFile is Result.Success) return viaFile
+        return (viaFile as? Result.Failed) ?: (viaStore as? Result.Failed)
+            ?: Result.Failed("Unbekannter Fehler beim Speichern")
+    }
+
+    private fun saveViaMediaStore(
+        ctx: Context,
+        bitmap: Bitmap,
+        fmt: Bitmap.CompressFormat,
+        name: String
+    ): Result {
+        if (Build.VERSION.SDK_INT < 29) {
+            return Result.Failed("Android 8/9: Galerie-Eintrag nur über den Dateiweg")
+        }
         return try {
-            if (Build.VERSION.SDK_INT >= 29) {
-                val values = ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, name)
-                    put(MediaStore.Images.Media.MIME_TYPE, mime(fmt))
-                    put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/$ALBUM")
-                    put(MediaStore.Images.Media.IS_PENDING, 1)
-                }
-                val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                    ?: return Result.Failed("Kein Zugriff auf die Galerie")
-                ctx.contentResolver.openOutputStream(uri)?.use { write(it, bitmap, fmt) }
-                    ?: return Result.Failed("Datei konnte nicht geschrieben werden")
-                values.clear()
-                values.put(MediaStore.Images.Media.IS_PENDING, 0)
-                ctx.contentResolver.update(uri, values, null, null)
-                ctx.contentResolver.notifyChange(uri, null)
-                Result.Success(uri, name)
-            } else {
-                @Suppress("DEPRECATION")
-                val dir = File(
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-                    ALBUM
-                ).apply { if (!exists()) mkdirs() }
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                put(MediaStore.Images.Media.MIME_TYPE, mime(fmt))
+                put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/$ALBUM")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+            val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: return Result.Failed("Galerie nahm die Datei nicht an")
+            ctx.contentResolver.openOutputStream(uri)?.use { out ->
+                if (!write(out, bitmap, fmt)) throw IllegalStateException("Schreiben fehlgeschlagen")
+            } ?: return Result.Failed("Galerie-Datei konnte nicht geöffnet werden")
+            values.clear()
+            values.put(MediaStore.Images.Media.IS_PENDING, 0)
+            ctx.contentResolver.update(uri, values, null, null)
+            ctx.contentResolver.notifyChange(uri, null)
+            Result.Success(uri, name)
+        } catch (se: SecurityException) {
+            Result.Failed("keine Schreibberechtigung für die Galerie")
+        } catch (t: Throwable) {
+            Result.Failed(t.message ?: t.javaClass.simpleName)
+        }
+    }
+
+    /**
+     * Dateiweg: öffentlicher Bilder-Ordner (Android 8/9) und – als letzter Ausweg, aber
+     * immer möglich – der app-eigene Bilder-Ordner. Die Datei wird anschließend in den
+     * Medienindex aufgenommen, sodass sie in der Galerie erscheint.
+     */
+    private fun saveViaFile(
+        ctx: Context,
+        bitmap: Bitmap,
+        fmt: Bitmap.CompressFormat,
+        name: String
+    ): Result {
+        val dirs = mutableListOf<File>()
+        @Suppress("DEPRECATION")
+        if (Build.VERSION.SDK_INT < 29) {
+            dirs += File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), ALBUM)
+        }
+        (ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: ctx.filesDir)?.let { dirs += it }
+        var lastError: String? = null
+        for (dir in dirs) {
+            try {
+                if (!dir.exists() && !dir.mkdirs()) continue
                 val file = File(dir, name)
-                file.outputStream().use { out -> if (!write(out, bitmap, fmt)) throw IllegalStateException("Speichern fehlgeschlagen") }
+                file.outputStream().use { out ->
+                    if (!write(out, bitmap, fmt)) throw IllegalStateException("Schreiben fehlgeschlagen")
+                }
                 android.media.MediaScannerConnection.scanFile(
                     ctx, arrayOf(file.absolutePath), arrayOf(mime(fmt)), null
                 )
-                Result.Success(Uri.fromFile(file), name)
+                return Result.Success(Uri.fromFile(file), file.absolutePath)
+            } catch (t: Throwable) {
+                lastError = t.message ?: t.javaClass.simpleName
             }
-        } catch (t: Throwable) {
-            Result.Failed(t.message ?: "Unbekannter Fehler")
         }
+        return Result.Failed(lastError ?: "Kein beschreibbarer Ordner gefunden")
     }
 
     /** Originaldatei ersetzen. */
     fun overwrite(ctx: Context, item: MediaItem, bitmap: Bitmap): Result {
         val uri = Uri.parse(item.uri)
-        if (!canOverwrite(item) || uri.scheme != "content") {
-            return Result.Failed("unsupported")
+        if (item.isVideoFile) return Result.Failed("Videos können nicht überschrieben werden")
+        if (!canOverwrite(item)) {
+            return Result.Failed("Das Format ${item.format} lässt sich nicht überschreiben – bitte als Kopie speichern")
+        }
+        if (uri.scheme != "content") {
+            return try {
+                val target = File(uri.path ?: return Result.Failed("Datei nicht gefunden"))
+                val fmt = format(bitmap, forceJpeg = true, ext = item.ext.lowercase(Locale.ROOT))
+                target.outputStream().use { out ->
+                    if (!write(out, bitmap, fmt)) throw IllegalStateException("Schreiben fehlgeschlagen")
+                }
+                Result.Success(Uri.fromFile(target), target.name)
+            } catch (t: Throwable) {
+                Result.Failed(t.message ?: t.javaClass.simpleName)
+            }
         }
         val fmt = format(bitmap, forceJpeg = item.ext.lowercase(Locale.ROOT) in setOf("jpg", "jpeg", "jpe", "jfif"), ext = item.ext.lowercase(Locale.ROOT))
         return try {
