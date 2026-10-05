@@ -23,21 +23,53 @@ jobs:
       - name: Gradle einrichten
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Android SDK einrichten
-        uses: android-actions/setup-android@v4
-        with:
-          packages: 'platforms;android-36 build-tools;36.0.0 platform-tools'
+      - name: Android SDK prüfen/ergänzen
+        run: |
+          set -x
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "SDK=$SDK" >> "$GITHUB_ENV"
+          ls "$SDK" || true
+          SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SM" ]; then
+            yes | "$SM" --licenses > /dev/null 2>&1 || true
+            "$SM" --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" || true
+          fi
+          ls "$SDK/platforms" || true
+          ls "$SDK/build-tools" || true
 
       - name: Release-APK bauen
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
 
       - name: Test-APK bauen (installiert parallel zur normalen App)
-        run: ./gradlew assembleTryout --no-daemon --stacktrace
+        run: ./gradlew assembleTryout --no-daemon --stacktrace 2>&1 | tee -a /tmp/build.log
 
       - name: APK hochladen
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: N3-Gallery-APK
           path: |
             app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
+
+      # Damit Build-Fehler auch ohne Zugriff auf die Runner-Logs gelesen werden können:
+      # die wichtigsten Zeilen landen als Kommentar am Pull Request.
+      - name: Build-Protokoll in den Pull Request schreiben
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### Build-Protokoll (${{ job.status }})"
+            echo '```'
+            grep -nE "^(e: |w: |> Task|FAILURE|\* What went wrong|Caused by|Execution failed)|error:|Could not|Unresolved|ERROR" /tmp/build.log | tail -80 || true
+            echo '--- letzte Zeilen ---'
+            tail -25 /tmp/build.log || true
+            echo '```'
+          } > /tmp/report.md
+          PR=$(gh pr list --head "${{ github.ref_name }}" --json number --jq '.[0].number' || true)
+          if [ -n "$PR" ]; then
+            gh pr comment "$PR" --body-file /tmp/report.md --edit-last || gh pr comment "$PR" --body-file /tmp/report.md || true
+          fi
