@@ -1,5 +1,62 @@
 # N3 Gallery – was neu ist
 
+## 1.25 – Apple-Prinzip: scharfe Kacheln, Hintergrund-Aufbau, Hardware-Dekoder
+
+### a) Kein unscharfes Aufblühen mehr
+
+Rückmeldung war: „alles ist zuerst unscharf und ladet erst dann“. Deshalb ist das
+Hochrechnen einer kleinen Vorschau **komplett entfernt**:
+
+* Eine Kachel zeigt ihr Bild erst in **echter Kachelgröße** – nichts wird mehr
+  auseinandergezogen.
+* Nur wenn die nächstkleinere Stufe höchstens **halb so klein** ist (also von sich aus
+  scharf genug), wird sie kurz gezeigt. Sonst bleibt es bei einer ruhigen Fläche.
+* Auch in der Großansicht ist die 48-px-Vorschau weg – auf Bildschirmgröße wäre sie
+  zwanzigfach vergrößert gewesen (die 1024-px-Vorschau kommt weiterhin blitzschnell davor).
+
+### b) Vorschaugrößen passend zur Kachel – der Grund für „langsam bei vielen Fotos“
+
+Die Größenstufen sind jetzt **64 / 128 / 256 / 512 / 1024 px**. Vorher wurde bei kleinen
+Kacheln (viele Spalten) eine 256-px-Vorschau dekodiert; jetzt reicht **64 px**:
+
+* 64 statt 256 px heißt **16 × weniger Pixel** pro Kachel – genau dann, wenn viele Fotos
+  nebeneinander stehen.
+* Die passende Stufe wird gewählt, die nächstgrößere nur benutzt, wenn sie schon fertig ist.
+
+### c) Hintergrund-Aufbau der ganzen Bibliothek (das Apple-Prinzip)
+
+iOS dekodiert fürs Raster **nie** das Originalbild, sondern baut im Hintergrund eine
+**Datenbank aus Vorschaubildern** in genau der Anzeigegröße auf. Genau das macht die App
+jetzt auch:
+
+* Ein **Daemon mit Hintergrund-Priorität** geht die Bibliothek in Listenreihenfolge durch,
+  erzeugt jede Vorschau in Kachelgröße und legt sie **dauerhaft ab** (Speicher + Festplatte).
+  Nach einem Neustart ist sie schon da.
+* Schon fertige Fotos und solche, die sich nicht dekodieren lassen, werden übersprungen.
+* **Beim Wischen pausiert der Daemon** (nur 8 ms Pause zwischen zwei Fotos, 90 ms solange
+  gescrollt wird) – die sichtbaren Kacheln haben die CPU dann für sich allein.
+* Ändert sich die Spaltenzahl, richtet sich der Aufbau automatisch auf die neue Kachelgröße
+  neu aus.
+
+### d) Hardware-Dekoder zuerst – wie iOS HEIC anzeigt
+
+* Auf Android 10+ werden **HEIC/HEIF/AVIF zuerst vom Hardware-Dekoder** gelesen
+  (`ImageDecoder`, Hardware-Puffer) – dieselbe Technik, die auf dem iPhone HEIC-Bilder
+  praktisch ohne Rechenzeit darstellt. Das Ergebnis wird in ein normales Bild kopiert und
+  der Hardware-Puffer sofort freigegeben.
+* **Schwarze Vorschauen erkannt:** Manche 10-Bit-/HDR-HEICs liefern über den Hardware-Pfad
+  schwarze Flächen. Die App prüft das Ergebnis und nimmt dann automatisch den Software-Weg.
+* Fällt der System-Dekoder mehrfach aus, wird er für HEIF nicht weiter versucht – kein
+  wiederholtes Warten bei jedem Foto.
+
+### e) Warum das zusammen schnell ist
+
+1. **Nie das Original fürs Raster** – nur die kleine Vorschau in Kachelgröße.
+2. **Decodieren in genau der Anzeigegröße** – statt groß laden und klein rechnen.
+3. **Einmal erzeugt, dauerhaft gespeichert** – beim zweiten Blick sofort da.
+4. **Hardware statt Software** für HEIC.
+5. **scrollen hat Vorrang** – Hintergrundarbeit pausiert, statt um CPU zu kämpfen.
+
 ## 1.24 – Mini-Vorschau (48 px), Zuschneiden wie bei Apple, Speichern robust
 
 ### a) Mini-Vorschau: der Vorschlag aus der Nachricht, umgesetzt
@@ -18,6 +75,10 @@ Ehrlich dazu: Bei *normal* großen Kacheln (4–6 Spalten, ~200–300 px) skalie
 Vorschau beliebig hoch – dort ersetzt die Mini-Vorschau nicht das scharfe Bild, sie
 überbrückt nur die Wartezeit. Deshalb bleibt die zweite Stufe (128/256/512/1024 px)
 erhalten und wird weiterhin im Hintergrund vorgeladen.
+
+> **Nachtrag 1.25:** Genau dieses Hochrechnen war in der Praxis nicht gut („zuerst
+> unscharf“) und wurde in 1.25 wieder entfernt – siehe Abschnitt 1.25. Die 48-px-Stufe
+> bleibt nur dort im Einsatz, wo sie die *Zielgröße* ist (weit herausgezoomtes Raster).
 
 ### b) Zuschneiden wie bei Apple
 

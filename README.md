@@ -9,7 +9,19 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kame
 
 ---
 
-## 🆕 Version 1.24 – Mini-Vorschau, Apple-artiges Zuschneiden, robustes Speichern
+## 🆕 Version 1.25 – Apple-Prinzip: scharfe Kacheln, schneller bei vielen Fotos
+
+* **Kein unscharfes Aufblühen mehr:** Kacheln erscheinen in echter Kachelgröße, nicht mehr
+  als hochgerechnete Mini-Vorschau („zuerst unscharf“ war die Rückmeldung).
+* **Viel schneller bei vielen Fotos nebeneinander:** Größenstufen jetzt 64/128/256/512/1024 px
+  – kleine Kacheln lesen nur noch eine 64-px-Vorschau statt 256 px (16 × weniger Pixel).
+* **Hintergrund-Aufbau wie die Apple-Thumbnail-Datenbank:** ein Daemon mit Hintergrund-Priorität
+  erzeugt die Vorschauen der ganzen Bibliothek in Kachelgröße und legt sie dauerhaft ab –
+  beim Wischen pausiert er, damit die sichtbaren Kacheln Vorrang haben.
+* **Hardware-Dekoder zuerst für HEIC/HEIF/AVIF** (Android 10+), mit automatischem Rückfall,
+  wenn der Hardware-Pfad schwarze Bilder liefert.
+
+## Version 1.24 – Mini-Vorschau, Apple-artiges Zuschneiden, robustes Speichern
 
 * **Mini-Vorschau (48 px) für jedes Foto:** wird immer zuerst gezeigt (weich hochgerechnet)
   statt grauer Kacheln – bei weit herausgezoomtem Raster ist sie sogar die Zielgröße.

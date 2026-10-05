@@ -255,23 +255,17 @@ object ImageLoader {
             }
         }
 
-        // 2) kleinere Stufe als sofortiger Platzhalter (unscharf → scharf)
+        // 2) Nächstkleinere Stufe – aber nur, wenn sie höchstens halb so groß ist.
+        //    Eine stark vergrößerte Mini-Vorschau wirkt verwaschen und springt dann
+        //    sichtbar scharf: lieber kurz eine ruhige Fläche als ein unscharfes Bild.
         var shown = false
         for (b in BUCKETS.reversed()) {
-            if (b >= bucket) continue
+            if (b >= bucket || b * 2 < bucket) continue
             val low = cache.get(keyFor(item, b))
             if (low != null) {
                 target.setImageBitmap(low)
                 shown = true
                 break
-            }
-        }
-        // Mini-Vorschau (48 px) aus Speicher/Festplatte: sofort Bildinhalt statt grauer Kachel
-        if (!shown && bucket != MICRO) {
-            val micro = cachedMicro(ctx.applicationContext, item, true)
-            if (micro != null) {
-                applyScaled(target, micro)
-                shown = true
             }
         }
         if (!shown) target.setImageBitmap(placeholder)
@@ -424,13 +418,6 @@ object ImageLoader {
     private fun microFile(ctx: Context, item: MediaItem): File =
         File(cacheDir(ctx), hashName(item, "micro"))
 
-    /** Schon vorhandene Mini-Vorschau (Speicher → Festplatte). Ohne Erzeugen. */
-    fun cachedMicro(ctx: Context, item: MediaItem, includeDisk: Boolean = true): Bitmap? {
-        cache.get(microKey(item))?.let { return it }
-        if (!includeDisk) return null
-        return readDiskMicro(ctx, item)
-    }
-
     private fun readDiskMicro(ctx: Context, item: MediaItem): Bitmap? {
         val file = microFile(ctx, item)
         if (!file.exists()) return null
@@ -441,13 +428,6 @@ object ImageLoader {
         }
         cache.put(microKey(item), bmp)
         return bmp
-    }
-
-    /** Zeigt sofort eine vorhandene Mini-Vorschau (ohne Dekodieren). true = etwas gezeigt. */
-    fun showMicro(ctx: Context, item: MediaItem, target: ImageView): Boolean {
-        val micro = cachedMicro(ctx.applicationContext, item, true) ?: return false
-        applyScaled(target, micro)
-        return true
     }
 
     /**
@@ -484,16 +464,6 @@ object ImageLoader {
         val w = (bmp.width * scale).toInt().coerceAtLeast(1)
         val h = (bmp.height * scale).toInt().coerceAtLeast(1)
         return runCatching { Bitmap.createScaledBitmap(bmp, w, h, true) }.getOrElse { bmp }
-    }
-
-    /** Bild mit weicher Filterung setzen – sanftes Hochrechnen statt harter Pixel. */
-    private fun applyScaled(view: ImageView, bmp: Bitmap) {
-        val drawable = android.graphics.drawable.BitmapDrawable(view.resources, bmp).apply {
-            setFilterBitmap(true)
-            setDither(true)
-        }
-        view.setImageDrawable(drawable)
-        view.alpha = 1f
     }
 
     /**
