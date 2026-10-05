@@ -29,7 +29,7 @@ class CollectionActivity : AppCompatActivity() {
                 val uris = MetaStore.itemsForTag(value).toSet()
                 DataHub.all.filter { uris.contains(it.uri) }
             }
-            "notes" -> DataHub.all.filter { MetaStore.note(it.uri).isNotBlank() }
+            "notes" -> DataHub.all.filter { MetaStore.hasNote(it.uri) }
             "favorites" -> DataHub.all.filter { MetaStore.isFavorite(it.uri) }
             "bucket" -> DataHub.all.filter { it.bucket == value }
             "family" -> DataHub.all.filter { it.family == value }
@@ -62,13 +62,21 @@ class CollectionActivity : AppCompatActivity() {
         }
         host.addView(recycler)
         recycler.layoutManager = GridLayoutManager(this, 3)
-        val adapter = GridAdapter(3, false) { index ->
+        val adapter = GridAdapter(3, false, { item ->
+            val index = items.indexOf(item)
+            if (index >= 0) {
+                startActivity(
+                    Intent(this, DetailActivity::class.java).putExtra(DetailActivity.EXTRA_POSITION, index)
+                )
+            }
+        }, { item ->
+            // Langes Drücken = direkt bearbeiten
             startActivity(
-                Intent(this, DetailActivity::class.java).putExtra(DetailActivity.EXTRA_POSITION, index)
+                Intent(this, EditorActivity::class.java).putExtra(EditorActivity.EXTRA_URI, item.uri)
             )
-        }
+        })
         recycler.adapter = adapter
-        adapter.submit(items)
+        adapter.submitItems(items)
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()

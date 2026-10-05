@@ -480,7 +480,7 @@ class TimelineFragment : BaseGridFragment() {
         val counts = HashMap<Long, Int>()
         val sizes = HashMap<Long, Long>()
         list.forEach { item ->
-            val key = keyOf(item)
+            val key = bucketKey(item)
             counts[key] = (counts[key] ?: 0) + 1
             sizes[key] = (sizes[key] ?: 0L) + item.size
         }
@@ -490,7 +490,8 @@ class TimelineFragment : BaseGridFragment() {
         info.putAll(fresh)
     }
 
-    private fun keyOf(item: MediaItem): Long = when (mode) {
+    /** Gruppenschlüssel (Ausnahme: nicht „keyOf“ heißen, sonst verdeckt das Grouper-Objekt ihn). */
+    private fun bucketKey(item: MediaItem): Long = when (mode) {
         GridPrefs.MODE_MONTH -> Fmt.monthKey(item.time)
         GridPrefs.MODE_YEAR -> Fmt.yearKey(item.time)
         else -> Fmt.dayKey(item.time)
@@ -500,11 +501,11 @@ class TimelineFragment : BaseGridFragment() {
         if (mode == GridPrefs.MODE_NONE) return null
         val currentMode = mode
         return object : Grouper {
-            override fun keyOf(item: MediaItem): String? = keyOf(item).toString()
+            override fun keyOf(item: MediaItem): String? = bucketKey(item).toString()
 
             /** Wird nur einmal pro Gruppe aufgerufen (nicht pro Foto!). */
             override fun headerOf(item: MediaItem): Pair<String, String> {
-                val k = keyOf(item)
+                val k = bucketKey(item)
                 val i = info[k] ?: (1 to item.size)
                 val sub = buildString {
                     append(getString(R.string.count_files, i.first))
@@ -768,7 +769,8 @@ class FoldersFragment : Fragment() {
         val store = FolderStore(requireContext())
         val all = DataHub.all
         val treeUris = store.treeUris()
-        val names = treeUris.associateWith { runCatching { store.displayName(it) }.getOrElse { it } }
+        val names: Map<String, String> =
+            treeUris.associateWith { tree -> runCatching { store.displayName(tree) }.getOrElse { tree } }
         val countFmt = getString(R.string.count_files, 0)
         val addTitle = getString(R.string.add_folder)
         val pickHint = getString(R.string.folder_pick)

@@ -132,6 +132,12 @@ class GridAdapter(
         differ.submitList(newRows)
     }
 
+    /** Einfache Liste ohne Gruppierung setzen (Alben, Sammlungen). */
+    fun submitItems(list: List<MediaItem>) {
+        ViewState.viewList = list
+        differ.submitList(list.map { Row.Entry(it) })
+    }
+
     override fun getItemCount(): Int = differ.currentList.size
 
     /** Überschriften und Banner füllen die ganze Zeile (alle Spalten). */

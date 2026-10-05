@@ -541,9 +541,9 @@ class PhotoEditorView @JvmOverloads constructor(
                         r
                     }
                     HANDLE_TL -> RectF(min(cropStart.left + dx, cropStart.right - 40), min(cropStart.top + dy, cropStart.bottom - 40), cropStart.right, cropStart.bottom)
-                    HANDLE_TR -> RectF(cropStart.left, min(cropStart.top + dy, cropStart.bottom - 40), max(cropStart.right + dx, cropStart.left + 40), cropStart.bottom)
-                    HANDLE_BL -> RectF(min(cropStart.left + dx, cropStart.right - 40), cropStart.top, cropStart.right, max(cropStart.bottom + dy, cropStart.top + 40))
-                    HANDLE_BR -> RectF(cropStart.left, cropStart.top, max(cropStart.right + dx, cropStart.left + 40), max(cropStart.bottom + dy, cropStart.top + 40))
+                    HANDLE_TR -> RectF(cropStart.left, min(cropStart.top + dy, cropStart.bottom - 40), maxOf(cropStart.right + dx, cropStart.left + 40), cropStart.bottom)
+                    HANDLE_BL -> RectF(min(cropStart.left + dx, cropStart.right - 40), cropStart.top, cropStart.right, maxOf(cropStart.bottom + dy, cropStart.top + 40))
+                    HANDLE_BR -> RectF(cropStart.left, cropStart.top, maxOf(cropStart.right + dx, cropStart.left + 40), maxOf(cropStart.bottom + dy, cropStart.top + 40))
                     else -> null
                 }
                 if (moved != null) cropRect = clampCrop(moved)
