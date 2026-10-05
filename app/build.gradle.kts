@@ -67,6 +67,9 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-test"
             signingConfig = signingConfigs.getByName("debug")
+            // Manche Bibliotheken (z. B. der HEIF-Decoder) liefern nur debug/release –
+            // für den Testbuild auf die release-Varianten zurückfallen.
+            matchingFallbacks += listOf("release")
         }
     }
 

@@ -186,22 +186,30 @@ class MainActivity : AppCompatActivity() {
         loading = true
         progress.visibility = android.view.View.VISIBLE
         lifecycleScope.launch {
-            val lib = withContext(Dispatchers.IO) {
-                Repository(applicationContext).loadAll().also {
+            val repo = Repository(applicationContext)
+            // 1) Schneller Durchgang: Android-Medienindex → die Galerie ist sofort gefüllt.
+            val quick = withContext(Dispatchers.IO) {
+                repo.loadMediaIndex().also {
                     // Favoriten/Notizen/Tags einmal im Hintergrund einlesen – danach ist
                     // der Zugriff beim Bildaufbau rein speicherintern.
                     com.n3vibecode.gallery.data.MetaStore.warmUp()
                 }
             }
-            DataHub.setItems(lib.items, lib.hiddenByUserSelection)
+            DataHub.setItems(quick.items, quick.hiddenByUserSelection)
             progress.visibility = android.view.View.GONE
             loading = false
-            if (lib.items.isEmpty()) {
+            if (quick.items.isEmpty()) {
                 Toast.makeText(
                     this@MainActivity,
                     getString(R.string.permission_needed),
                     Toast.LENGTH_LONG
                 ).show()
+            }
+
+            // 2) Vollständiger Durchgang inkl. eigener Ordner (SAF) und App-Export.
+            val full = withContext(Dispatchers.IO) { repo.loadAll() }
+            if (full.items.size != quick.items.size) {
+                DataHub.setItems(full.items, full.hiddenByUserSelection)
             }
         }
     }

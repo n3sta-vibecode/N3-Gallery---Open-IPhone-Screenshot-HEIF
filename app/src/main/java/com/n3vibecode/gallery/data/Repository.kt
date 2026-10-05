@@ -22,6 +22,17 @@ class Repository(private val ctx: Context) {
 
     private val folderStore = FolderStore(ctx)
 
+    /**
+     * Schneller erster Durchgang: nur der Android-Medienindex.
+     * Damit ist die Galerie sofort gefüllt, während eigene Ordner (SAF) noch gelesen werden.
+     */
+    suspend fun loadMediaIndex(): Library = withContext(Dispatchers.IO) {
+        val out = LinkedHashMap<String, MediaItem>()
+        runCatching { mediaStoreItems() }.getOrDefault(emptyList()).forEach { out[it.key] = it }
+        runCatching { mediaStoreFilesLikeImages() }.getOrDefault(emptyList()).forEach { out.putIfAbsent(it.key, it) }
+        Library(sort(out), false)
+    }
+
     suspend fun loadAll(): Library = withContext(Dispatchers.IO) {
         val out = LinkedHashMap<String, MediaItem>()
         val limited = false
@@ -33,16 +44,18 @@ class Repository(private val ctx: Context) {
         runCatching { mediaStoreFilesLikeImages() }.getOrDefault(emptyList()).forEach { out.putIfAbsent(it.key, it) }
 
         // 3) SAF-Ordner
-        folderStore.scan().forEach { out[it.key] = it }
+        runCatching { folderStore.scan() }.getOrDefault(emptyList()).forEach { out[it.key] = it }
 
         // 4) App-eigener Export-Ordner
         runCatching { appExportItems() }.getOrDefault(emptyList()).forEach { out[it.key] = it }
 
-        val sorted = out.values.sortedWith(
+        Library(sort(out), limited)
+    }
+
+    private fun sort(out: LinkedHashMap<String, MediaItem>): List<MediaItem> =
+        out.values.sortedWith(
             compareByDescending<MediaItem> { it.time }.thenByDescending { it.size }
         )
-        Library(sorted, limited)
-    }
 
     // ------------------------------------------------------------------ MediaStore
 
