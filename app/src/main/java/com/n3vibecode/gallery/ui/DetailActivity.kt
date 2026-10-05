@@ -57,6 +57,9 @@ class DetailActivity : AppCompatActivity() {
     private lateinit var sheetHint: TextView
 
     private var current: MediaItem? = null
+
+    /** Angelegte Seiten (Position → Seite), damit die sichtbare Seite ihr Vollbild laden kann. */
+    private val pages = HashMap<Int, MediaPageFragment>()
     private var currentMeta: MediaMeta? = null
 
     private val permissionLauncher = registerForActivityResult(
@@ -204,7 +207,11 @@ class DetailActivity : AppCompatActivity() {
 
         pager.adapter = object : FragmentStateAdapter(this) {
             override fun getItemCount(): Int = ViewState.viewList.size
-            override fun createFragment(position: Int) = MediaPageFragment.create(position)
+            // primary = die gerade sichtbare Seite. Nur sie lädt das Vollbild, die
+            // Nachbarseiten halten die schnelle Vorschau fürs Wischen bereit.
+            override fun createFragment(position: Int) =
+                MediaPageFragment.create(position, position == pager.currentItem)
+                    .also { pages[position] = it }
         }
         // Nachbarfotos schon im Voraus laden – Wischen zeigt sofort das nächste Bild
         pager.offscreenPageLimit = 1
@@ -212,12 +219,15 @@ class DetailActivity : AppCompatActivity() {
             override fun onPageSelected(position: Int) {
                 pager.isUserInputEnabled = true
                 onItemShown(position)
+                updatePrimary(position)
             }
         })
 
         val start = intent.getIntExtra(EXTRA_POSITION, 0).coerceIn(0, list.size - 1)
         pager.setCurrentItem(start, false)
         onItemShown(start)
+        // Nach dem Aufbau (die Seite entsteht erst mit dem Layout) das Vollbild starten
+        pager.post { updatePrimary(start) }
 
         findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
         // ℹ️  = Vollbild-Metadaten-Seite (immer vollständig scrollbar, kein Bottom-Sheet)
@@ -245,6 +255,13 @@ class DetailActivity : AppCompatActivity() {
     }
 
     // ------------------------------------------------------------------ Anzeige
+
+    /** Nur die sichtbare Seite lädt das Vollbild – die Nachbarn bleiben bei der Vorschau. */
+    private fun updatePrimary(current: Int) {
+        for ((position, page) in HashMap(pages)) {
+            page.setPrimary(position == current)
+        }
+    }
 
     private fun onItemShown(position: Int) {
         val item = ViewState.viewList.getOrNull(position) ?: return
@@ -431,11 +448,15 @@ class DetailActivity : AppCompatActivity() {
 
     private fun recreatePager() {
         val position = pager.currentItem
+        pages.clear()
         pager.adapter = object : FragmentStateAdapter(this) {
             override fun getItemCount(): Int = ViewState.viewList.size
-            override fun createFragment(position: Int) = MediaPageFragment.create(position)
+            override fun createFragment(position: Int) =
+                MediaPageFragment.create(position, position == pager.currentItem)
+                    .also { pages[position] = it }
         }
         pager.setCurrentItem(position, false)
+        pager.post { updatePrimary(position) }
     }
 
     // ------------------------------------------------------------------ Teilen / Kopieren / Löschen

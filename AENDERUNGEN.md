@@ -1,5 +1,60 @@
 # N3 Gallery – was neu ist
 
+## 1.26 – Speichern repariert, schnelleres Öffnen, Vorschauen bleiben im Speicher
+
+### a) Bearbeitete Fotos speichern – jetzt wirklich
+
+Drei Ursachen, alle behoben:
+
+* **Leere Bilder in der Galerie:** Wenn das Schreiben still scheiterte, blieb ein
+  0-Byte-Eintrag in der Galerie stehen – sah aus wie „gespeichert“, war aber nichts.
+  Jetzt wird nach dem Schreiben **nachgesehen** (Datei wirklich mit Inhalt da?) und ein
+  misslungener Eintrag wird **wieder entfernt**.
+* **„Gespeichert“, aber nirgends zu finden:** Als Ausweichweg wurde früher in den
+  app-internen Ordner geschrieben (`Android/data/…`). Den zeigt **keine** Galerie an.
+  Dieser Weg ist weg. Stattdessen: Galerie mit `Pictures/N3 Gallery` → falls das Gerät
+  das ablehnt, Galerie direkt in `Pictures` → auf Android 8/9 der öffentliche Bilder-Ordner.
+* **Letzter Ausweg ohne Datenverlust:** Nimmt die Galerie die Datei trotzdem nicht an,
+  liegt das Bild im Teilen-Ordner und ein Dialog bietet **„Teilen“** an (z. B. in Fotos
+  sichern). Und der Fehlergrund steht als Dialog da, nicht mehr als kurz aufblitzender
+  Hinweis.
+
+Zusätzlich: Klappt das Aufbereiten wegen Speichermangels nicht, wird automatisch eine
+Stufe kleiner gerechnet (4096 → 2560 → 1600 px) statt mit „konnte nicht aufbereitet
+werden“ abzubrechen. Bei HEIC steht im Speichern-Dialog, dass die Kopie als JPEG
+entsteht (HEIC lässt sich nicht überschreiben).
+
+### b) Erstes Antippen eines Fotos aus dem Raster: kürzere Wartezeit
+
+* **Vorher dekodierten drei Bilder gleichzeitig:** Die Großansicht hält die Nachbarfotos
+  für das Wischen bereit (`offscreenPageLimit = 1`) und ließ **jede** dieser Seiten sofort
+  das Vollbild in Bildschirmgröße rechnen. Drei schwere Dekodiervorgänge teilten sich die
+  CPU – das angetippte Foto wartete mit. Jetzt lädt **nur die sichtbare Seite** das
+  Vollbild; die Nachbarn bleiben bei der schnellen 1024-px-Vorschau (die fürs Wischen
+  reicht) und starten das Vollbild, sobald sie sichtbar werden.
+* **Kein doppeltes Dekodieren derselben Größe:** Läuft für ein Foto schon eine
+  Dekodierung, hängen sich weitere Anfragen an dieselbe Arbeit an, statt sie parallel zu
+  wiederholen.
+* **Vollbild-Threads mit höherer Priorität** als die Hintergrundarbeit des Rasters.
+* Die Raster-Kachel erscheint weiterhin **sofort** beim Antippen (schon im Speicher).
+
+### c) Vorschauen im RAM – „schon geladen“ heißt jetzt „bleibt da“
+
+Bisher lagen Vorschauen nur als fertige Bilder im Speicher. Ein 512-px-Bild belegt so
+**1 MB**, ein 64-px-Bild 16 kB – bei vielen Fotos ist der Speicher schnell voll und die
+ältesten Vorschauen fielen heraus (und mussten später neu dekodiert werden).
+
+Jetzt liegt **jede Vorschau zusätzlich komprimiert im RAM** (JPEG/PNG-Bytes, bis zu 32 MB):
+
+* Ein 512-px-Bild braucht so nur ~40 kB statt 1 MB – es passen **etwa 25× so viele**
+  Vorschauen in denselben Speicher.
+* Wird eine Kachel erneut gebraucht (zurückscrollen, Zoom ändern, Foto öffnen), ist sie in
+  Millisekunden wieder da – **ohne** erneutes Dekodieren (das bei HEIC/RAW Sekunden kostet).
+* Das gilt zusätzlich zur Festplatten-Ablage: nach einem App-Neustart sind die Vorschauen
+  weiterhin sofort da.
+* Die Vorschauen aus dem Hintergrund-Aufbau werden **nur** komprimiert abgelegt, damit der
+  Speicher für die sichtbaren Kacheln frei bleibt.
+
 ## 1.25 – Apple-Prinzip: scharfe Kacheln, Hintergrund-Aufbau, Hardware-Dekoder
 
 ### a) Kein unscharfes Aufblühen mehr

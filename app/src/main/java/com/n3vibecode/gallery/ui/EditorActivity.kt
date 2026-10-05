@@ -421,6 +421,10 @@ class EditorActivity : AppCompatActivity() {
             ) {
                 append("\n\n")
                 append(getString(R.string.editor_not_writable))
+                if (media.isHeif || media.isAvif) {
+                    append(" ")
+                    append(getString(R.string.editor_save_heif_note))
+                }
             }
         }
         MaterialAlertDialogBuilder(this)
@@ -446,7 +450,7 @@ class EditorActivity : AppCompatActivity() {
         progress.visibility = View.VISIBLE
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                val bmp = editor.renderResult()
+                val bmp = renderSafely()
                 if (bmp == null) {
                     SaveOutcome.RenderFailed
                 } else {
@@ -459,7 +463,7 @@ class EditorActivity : AppCompatActivity() {
             }
             progress.visibility = View.GONE
             if (result is SaveOutcome.RenderFailed) {
-                toast(getString(R.string.editor_render_failed))
+                showSaveProblem(getString(R.string.editor_render_failed))
                 return@launch
             }
             val res = (result as SaveOutcome.Done).result
@@ -470,9 +474,67 @@ class EditorActivity : AppCompatActivity() {
                     reportChanged()
                     finish()
                 }
-                is MediaSaver.Result.Failed -> toast(getString(R.string.editor_save_failed, res.message))
-                else -> toast(getString(R.string.editor_save_failed, ""))
+                is MediaSaver.Result.ShareOnly -> offerShare(res.file, res.reason)
+                is MediaSaver.Result.Failed -> showSaveProblem(res.message)
+                else -> showSaveProblem("")
             }
+        }
+    }
+
+    /**
+     * Ergebnis rendern. Klappt es wegen Speichermangels nicht in voller Größe, wird
+     * automatisch eine Stufe kleiner gerechnet – besser ein kleineres Bild als gar keins.
+     */
+    private fun renderSafely(): Bitmap? {
+        editor.renderResult(4096)?.let { return it }
+        editor.renderResult(2560)?.let { return it }
+        return editor.renderResult(1600)
+    }
+
+    /** Fehler nicht nur kurz einblenden, sondern stehen lassen, bis er gelesen ist. */
+    private fun showSaveProblem(reason: String) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.editor_save_failed_title)
+            .setMessage(if (reason.isBlank()) getString(R.string.editor_render_failed)
+            else getString(R.string.editor_save_failed, reason))
+            .setPositiveButton(R.string.ok, null)
+            .show()
+    }
+
+    /**
+     * Die Galerie hat die Datei nicht angenommen: Bild liegt im Teilen-Ordner und kann
+     * sofort weitergegeben werden – nichts ist verloren.
+     */
+    private fun offerShare(file: java.io.File, reason: String) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.editor_save_failed_title)
+            .setMessage(
+                buildString {
+                    if (reason.isNotBlank()) {
+                        append(getString(R.string.editor_save_failed, reason))
+                        append("\n\n")
+                    }
+                    append(getString(R.string.editor_share_only_msg))
+                }
+            )
+            .setPositiveButton(R.string.share) { _, _ -> shareFile(file) }
+            .setNegativeButton(R.string.ok, null)
+            .show()
+    }
+
+    private fun shareFile(file: java.io.File) {
+        try {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this, packageName + ".fileprovider", file
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = if (file.name.lowercase().endsWith(".png")) "image/png" else "image/jpeg"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, getString(R.string.share)))
+        } catch (t: Throwable) {
+            toast(getString(R.string.share_failed, t.message ?: ""))
         }
     }
 
@@ -489,7 +551,7 @@ class EditorActivity : AppCompatActivity() {
         progress.visibility = View.VISIBLE
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                val bmp = editor.renderResult()
+                val bmp = renderSafely()
                 if (bmp == null) {
                     SaveOutcome.RenderFailed
                 } else {
@@ -500,7 +562,7 @@ class EditorActivity : AppCompatActivity() {
             }
             progress.visibility = View.GONE
             if (result is SaveOutcome.RenderFailed) {
-                toast(getString(R.string.editor_render_failed))
+                showSaveProblem(getString(R.string.editor_render_failed))
                 return@launch
             }
             val res = (result as SaveOutcome.Done).result
@@ -513,6 +575,10 @@ class EditorActivity : AppCompatActivity() {
                     reportChanged()
                     finish()
                 }
+                is MediaSaver.Result.ShareOnly -> {
+                    pendingOverwrite = false
+                    offerShare(res.file, res.reason)
+                }
                 is MediaSaver.Result.NeedsPermission -> {
                     pendingOverwrite = true
                     try {
@@ -524,7 +590,7 @@ class EditorActivity : AppCompatActivity() {
                 }
                 is MediaSaver.Result.Failed -> {
                     pendingOverwrite = false
-                    toast(getString(R.string.editor_save_failed, res.message))
+                    showSaveProblem(res.message)
                 }
                 else -> {
                     pendingOverwrite = false

@@ -20,6 +20,37 @@ class MediaPageFragment : Fragment() {
 
     private var item: MediaItem? = null
 
+    /** Ist das die gerade sichtbare Seite? Nur die lädt das Vollbild. */
+    @Volatile private var primary = false
+    private var image: android.widget.ImageView? = null
+    private var progress: ProgressBar? = null
+    private var message: TextView? = null
+    private var hint: TextView? = null
+    private var maxPx = 0
+    private var fullRequested = false
+
+    /** true, sobald das Vollbild angezeigt wird – dann keine kleinere Vorschau mehr darüber. */
+    @Volatile private var fullShown = false
+
+    /**
+     * Wird von der Großansicht aufgerufen, wenn diese Seite sichtbar wird bzw. nicht mehr
+     * sichtbar ist. Nur die sichtbare Seite dekodiert das Vollbild – die Nachbarseiten
+     * bleiben bei der schnellen 1024-px-Vorschau (Vorbereitung fürs Wischen).
+     * Vorher dekodierten immer drei Seiten gleichzeitig, wodurch das angetippte Foto
+     * sekundenlang auf sich warten ließ.
+     */
+    fun setPrimary(value: Boolean) {
+        if (value == primary) return
+        primary = value
+        if (value) requestFull()
+    }
+
+    private fun requestFull() {
+        val media = item ?: return
+        val image = image ?: return
+        loadFull(media, image)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val index = arguments?.getInt(ARG_INDEX, 0) ?: 0
@@ -35,6 +66,10 @@ class MediaPageFragment : Fragment() {
         val progress = view.findViewById<ProgressBar>(R.id.progress)
         val message = view.findViewById<TextView>(R.id.tvMessage)
         val hint = view.findViewById<TextView>(R.id.tvHint)
+        this.image = image
+        this.progress = progress
+        this.message = message
+        this.hint = hint
 
         val media = item
         if (media == null) {
@@ -69,7 +104,8 @@ class MediaPageFragment : Fragment() {
         }
 
         val maxPx = ImageLoader.detailPx(requireContext())
-        var fullShown = false
+        this.maxPx = maxPx
+        fullShown = false
 
         // Mini-Vorschau (48 px) wird hier absichtlich NICHT hochgezogen: auf
         // Bildschirmgröße wäre sie stark unscharf („lädt erst dann scharf“).
@@ -86,7 +122,18 @@ class MediaPageFragment : Fragment() {
                 message.visibility = View.GONE
             }
         }
-        // 3) Vollbild in Bildschirmgröße
+        // 3) Vollbild in Bildschirmgröße – aber nur auf der gerade sichtbaren Seite
+        if (!primary) primary = arguments?.getBoolean(ARG_PRIMARY, false) == true
+        if (primary) loadFull(media, image)
+    }
+
+    /** Vollbild laden (eigene Funktion, damit sie auch später beim Wischen starten kann). */
+    private fun loadFull(media: MediaItem, image: android.widget.ImageView) {
+        if (fullRequested || !isAdded) return
+        val progress = this.progress ?: return
+        val message = this.message ?: return
+        val hint = this.hint ?: return
+        fullRequested = true
         ImageLoader.loadFullDetailed(requireContext(), media, maxPx) { bmp: Bitmap?, path ->
             if (!isAdded) return@loadFullDetailed
             progress.visibility = View.GONE
@@ -156,15 +203,25 @@ class MediaPageFragment : Fragment() {
 
     override fun onDestroyView() {
         (activity as? DetailActivity)?.setPagerInputEnabled(true)
+        // Wichtig: keine Verweise auf die zerstörte Ansicht behalten – sonst würde ein
+        // späteres „diese Seite ist jetzt sichtbar“ auf alte Views zugreifen.
+        image = null
+        progress = null
+        message = null
+        hint = null
         super.onDestroyView()
     }
 
     companion object {
         private var zoomHintShown = false
         const val ARG_INDEX = "index"
+        const val ARG_PRIMARY = "primary"
 
-        fun create(index: Int): MediaPageFragment = MediaPageFragment().apply {
-            arguments = Bundle().apply { putInt(ARG_INDEX, index) }
+        fun create(index: Int, primary: Boolean): MediaPageFragment = MediaPageFragment().apply {
+            arguments = Bundle().apply {
+                putInt(ARG_INDEX, index)
+                putBoolean(ARG_PRIMARY, primary)
+            }
         }
     }
 }

@@ -269,5 +269,8 @@
     <string name="editor_discard">Verwerfen</string>
     <string name="editor_nothing_to_save">Noch nichts zu speichern – erst zuschneiden, zeichnen oder Text einfügen.</string>
     <string name="editor_no_write_permission">Ohne die Speicher-Berechtigung kann das Foto nicht gespeichert werden.</string>
+    <string name="editor_save_failed_title">Speichern nicht möglich</string>
+    <string name="editor_save_heif_note">HEIC/HEIF lässt sich nicht überschreiben – die Kopie wird als JPEG gespeichert.</string>
+    <string name="editor_share_only_msg">Die Galerie hat die Datei nicht angenommen. Das Bild liegt deshalb im Teilen-Ordner der App – über „Teilen“ kannst du es in Fotos sichern oder verschicken. Das Original bleibt unverändert.</string>
     <string name="editor_render_failed">Das bearbeitete Foto konnte nicht aufbereitet werden (zu wenig Speicher?). Versuche einen kleineren Zuschnitt.</string>
 </resources>

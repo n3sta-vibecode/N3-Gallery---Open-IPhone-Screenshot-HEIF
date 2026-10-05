@@ -9,7 +9,21 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kame
 
 ---
 
-## 🆕 Version 1.25 – Apple-Prinzip: scharfe Kacheln, schneller bei vielen Fotos
+## 🆕 Version 1.26 – Speichern repariert, schneller öffnen, Vorschauen im RAM
+
+* **Bearbeitete Fotos speichern funktioniert jetzt:** Es wird geprüft, ob wirklich Daten
+  geschrieben wurden (keine leeren Bilder in der Galerie mehr), der unsichtbare
+  app-interne Ausweichordner ist weg (dort fand keine Galerie das Bild), und als letzter
+  Ausweg bietet ein Dialog „Teilen“ an. Klappt das Aufbereiten aus Speichernot nicht,
+  wird automatisch kleiner gerechnet.
+* **Erstes Öffnen eines Fotos ist kürzer:** Nur die sichtbare Seite lädt das Vollbild –
+  vorher dekodierten drei Seiten gleichzeitig. Gleiche Dekodierungen werden nicht mehr
+  doppelt gestartet.
+* **Vorschauen bleiben im Speicher:** Jede Vorschau liegt zusätzlich komprimiert im RAM
+  (~25× mehr Vorschauen passen hinein als vorher) – Zurückscrollen und Zoomwechsel sind
+  dadurch praktisch ohne Wartezeit.
+
+## Version 1.25 – Apple-Prinzip: scharfe Kacheln, schneller bei vielen Fotos
 
 * **Kein unscharfes Aufblühen mehr:** Kacheln erscheinen in echter Kachelgröße, nicht mehr
   als hochgerechnete Mini-Vorschau („zuerst unscharf“ war die Rückmeldung).

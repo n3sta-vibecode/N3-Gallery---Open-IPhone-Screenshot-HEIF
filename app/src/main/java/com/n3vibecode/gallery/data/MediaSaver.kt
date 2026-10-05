@@ -29,6 +29,13 @@ object MediaSaver {
 
     sealed class Result {
         data class Success(val uri: Uri, val name: String) : Result()
+
+        /**
+         * Die Galerie hat die Datei nicht angenommen. Das Bild ist deshalb **nicht verloren**:
+         * es liegt im Teilen-Ordner und kann direkt weitergegeben werden (Teilen-Knopf).
+         */
+        data class ShareOnly(val file: File, val reason: String) : Result()
+
         data class NeedsPermission(val intentSender: IntentSender) : Result()
         data class Failed(val message: String) : Result()
     }
@@ -78,46 +85,112 @@ object MediaSaver {
     fun saveCopy(ctx: Context, bitmap: Bitmap, baseName: String, jpeg: Boolean = true): Result {
         val fmt = format(bitmap, jpeg, "")
         val name = fileName(baseName, extension(fmt))
-        // Erst Galerie (MediaStore), sonst öffentlicher Bilder-Ordner bzw. app-eigener Ordner.
-        val viaStore = saveViaMediaStore(ctx, bitmap, fmt, name)
-        if (viaStore is Result.Success) return viaStore
+        val problems = StringBuilder()
+
+        // 1) Galerie über MediaStore (ab Android 10): Pictures/N3 Gallery
+        if (Build.VERSION.SDK_INT >= 29) {
+            val album = saveViaMediaStore(ctx, bitmap, fmt, name, ALBUM)
+            if (album is Result.Success) return album
+            if (album is Result.Failed) problems.append(album.message)
+
+            // 2) Manche Galerien mögen keinen Unterordner: dann direkt in Pictures.
+            //    Und für den Fall, dass IS_PENDING abgelehnt wird, ohne PENDING-Flag.
+            val top = saveViaMediaStore(ctx, bitmap, fmt, name, null)
+            if (top is Result.Success) return top
+            if (top is Result.Failed) problems.append(" / ").append(top.message)
+        }
+
+        // 3) Dateiweg: öffentlicher Bilder-Ordner (Android 8/9 mit Freigabe)
         val viaFile = saveViaFile(ctx, bitmap, fmt, name)
         if (viaFile is Result.Success) return viaFile
-        return (viaFile as? Result.Failed) ?: (viaStore as? Result.Failed)
-            ?: Result.Failed("Unbekannter Fehler beim Speichern")
+        if (viaFile is Result.Failed) problems.append(" / ").append(viaFile.message)
+
+        // 4) Letzter Ausweg: ablegen und zum Teilen anbieten – nichts geht verloren.
+        //    Früher landete das Bild in einem app-internen Ordner, den keine Galerie zeigt
+        //    („gespeichert“, aber nirgends zu sehen) – das ist jetzt nicht mehr so.
+        val share = saveForSharing(ctx, bitmap, fmt, name)
+        if (share != null) {
+            return Result.ShareOnly(share, problems.toString().trim(' ', '/'))
+        }
+        return Result.Failed(problems.toString().ifBlank { "Unbekannter Fehler beim Speichern" })
+    }
+
+    /** Ablage im Teilen-Ordner (FileProvider) für den letzten Ausweg. */
+    private fun saveForSharing(ctx: Context, bitmap: Bitmap, fmt: Bitmap.CompressFormat, name: String): File? = try {
+        val file = File(com.n3vibecode.gallery.GalleryApp.shareDir(), name)
+        file.outputStream().use { out ->
+            if (!write(out, bitmap, fmt)) throw IllegalStateException("Schreiben fehlgeschlagen")
+        }
+        if (file.length() > 0) file else null
+    } catch (_: Throwable) {
+        null
     }
 
     private fun saveViaMediaStore(
         ctx: Context,
         bitmap: Bitmap,
         fmt: Bitmap.CompressFormat,
-        name: String
+        name: String,
+        album: String?
     ): Result {
         if (Build.VERSION.SDK_INT < 29) {
             return Result.Failed("Android 8/9: Galerie-Eintrag nur über den Dateiweg")
         }
+        var inserted: Uri? = null
         return try {
             val values = ContentValues().apply {
                 put(MediaStore.Images.Media.DISPLAY_NAME, name)
                 put(MediaStore.Images.Media.MIME_TYPE, mime(fmt))
-                put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/$ALBUM")
+                put(
+                    MediaStore.Images.Media.RELATIVE_PATH,
+                    if (album.isNullOrBlank()) Environment.DIRECTORY_PICTURES
+                    else "${Environment.DIRECTORY_PICTURES}/$album"
+                )
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
             val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                ?: return Result.Failed("Galerie nahm die Datei nicht an")
+                ?: return Result.Failed("die Galerie nahm keinen Eintrag an")
+            inserted = uri
             ctx.contentResolver.openOutputStream(uri)?.use { out ->
                 if (!write(out, bitmap, fmt)) throw IllegalStateException("Schreiben fehlgeschlagen")
-            } ?: return Result.Failed("Galerie-Datei konnte nicht geöffnet werden")
-            values.clear()
-            values.put(MediaStore.Images.Media.IS_PENDING, 0)
-            ctx.contentResolver.update(uri, values, null, null)
+            } ?: throw IllegalStateException("Datei ließ sich nicht öffnen")
+
+            // Nachsehen, dass wirklich Daten angekommen sind. Sonst bliebe ein leeres Bild
+            // in der Galerie stehen – genau das sah aus wie „Speichern funktioniert nicht“.
+            if (contentOk(ctx, uri) == false) throw IllegalStateException("die Datei blieb leer")
+
+            val done = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
+            ctx.contentResolver.update(uri, done, null, null)
             ctx.contentResolver.notifyChange(uri, null)
             Result.Success(uri, name)
         } catch (se: SecurityException) {
+            // Kaputten Eintrag entfernen (falls schon angelegt)
+            inserted?.let { runCatching { ctx.contentResolver.delete(it, null, null) } }
             Result.Failed("keine Schreibberechtigung für die Galerie")
         } catch (t: Throwable) {
+            inserted?.let { runCatching { ctx.contentResolver.delete(it, null, null) } }
             Result.Failed(t.message ?: t.javaClass.simpleName)
         }
+    }
+
+    /**
+     * Prüft, ob die geschriebene Datei wirklich Inhalt hat.
+     * true = Daten da, false = leer, null = nicht prüfbar (dann nichts löschen!).
+     */
+    private fun contentOk(ctx: Context, uri: Uri): Boolean? = try {
+        val input = ctx.contentResolver.openInputStream(uri) ?: return null
+        var read = 0
+        input.use { ins ->
+            val buf = ByteArray(4096)
+            while (read <= 8) {
+                val n = ins.read(buf)
+                if (n <= 0) break
+                read += n
+            }
+        }
+        read > 0
+    } catch (_: Throwable) {
+        null
     }
 
     /**
@@ -134,9 +207,12 @@ object MediaSaver {
         val dirs = mutableListOf<File>()
         @Suppress("DEPRECATION")
         if (Build.VERSION.SDK_INT < 29) {
-            dirs += File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), ALBUM)
+            val pictures = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+            dirs += File(pictures, ALBUM)
+            dirs += pictures
         }
-        (ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: ctx.filesDir)?.let { dirs += it }
+        // Wichtig: KEIN app-interner Ordner mehr. Dort landete das Bild früher, war aber in
+        // keiner Galerie zu sehen – der Nutzer sah „gespeichert“ und fand nichts.
         var lastError: String? = null
         for (dir in dirs) {
             try {
@@ -145,6 +221,8 @@ object MediaSaver {
                 file.outputStream().use { out ->
                     if (!write(out, bitmap, fmt)) throw IllegalStateException("Schreiben fehlgeschlagen")
                 }
+                // Leere Datei wäre in der Galerie ein kaputtes Bild
+                if (file.length() <= 0) throw IllegalStateException("die Datei blieb leer")
                 android.media.MediaScannerConnection.scanFile(
                     ctx, arrayOf(file.absolutePath), arrayOf(mime(fmt)), null
                 )

@@ -77,10 +77,56 @@ object ImageLoader {
         return (max / 4).coerceIn(32L * 1024 * 1024, 160L * 1024 * 1024).toInt()
     }
 
-    fun cached(key: String): Bitmap? = cache.get(key)
+    /**
+     * Zusätzlich dieselben Vorschauen **komprimiert** im RAM (JPEG/PNG-Bytes).
+     *
+     * Warum: Ein 512-px-Bild als Bitmap belegt 1 MB, komprimiert nur ~40 kB – also passen
+     * 25× so viele Vorschauen in denselben Speicher. Wird eine Kachel erneut gebraucht,
+     * ist sie in ~1 ms wieder da (statt neu zu dekodieren, was bei HEIC/RAW Sekunden kostet).
+     * Das ist der Weg, wie „schon geladen“ dauerhaft „sofort da“ bedeutet.
+     */
+    private val bytes: LruCache<String, ByteArray> = object : LruCache<String, ByteArray>(bytesCacheSize()) {
+        // Wichtig: nach Bytes rechnen, nicht nach Anzahl Einträgen – sonst wäre das
+        // Limit wirkungslos.
+        override fun sizeOf(key: String, value: ByteArray): Int = value.size
+    }
+
+    private fun bytesCacheSize(): Int {
+        val max = Runtime.getRuntime().maxMemory()
+        // Gut ein Sechzehntel des Heaps, mindestens 4 MB, höchstens 32 MB
+        return (max / 16).coerceIn(4L * 1024 * 1024, 32L * 1024 * 1024).toInt()
+    }
+
+    /** Vorschau als Bytes ablegen – nur für Rastergrößen, nie für das Vollbild. */
+    private fun cacheBytes(key: String, bmp: Bitmap) {
+        if (maxOf(bmp.width, bmp.height) > 1024) return
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) return
+        try {
+            val out = java.io.ByteArrayOutputStream(16 * 1024)
+            val fmt = if (bmp.hasAlpha()) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+            if (bmp.compress(fmt, 85, out)) bytes.put(key, out.toByteArray())
+        } catch (_: Throwable) {
+        }
+    }
+
+    /** Speicher-Cache: erst das fertige Bild, sonst die komprimierte Vorschau auspacken. */
+    private fun memGet(key: String): Bitmap? {
+        cache.get(key)?.let { return it }
+        val raw = bytes.get(key) ?: return null
+        val bmp = runCatching { BitmapFactory.decodeByteArray(raw, 0, raw.size) }.getOrNull() ?: return null
+        cache.put(key, bmp)
+        return bmp
+    }
+
+    fun cached(key: String): Bitmap? = memGet(key)
+
+    /** Ist die Vorschau schon im Speicher – als fertiges Bild **oder** als Bytes? */
+    private fun hasCached(key: String): Boolean =
+        cache.get(key) != null || bytes.get(key) != null
 
     fun put(key: String, bmp: Bitmap) {
         cache.put(key, bmp)
+        cacheBytes(key, bmp)
     }
 
     /** Leert den Speicher-Cache (Vorschauen auf der Festplatte bleiben gültig). */
@@ -91,6 +137,7 @@ object ImageLoader {
     /** Zusätzlich alles vergessen (nach Bearbeiten/Überschreiben einer Datei). */
     fun clearAll(ctx: Context) {
         cache.evictAll()
+        bytes.evictAll()
         prefetched.clear()
         failed.clear()
     }
@@ -149,7 +196,11 @@ object ImageLoader {
     private val fullPool = Executors.newFixedThreadPool(3, object : ThreadFactory {
         private val n = AtomicInteger(1)
         override fun newThread(r: Runnable): Thread =
-            Thread(r, "n3-full-${n.getAndIncrement()}").apply { priority = Thread.NORM_PRIORITY }
+            Thread(r, "n3-full-${n.getAndIncrement()}").apply {
+                // Etwas über Normalpriorität: Das angetippte Foto ist wichtiger als alles,
+                // was im Hintergrund fürs Raster entsteht.
+                priority = Thread.NORM_PRIORITY + 1
+            }
     })
 
     /**
@@ -248,7 +299,7 @@ object ImageLoader {
         // 1) passende oder größere Stufe im Speicher → fertig
         for (b in BUCKETS) {
             if (b < bucket) continue
-            val hit = cache.get(keyFor(item, b))
+            val hit = memGet(keyFor(item, b))
             if (hit != null) {
                 target.setImageBitmap(hit)
                 return
@@ -261,7 +312,7 @@ object ImageLoader {
         var shown = false
         for (b in BUCKETS.reversed()) {
             if (b >= bucket || b * 2 < bucket) continue
-            val low = cache.get(keyFor(item, b))
+            val low = memGet(keyFor(item, b))
             if (low != null) {
                 target.setImageBitmap(low)
                 shown = true
@@ -352,7 +403,7 @@ object ImageLoader {
                 val item = items[index]
                 index++
                 if (failed.containsKey(item.uri)) continue
-                if (cache.get(keyFor(item, bucket)) != null) continue
+                if (hasCached(keyFor(item, bucket))) continue
                 if (diskFile(app, item, bucket).exists()) continue
                 try {
                     obtainThumb(app, item, bucket, null, keepInMemory = false)
@@ -398,7 +449,7 @@ object ImageLoader {
         for (item in items) {
             if (queued >= limit) break
             val key = keyFor(item, bucket)
-            if (cache.get(key) != null) continue
+            if (hasCached(key)) continue
             if (failed.containsKey(item.uri)) continue
             if (!prefetched.add(key)) continue
             if (diskFile(app, item, bucket).exists()) continue
@@ -435,7 +486,7 @@ object ImageLoader {
      * Dekodiervorgang. Ergebnis wird im Speicher und auf der Festplatte abgelegt.
      */
     private fun obtainMicro(ctx: Context, item: MediaItem, signal: CancellationSignal?): Bitmap? {
-        cache.get(microKey(item))?.let { return it }
+        memGet(microKey(item))?.let { return it }
         readDiskMicro(ctx, item)?.let { return it }
         if (signal?.isCanceled == true) return null
         if (failed.containsKey(item.uri)) return null
@@ -474,7 +525,7 @@ object ImageLoader {
         val bucket = bucketFor(sizePx)
         for (b in BUCKETS) {
             if (b < bucket) continue
-            cache.get(keyFor(item, b))?.let { return it }
+            memGet(keyFor(item, b))?.let { return it }
         }
         if (failed.containsKey(item.uri)) return null
         return obtainThumb(ctx.applicationContext, item, bucket, null)
@@ -482,7 +533,7 @@ object ImageLoader {
 
     /** Beste schon vorhandene Vorschau (größte Stufe zuerst) – sofort, ohne Warten. */
     fun bestCached(item: MediaItem): Bitmap? {
-        for (b in BUCKETS.reversed()) cache.get(keyFor(item, b))?.let { return it }
+        for (b in BUCKETS.reversed()) memGet(keyFor(item, b))?.let { return it }
         return null
     }
 
@@ -491,7 +542,7 @@ object ImageLoader {
      * während das Vollbild noch dekodiert. Läuft vor allen wartenden Raster-Kacheln.
      */
     fun loadPreview(ctx: Context, item: MediaItem, onDone: (Bitmap?) -> Unit) {
-        cache.get(keyFor(item, BUCKETS.last()))?.let { onDone(it); return }
+        memGet(keyFor(item, BUCKETS.last()))?.let { onDone(it); return }
         val appCtx = ctx.applicationContext
         interactiveBusy.incrementAndGet()
         fullPool.execute {
@@ -515,14 +566,29 @@ object ImageLoader {
         loadFullDetailed(ctx, item, maxPx) { bmp, _ -> onDone(bmp) }
     }
 
+    /**
+     * Läuft für eine Größe schon eine Dekodierung? Dann hängen sich weitere Anfragen an
+     * dieselbe Arbeit an, statt dasselbe Bild ein zweites Mal zu dekodieren. Das ist beim
+     * Antippen wichtig: Vorher dekodierten Großansicht und Vorbereitung parallel dasselbe
+     * Foto und nahmen sich gegenseitig die Rechenzeit weg.
+     */
+    private val runningFull = ConcurrentHashMap<String, MutableList<(Bitmap?, DecodePath) -> Unit>>()
+
     /** Wie [loadFull], meldet aber zusätzlich, über welchen Weg dekodiert wurde. */
     fun loadFullDetailed(ctx: Context, item: MediaItem, maxPx: Int, onDone: (Bitmap?, DecodePath) -> Unit) {
         val key = keyFor(item, maxPx)
-        val hit = cache.get(key)
-        if (hit != null) {
-            onDone(hit, DecodePath.NATIVE)
+        memGet(key)?.let {
+            onDone(it, DecodePath.NATIVE)
             return
         }
+        val waiters: MutableList<(Bitmap?, DecodePath) -> Unit> =
+            java.util.Collections.synchronizedList(mutableListOf<(Bitmap?, DecodePath) -> Unit>())
+        val already = runningFull.putIfAbsent(key, waiters)
+        if (already != null) {
+            already.add(onDone)
+            return
+        }
+        waiters.add(onDone)
         interactiveBusy.incrementAndGet()
         fullPool.execute {
             val result = try {
@@ -530,8 +596,10 @@ object ImageLoader {
             } finally {
                 interactiveBusy.decrementAndGet()
             }
-            result.bitmap?.let { cache.put(key, it) }
-            main.post { onDone(result.bitmap, result.path) }
+            result.bitmap?.let { put(key, it) }
+            runningFull.remove(key)
+            val snapshot = ArrayList(waiters)
+            main.post { for (w in snapshot) runCatching { w(result.bitmap, result.path) } }
         }
     }
 
@@ -553,14 +621,14 @@ object ImageLoader {
         if (bucket == MICRO) return obtainMicro(ctx, item, signal)
 
         val key = keyFor(item, bucket)
-        cache.get(key)?.let { return it }
+        memGet(key)?.let { return it }
 
         // Festplatten-Cache (genau diese Größenstufe)
         val file = diskFile(ctx, item, bucket)
         if (file.exists()) {
             val bmp = runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
             if (bmp != null) {
-                if (keepInMemory) cache.put(key, bmp)
+                if (keepInMemory) put(key, bmp) else cacheBytes(key, bmp)
                 return bmp
             }
             runCatching { file.delete() }
@@ -571,7 +639,7 @@ object ImageLoader {
         // neu zu dekodieren. Das ist der Unterschied zwischen „Bild ist sofort da“ und
         // mehreren Sekunden Wartezeit – besonders bei HEIC/RAW, wo Dekodieren teuer ist.
         cachedThumbAnySize(ctx, item, bucket)?.let { reuse ->
-            if (keepInMemory) cache.put(key, reuse)
+            if (keepInMemory) put(key, reuse) else cacheBytes(key, reuse)
             writeDisk(ctx, file, reuse)
             return reuse
         }
@@ -599,7 +667,9 @@ object ImageLoader {
         }
 
         if (bmp != null) {
-            if (keepInMemory) cache.put(key, bmp)
+            // Der Hintergrund-Aufbau legt die Vorschau nur komprimiert ab (wenig RAM),
+            // sichtbare Kacheln bekommen zusätzlich das fertige Bild.
+            if (keepInMemory) put(key, bmp) else cacheBytes(key, bmp)
             writeDisk(ctx, file, bmp)
         }
         return bmp
