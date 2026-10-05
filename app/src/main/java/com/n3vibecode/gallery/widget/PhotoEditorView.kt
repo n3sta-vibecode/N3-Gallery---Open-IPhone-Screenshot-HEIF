@@ -638,9 +638,18 @@ class PhotoEditorView @JvmOverloads constructor(
                 return true
             }
             MotionEvent.ACTION_POINTER_UP -> {
+                // Nach dem Zoomen soll der übrig gebliebene Finger weiterziehen können –
+                // genau wie in der Apple-Fotos-App.
+                lastDistance = 0f
                 lastMidX = midX(event)
                 lastMidY = midY(event)
-                lastDistance = 0f
+                if (mode == EditorMode.CROP) {
+                    activeHandle = HANDLE_MOVE
+                    gestureStartX = lastMidX
+                    gestureStartY = lastMidY
+                    panStartX = panX
+                    panStartY = panY
+                }
                 return true
             }
             MotionEvent.ACTION_UP -> {
