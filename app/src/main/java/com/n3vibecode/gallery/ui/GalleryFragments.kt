@@ -63,11 +63,6 @@ interface PageAware {
 /** Basis: Raster-RecyclerView mit Leerzustand und automatischer Aktualisierung. */
 abstract class BaseGridFragment : Fragment(), PageAware {
 
-    private companion object {
-        /** Wie viele Kacheln nach dem Aufbau im Hintergrund vorbereitet werden. */
-        const val WARM_UP_LIMIT = 600
-    }
-
     protected lateinit var recycler: RecyclerView
     protected lateinit var emptyView: View
     protected lateinit var emptyTitle: TextView
@@ -174,6 +169,8 @@ abstract class BaseGridFragment : Fragment(), PageAware {
         DataHub.removeListener(onHubChange)
         // Laufende Berechnungen dieser Ansicht verwerfen
         refreshToken++
+        // Nicht in den „es wird gescrollt“-Zustand hängen bleiben
+        ImageLoader.setScrolling(false)
         super.onDestroyView()
     }
 
@@ -185,6 +182,7 @@ abstract class BaseGridFragment : Fragment(), PageAware {
     override fun setPageActive(active: Boolean) {
         val becameActive = active && !pageActive
         pageActive = active
+        if (!active) ImageLoader.setScrolling(false)
         if (becameActive && dirty) {
             dirty = false
             if (isAdded) refresh()
@@ -334,8 +332,9 @@ abstract class BaseGridFragment : Fragment(), PageAware {
         if (list.isEmpty() || !isAdded) return
         val ctx = requireContext().applicationContext
         val px = adapter.tilePx()
-        val chunk = list.take(WARM_UP_LIMIT)
-        GridWork.run { ImageLoader.prefetch(ctx, chunk, px, WARM_UP_LIMIT) }
+        // Die ganze Liste der Reihe nach vorbereiten – der Daemon überspringt, was schon
+        // fertig ist, und macht beim nächsten Start dort weiter.
+        ImageLoader.startWarmUp(ctx, list, px)
     }
 
     /**
@@ -344,6 +343,12 @@ abstract class BaseGridFragment : Fragment(), PageAware {
      */
     private fun setupPrefetch() {
         recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(rv: RecyclerView, newState: Int) {
+                // Beim Wischen pausiert der Hintergrund-Aufbau: die sichtbaren Kacheln
+                // bekommen die CPU allein (wie bei Apple Fotos).
+                ImageLoader.setScrolling(newState != RecyclerView.SCROLL_STATE_IDLE)
+            }
+
             override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
                 if (dy == 0 || !isAdded) return
                 val now = SystemClock.uptimeMillis()
@@ -483,6 +488,11 @@ abstract class BaseGridFragment : Fragment(), PageAware {
         adapter.setSpan(span)
         recycler.requestLayout()
         syncControls()
+        // Andere Kachelgröße = andere Vorschaugröße: Hintergrund-Aufbau neu ausrichten
+        val list = lastVisible
+        if (isAdded && !list.isNullOrEmpty()) {
+            ImageLoader.startWarmUp(requireContext().applicationContext, list, adapter.tilePx())
+        }
     }
 }
 

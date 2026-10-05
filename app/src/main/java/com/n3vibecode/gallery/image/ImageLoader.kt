@@ -54,7 +54,12 @@ object ImageLoader {
      */
     const val MICRO = 48
 
-    private val BUCKETS = intArrayOf(128, 256, 512, 1024)
+    /**
+     * Zielkanten in px. Wichtig: **nie größer dekodieren als angezeigt wird.**
+     * Bei vielen Spalten (Kachel ≈ 50–90 px) wird nur die 64er-Stufe gebraucht – ein
+     * Bruchteil der Arbeit eines 512er-Dekodiervorgangs und trotzdem knackscharf.
+     */
+    private val BUCKETS = intArrayOf(64, 128, 256, 512, 1024)
 
     private fun bucketFor(px: Int): Int {
         for (b in BUCKETS) if (px <= b) return b
@@ -177,28 +182,11 @@ object ImageLoader {
             runCatching { signal.cancel() }
         }
 
-        /** Wurde schon das scharfe Bild gezeigt? (dann darf die Mini-Vorschau nicht mehr kommen) */
-        @Volatile private var fullPosted = false
-
         fun run() {
             if (cancelled) { finished = true; return }
-
-            // 1) Zuerst eine winzige Vorschau (48 px): die ist in Millisekunden da und wird
-            //    weich auf die Kachelgröße gerechnet. Statt grauer Fläche sieht man sofort
-            //    den Bildinhalt – wie bei Apple/Google Fotos.
-            if (bucket != MICRO) {
-                val micro = obtainMicro(appCtx, item, signal)
-                if (cancelled) { finished = true; return }
-                if (micro != null) {
-                    main.post {
-                        if (cancelled || fullPosted) return@post
-                        val view = targetRef?.get() ?: return@post
-                        if (view.tag == key && view.drawable == null) applyScaled(view, micro)
-                    }
-                }
-            }
-
-            // 2) Dann die passende Größe
+            // Es wird bewusst NUR die passende, scharfe Größe geliefert. Eine unscharfe
+            // Zwischenstufe wirkt wie „lädt noch“ – stattdessen sind die Kacheln durch
+            // den Hintergrund-Aufbau (siehe [startWarmUp]) schon fertig, bevor man hinkommt.
             val bmp = obtainThumb(appCtx, item, bucket, signal, keepInMemory)
             if (cancelled) {
                 // Ergebnis liegt im Cache – wird beim nächsten Binden sofort gezeigt
@@ -207,7 +195,6 @@ object ImageLoader {
             }
             main.post {
                 finished = true
-                fullPosted = true
                 if (cancelled) return@post
                 val view = targetRef?.get()
                 if (view != null) {
@@ -302,6 +289,98 @@ object ImageLoader {
         pending.remove(target)?.cancel()
         target.animate().cancel()
         target.alpha = 1f
+    }
+
+    // ------------------------------------------------------------------ Hintergrund-Aufbau
+    //
+    // Das ist das Apple-Prinzip: Die Vorschaubilder entstehen **nicht erst beim Scrollen**,
+    // sondern werden im Hintergrund der Reihe nach für die ganze Bibliothek erzeugt und
+    // dauerhaft gespeichert (wie die Thumbnail-Datenbank in iOS Fotos). Beim Wischen wird
+    // diese Arbeit pausiert, damit die sichtbaren Kacheln die CPU allein haben.
+
+    @Volatile private var scrolling = false
+    @Volatile private var warmUpItems: List<MediaItem> = emptyList()
+    @Volatile private var warmUpBucket = 0
+    @Volatile private var warmUpGeneration = 0
+    @Volatile private var warmUpFinished = false
+    private val warmUpLock = Any()
+    private var warmUpThread: Thread? = null
+
+    /** Wird vom Raster gesetzt: während des Wischens pausiert der Hintergrund-Aufbau. */
+    fun setScrolling(value: Boolean) {
+        scrolling = value
+    }
+
+    /** Fertig vorgerechnet? (Diagnose) */
+    fun warmUpDone(): Boolean = warmUpFinished
+
+    /**
+     * Startet (oder aktualisiert) den Hintergrund-Aufbau für die übergebene Liste in der
+     * gewünschten Kachelgröße. Läuft in Listenreihenfolge, überspringt alles, was schon
+     * auf der Festplatte liegt, und macht beim nächsten App-Start dort weiter.
+     */
+    fun startWarmUp(ctx: Context, items: List<MediaItem>, sizePx: Int) {
+        if (items.isEmpty()) return
+        val bucket = bucketFor(sizePx)
+        val app = ctx.applicationContext
+        synchronized(warmUpLock) {
+            if (warmUpBucket == bucket && warmUpItems.size == items.size &&
+                (items.isEmpty() || warmUpItems.firstOrNull()?.uri == items.first().uri)
+            ) return
+            warmUpItems = items
+            warmUpBucket = bucket
+            warmUpFinished = false
+            warmUpGeneration++
+            val generation = warmUpGeneration
+            if (warmUpThread == null) {
+                warmUpThread = Thread({ warmUpLoop(app, generation) }, "n3-thumb-daemon").apply {
+                    priority = Thread.NORM_PRIORITY - 1
+                    isDaemon = true
+                    start()
+                }
+            }
+        }
+    }
+
+    private fun warmUpLoop(app: Context, startGeneration: Int) {
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
+        var generation = startGeneration
+        while (true) {
+            val items = warmUpItems
+            val bucket = warmUpBucket
+            var index = 0
+            while (index < items.size) {
+                if (generation != warmUpGeneration) break          // neue Liste/Größe -> von vorn
+                if (scrolling || interactiveBusy.get() > 0) {       // beim Wischen pausieren
+                    sleepQuietly(90)
+                    continue
+                }
+                val item = items[index]
+                index++
+                if (failed.containsKey(item.uri)) continue
+                if (cache.get(keyFor(item, bucket)) != null) continue
+                if (diskFile(app, item, bucket).exists()) continue
+                try {
+                    obtainThumb(app, item, bucket, null, keepInMemory = false)
+                } catch (_: Throwable) {
+                    // einzelne Fehler überspringen
+                }
+                // Kurz Luft lassen: die Oberfläche hat immer Vorrang.
+                sleepQuietly(8)
+            }
+            if (generation == warmUpGeneration) warmUpFinished = true
+            // Warten, bis wieder etwas zu tun ist (neue Liste, andere Kachelgröße)
+            while (generation == warmUpGeneration) sleepQuietly(400)
+            generation = warmUpGeneration
+            warmUpFinished = false
+        }
+    }
+
+    private fun sleepQuietly(ms: Long) {
+        try {
+            Thread.sleep(ms)
+        } catch (_: InterruptedException) {
+        }
     }
 
     // ------------------------------------------------------------------ Vorladen (Prefetch)
@@ -531,8 +610,15 @@ object ImageLoader {
         // Systemvorschau (Android 10+) – schnell, auch für Videos und alte Fotos
         var bmp: Bitmap? = systemThumbnail(ctx, item, bucket, signal)
 
+        // Manche Geräte liefern für 10-Bit-/HDR-HEIFs eine (fast) schwarze Systemvorschau.
+        // Dann lieber den eigenen Decoder fragen, statt schwarze Kacheln zu zeigen.
+        if (bmp != null && (item.isHeif || item.isAvif) && Decoder.looksUniformlyDark(bmp)) {
+            val alternative = runCatching { Decoder.decode(ctx, item, bucket) }.getOrNull()
+            if (alternative != null && !Decoder.looksUniformlyDark(alternative)) bmp = alternative
+        }
+
         // Eigener Dekoder
-        if (bmp == null && signal?.isCanceled != true) {
+        if ((bmp == null || (item.isHeif && Decoder.looksUniformlyDark(bmp))) && signal?.isCanceled != true) {
             bmp = try {
                 Decoder.decode(ctx, item, bucket)
             } catch (_: OutOfMemoryError) {

@@ -54,8 +54,8 @@ jobs:
       - name: APK umbenennen
         if: always()
         run: |
-          [ -f app/build/outputs/apk/release/app-release.apk ] && cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/N3-Gallery-1.24-release.apk || true
-          [ -f app/build/outputs/apk/tryout/app-tryout.apk ] && cp app/build/outputs/apk/tryout/app-tryout.apk app/build/outputs/apk/tryout/N3-Gallery-1.24-TEST.apk || true
+          [ -f app/build/outputs/apk/release/app-release.apk ] && cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/N3-Gallery-1.25-release.apk || true
+          [ -f app/build/outputs/apk/tryout/app-tryout.apk ] && cp app/build/outputs/apk/tryout/app-tryout.apk app/build/outputs/apk/tryout/N3-Gallery-1.25-TEST.apk || true
 
       - name: APK hochladen
         if: always()
@@ -86,14 +86,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="testbuild-1.24"
-          git archive --format=zip -o /tmp/N3Gallery-Projekt-1.24.zip HEAD app build.gradle.kts settings.gradle.kts gradle.properties gradlew gradlew.bat gradle tools .github || true
+          TAG="testbuild-1.25"
+          git archive --format=zip -o /tmp/N3Gallery-Projekt-1.25.zip HEAD app build.gradle.kts settings.gradle.kts gradle.properties gradlew gradlew.bat gradle tools .github || true
           if ! gh release view "$TAG" > /dev/null 2>&1; then
-            gh release create "$TAG" --title "Testbuild 1.24 – flüssiges Scrollen + Foto-Editor" \
-              --notes "Automatisch gebaut. Zwei APKs: \"N3-Gallery-1.24-release.apk\" (gleiche App wie bisher, neue Version) und \"N3-Gallery-1.24-TEST.apk\" (installiert parallel zur vorhandenen App, nichts geht verloren). Quelle: Branch ${{ github.ref_name }}." \
+            gh release create "$TAG" --title "Testbuild 1.25 – flüssiges Scrollen + Foto-Editor" \
+              --notes "Automatisch gebaut. Zwei APKs: \"N3-Gallery-1.25-release.apk\" (gleiche App wie bisher, neue Version) und \"N3-Gallery-1.25-TEST.apk\" (installiert parallel zur vorhandenen App, nichts geht verloren). Quelle: Branch ${{ github.ref_name }}." \
               --prerelease
           fi
-          gh release upload "$TAG" app/build/outputs/apk/release/N3-Gallery-1.24-release.apk app/build/outputs/apk/tryout/N3-Gallery-1.24-TEST.apk /tmp/N3Gallery-Projekt-1.24.zip --clobber
+          gh release upload "$TAG" app/build/outputs/apk/release/N3-Gallery-1.25-release.apk app/build/outputs/apk/tryout/N3-Gallery-1.25-TEST.apk /tmp/N3Gallery-Projekt-1.25.zip --clobber
 
       # Damit Build-Fehler auch ohne Zugriff auf die Runner-Logs gelesen werden können:
       # die wichtigsten Zeilen landen als Kommentar am Pull Request.
@@ -108,7 +108,7 @@ jobs:
             grep -nE "^(e: |FAILURE|\* What went wrong|Caused by|Execution failed)|error:|Could not|Unresolved" /tmp/build.log | tail -40 || true
             echo '--- APK-Daten ---'
             AAPT="$SDK/build-tools/36.0.0/aapt2"
-            for apk in app/build/outputs/apk/release/N3-Gallery-1.24-release.apk app/build/outputs/apk/tryout/N3-Gallery-1.24-TEST.apk; do
+            for apk in app/build/outputs/apk/release/N3-Gallery-1.25-release.apk app/build/outputs/apk/tryout/N3-Gallery-1.25-TEST.apk; do
               [ -f "$apk" ] || continue
               echo "$apk"
               [ -x "$AAPT" ] && "$AAPT" dump badging "$apk" | grep -E "^package:|^application-label:|^launchable-activity:|^sdkVersion:|^targetSdkVersion:" || true

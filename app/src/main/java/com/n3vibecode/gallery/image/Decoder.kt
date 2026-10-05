@@ -32,6 +32,45 @@ data class DecodeResult(val bitmap: Bitmap?, val path: DecodePath)
  */
 object Decoder {
 
+    /** Läuft gerade erfolgreich ein Hardware-/System-Dekodierweg für HEIF? */
+    private val platformWins = java.util.concurrent.atomic.AtomicInteger(0)
+    private val platformFails = java.util.concurrent.atomic.AtomicInteger(0)
+
+    @Volatile private var skipPlatformForHeif = false
+
+    /** Diagrose: nutzt das Gerät den System-Decoder für HEIFs? */
+    fun usesSystemDecoderForHeif(): Boolean = !skipPlatformForHeif
+
+    /**
+     * Erkennt (fast) einfarbig schwarze Bilder. Solche Ergebnisse entstehen bei manchen
+     * Geräten, wenn 10-Bit-/HDR-HEIFs über den falschen Weg dekodiert werden – dann wird
+     * der nächste Weg probiert, statt schwarze Kacheln zu zeigen.
+     */
+    fun looksUniformlyDark(bmp: Bitmap): Boolean {
+        val w = bmp.width
+        val h = bmp.height
+        if (w < 2 || h < 2) return false
+        var dark = true
+        var samples = 0
+        for (gy in 0 until 6) {
+            for (gx in 0 until 6) {
+                val x = (w - 1) * gx / 5
+                val y = (h - 1) * gy / 5
+                val c = runCatching { bmp.getPixel(x, y) }.getOrElse { return false }
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                samples++
+                if (r + g + b > 48) {   // mehr als „fast schwarz“
+                    dark = false
+                    break
+                }
+            }
+            if (!dark) break
+        }
+        return dark && samples > 0
+    }
+
     fun sampleSize(w: Int, h: Int, maxPx: Int): Int {
         if (w <= 0 || h <= 0 || maxPx <= 0) return 1
         var sample = 1
@@ -64,9 +103,23 @@ object Decoder {
                 return DecodeResult(null, DecodePath.NONE)
             }
 
-            // 3) HEIF/AVIF: System zuerst (schnell), sonst der eingebaute libheif-Decoder
+            // 3) HEIF/AVIF: System zuerst (auf vielen Geräten Hardware-Decoder = sehr schnell),
+            //    sonst der eingebaute libheif-Decoder.
+            //
+            //    Wichtig für die Geschwindigkeit: Kann das Gerät Apple-HEIFs (Kachel-Raster,
+            //    10-Bit) nicht über den System-Decoder öffnen, wird das gemerkt – sonst kostet
+            //    jeder einzelne Fehlversuch bei jedem Foto wieder Zeit.
             if (isHeifFamily) {
-                platformDecode(ctx, item, maxPx)?.let { return DecodeResult(it, DecodePath.NATIVE) }
+                if (!skipPlatformForHeif) {
+                    val viaSystem = platformDecode(ctx, item, maxPx)
+                    if (viaSystem != null) {
+                        platformWins.incrementAndGet()
+                        return DecodeResult(viaSystem, DecodePath.NATIVE)
+                    }
+                    if (platformWins.get() == 0 && platformFails.incrementAndGet() >= 3) {
+                        skipPlatformForHeif = true
+                    }
+                }
                 heifDecode(ctx, item, maxPx)?.let { return DecodeResult(it, DecodePath.HEIF_LIB) }
                 embeddedJpeg(ctx, item, maxPx)?.let { return DecodeResult(it, DecodePath.EMBEDDED_JPEG) }
                 return DecodeResult(null, DecodePath.NONE)
@@ -113,6 +166,13 @@ object Decoder {
 
     fun platformDecode(ctx: Context, item: MediaItem, maxPx: Int): Bitmap? {
         val uri = Uri.parse(item.uri)
+        // Zuerst der Hardware-Weg (ab Android 10): für HEVC/HEIF deutlich schneller als
+        // Software – so wie Apple es macht. Ergebnis wird geprüft (HDR kann sonst schwarz werden).
+        if (Build.VERSION.SDK_INT >= 29 && (item.isHeif || item.isAvif)) {
+            hardwareDecode(ctx, uri, maxPx)?.let { hw ->
+                if (!looksUniformlyDark(hw)) return hw
+            }
+        }
         if (Build.VERSION.SDK_INT >= 28) {
             try {
                 val source = ImageDecoder.createSource(ctx.contentResolver, uri)
@@ -129,6 +189,33 @@ object Decoder {
             }
         }
         return bitmapFactoryDecode(ctx, uri, maxPx)
+    }
+
+    /**
+     * Hardware-Dekodierung (Android 10+). Der HEVC-Decoder der CPU/GPU ist um ein
+     * Vielfaches schneller als libheif in Software – deshalb zuerst probieren.
+     * Das Ergebnis wird in ein normales (Software-)Bitmap kopiert, damit es sich
+     * speichern und weiterverarbeiten lässt.
+     */
+    private fun hardwareDecode(ctx: Context, uri: Uri, maxPx: Int): Bitmap? {
+        return try {
+            val source = ImageDecoder.createSource(ctx.contentResolver, uri)
+            val hw = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_HARDWARE
+                val sample = sampleSize(info.size.width, info.size.height, maxPx)
+                if (sample > 1) decoder.setTargetSampleSize(sample)
+            }
+            if (hw == null) return null
+            val software = Bitmap.createBitmap(hw.width, hw.height, Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(software)
+            canvas.drawBitmap(hw, 0f, 0f, null)
+            hw.recycle()
+            software
+        } catch (_: Throwable) {
+            null
+        } catch (_: OutOfMemoryError) {
+            null
+        }
     }
 
     private fun bitmapFactoryDecode(ctx: Context, uri: Uri, maxPx: Int): Bitmap? {
