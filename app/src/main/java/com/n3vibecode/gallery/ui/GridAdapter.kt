@@ -47,7 +47,7 @@ interface Grouper {
 class GridAdapter(
     spanCount: Int,
     private var withHeaders: Boolean,
-    private val onItemClick: (MediaItem) -> Unit,
+    private val onItemClick: (item: MediaItem, index: Int) -> Unit,
     private val onItemLongClick: ((MediaItem) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
@@ -111,6 +111,7 @@ class GridAdapter(
     sealed class Row(val id: String) {
         class Header(val title: String, val sub: String) : Row("h:" + title)
         object Banner : Row("banner")
+
         class Entry(val item: MediaItem) : Row("i:" + item.uri)
 
         override fun equals(other: Any?): Boolean = when {
@@ -127,16 +128,30 @@ class GridAdapter(
 
     private val differ = AsyncListDiffer(this, DIFF)
 
-    /** Zeilenliste im Hintergrund aufbauen (siehe [buildRows]) und hier übergeben. */
-    fun submitRows(newRows: List<Row>) {
+    /**
+     * Zeilenliste im Hintergrund aufbauen (siehe [buildRows]) und hier übergeben.
+     * [items] ist die zugehörige Fotoliste – aus ihr stammt die Position beim Antippen.
+     */
+    fun submitRows(newRows: List<Row>, items: List<MediaItem> = emptyList()) {
+        if (items.isNotEmpty()) {
+            val map = HashMap<String, Int>(items.size * 2)
+            items.forEachIndexed { index, item -> map[item.uri] = index }
+            indexByUri = map
+        }
         differ.submitList(newRows)
     }
 
     /** Einfache Liste ohne Gruppierung setzen (Alben, Sammlungen). */
     fun submitItems(list: List<MediaItem>) {
         ViewState.viewList = list
+        val map = HashMap<String, Int>(list.size * 2)
+        list.forEachIndexed { index, item -> map[item.uri] = index }
+        indexByUri = map
         differ.submitList(list.map { Row.Entry(it) })
     }
+
+    /** Position eines Fotos in der aktuellen Liste (für das Antippen). */
+    private var indexByUri: Map<String, Int> = emptyMap()
 
     override fun getItemCount(): Int = differ.currentList.size
 
@@ -232,6 +247,14 @@ class GridAdapter(
                     if (!tiny && item.isVideoFile) View.VISIBLE else View.GONE
                 if (h.iconOverlay.visibility == View.VISIBLE) {
                     h.iconOverlay.setImageResource(R.drawable.ic_play)
+                }
+
+                // Antippen: Position kommt direkt aus der Zeile – dadurch öffnet sich
+                // garantiert genau dieses Foto, unabhängig von anderen Listen im Speicher.
+                h.itemView.setOnClickListener { onItemClick(item, indexByUri[item.uri] ?: -1) }
+                h.itemView.setOnLongClickListener {
+                    onItemLongClick?.invoke(item)
+                    onItemLongClick != null
                 }
             }
         }

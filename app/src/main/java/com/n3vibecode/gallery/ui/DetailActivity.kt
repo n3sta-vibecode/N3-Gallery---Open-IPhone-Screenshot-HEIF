@@ -174,6 +174,28 @@ class DetailActivity : AppCompatActivity() {
             }
         }
 
+        // Sicherstellen, dass Position und Liste zusammenpassen: Wenn wir die Bild-URI
+        // kennen, bestimmen wir die Position daraus. So kann nie ein anderes Foto
+        // geöffnet werden, nur weil eine andere Ansicht die Liste überschrieben hat.
+        val wantedUri = intent.getStringExtra(EXTRA_URI)
+        if (!wantedUri.isNullOrBlank()) {
+            val current = ViewState.viewList
+            val idx = current.indexOfFirst { it.uri == wantedUri }
+            if (idx >= 0) {
+                intent.putExtra(EXTRA_POSITION, idx)
+            } else {
+                // Aus einer Sammlung geöffnet, deren Liste nicht mehr gesetzt ist
+                val fromLibrary = DataHub.all.indexOfFirst { it.uri == wantedUri }
+                if (fromLibrary >= 0) {
+                    ViewState.viewList = DataHub.all
+                    intent.putExtra(EXTRA_POSITION, fromLibrary)
+                } else {
+                    DataHub.find(wantedUri)?.let { ViewState.viewList = listOf(it) }
+                    intent.putExtra(EXTRA_POSITION, 0)
+                }
+            }
+        }
+
         val list = ViewState.viewList
         if (list.isEmpty()) {
             finish()
@@ -530,5 +552,8 @@ class DetailActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_POSITION = "position"
+
+        /** Eindeutige Kennung des Fotos – verhindert, dass ein anderes Bild geöffnet wird. */
+        const val EXTRA_URI = "uri"
     }
 }

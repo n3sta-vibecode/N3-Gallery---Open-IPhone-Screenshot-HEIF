@@ -52,9 +52,11 @@ class OverviewActivity : AppCompatActivity() {
         tvTitle.text = getString(R.string.overview_title) + " · " + getString(R.string.count_files, list.size)
 
         mosaic.onCellTap = { index ->
+            ViewState.viewList = list
             startActivity(
                 Intent(this, DetailActivity::class.java)
                     .putExtra(DetailActivity.EXTRA_POSITION, index)
+                    .putExtra(DetailActivity.EXTRA_URI, list.getOrNull(index)?.uri)
             )
         }
 

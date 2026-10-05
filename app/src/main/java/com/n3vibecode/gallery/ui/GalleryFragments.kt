@@ -63,6 +63,11 @@ interface PageAware {
 /** Basis: Raster-RecyclerView mit Leerzustand und automatischer Aktualisierung. */
 abstract class BaseGridFragment : Fragment(), PageAware {
 
+    private companion object {
+        /** Wie viele Kacheln nach dem Aufbau im Hintergrund vorbereitet werden. */
+        const val WARM_UP_LIMIT = 600
+    }
+
     protected lateinit var recycler: RecyclerView
     protected lateinit var emptyView: View
     protected lateinit var emptyTitle: TextView
@@ -152,7 +157,6 @@ abstract class BaseGridFragment : Fragment(), PageAware {
         lm.initialPrefetchItemCount = span * 2
         recycler.layoutManager = lm
         recycler.adapter = adapter
-        recycler.setHasFixedSize(true)
         // Viele kleine Kacheln: großzügiger Kachel-Pool und Zwischenspeicher, damit beim
         // Scrollen und Zoomen kaum neue Views gebaut werden müssen
         recycler.recycledViewPool.setMaxRecycledViews(1, 400)
@@ -188,19 +192,31 @@ abstract class BaseGridFragment : Fragment(), PageAware {
     }
 
     protected open fun openDetail(index: Int) {
+        openDetail(index, null)
+    }
+
+    /**
+     * Öffnet die Großansicht. Wichtig: Die Liste, zu der die Position gehört, wird hier
+     * **mitgegeben** und als aktuelle Liste gesetzt. Vorher lag sie nur irgendwo global
+     * im Speicher und konnte von einer anderen Ansicht (Album, Ordner, Sammlung)
+     * überschrieben werden – dann öffnete ein Tipp das falsche Foto oder gar keins.
+     */
+    protected fun openDetail(index: Int, uri: String?) {
+        lastVisible?.let { ViewState.viewList = it }
         startActivity(
             Intent(requireContext(), DetailActivity::class.java)
                 .putExtra(DetailActivity.EXTRA_POSITION, index)
+                .putExtra(DetailActivity.EXTRA_URI, uri)
         )
     }
 
-    private fun openDetailFromItem(item: MediaItem) {
-        val index = currentItems().indexOf(item)
-        if (index >= 0) openDetail(index)
+    private fun openDetailFromItem(item: MediaItem, index: Int) {
+        openDetail(index, item.uri)
     }
 
-    /** Aktuell angezeigte Liste (für Index-Berechnung beim Antippen). */
-    private fun currentItems(): List<MediaItem> = ViewState.viewList
+    /** Zuletzt angezeigte Liste (gehört zu den Positionen der Kacheln). */
+    @Volatile
+    private var lastVisible: List<MediaItem>? = null
 
     /** Langes Drücken: Bearbeiten (Zuschneiden/Zeichnen/Text), Teilen, Details. */
     private fun onItemLongPress(item: MediaItem) {
@@ -216,8 +232,8 @@ abstract class BaseGridFragment : Fragment(), PageAware {
                     0 -> EditorActivity.start(requireContext(), item.uri)
                     1 -> share(item)
                     else -> {
-                        val index = currentItems().indexOf(item)
-                        if (index >= 0) openDetail(index)
+                        val index = lastVisible?.indexOfFirst { it.uri == item.uri } ?: -1
+                        if (index >= 0) openDetail(index, item.uri)
                     }
                 }
             }
@@ -273,9 +289,11 @@ abstract class BaseGridFragment : Fragment(), PageAware {
             if (token != refreshToken) return@run
             main.post {
                 if (token != refreshToken || !isAdded) return@post
-                adapter.submitRows(rows)
+                lastVisible = list
+                adapter.submitRows(rows, list)
                 DataHubViewHelper.updateEmpty(emptyView, list.isEmpty(), emptyText())
                 startPrefetch()
+                startWarmUp(list)
             }
         }
     }
@@ -307,6 +325,20 @@ abstract class BaseGridFragment : Fragment(), PageAware {
     }
 
     /**
+     * Nach dem Aufbau die nächsten Kacheln in Ruhe fertigstellen (in Reihenfolge der Liste,
+     * also genau die, die beim Weiterscrollen drankommen). Die Anfragen landen **hinter**
+     * den sichtbaren Bildern in der Warteschlange – Wischen und Antippen bleiben dadurch
+     * jederzeit reaktionsschnell, und beim Scrollen sind die Bilder schon da.
+     */
+    private fun startWarmUp(list: List<MediaItem>) {
+        if (list.isEmpty() || !isAdded) return
+        val ctx = requireContext().applicationContext
+        val px = adapter.tilePx()
+        val chunk = list.take(WARM_UP_LIMIT)
+        GridWork.run { ImageLoader.prefetch(ctx, chunk, px, WARM_UP_LIMIT) }
+    }
+
+    /**
      * Beim Wischen die nächsten Kacheln vorladen – die Anfragen landen hinter den
      * sichtbaren Bildern in der Warteschlange und kosten daher keine Reaktionszeit.
      */
@@ -326,7 +358,7 @@ abstract class BaseGridFragment : Fragment(), PageAware {
                 val backward = if (dy < 0 && first > spread) adapter.itemsBetween(first - spread * 2, first - 1) else emptyList()
                 val ctx = requireContext().applicationContext
                 val px = adapter.tilePx()
-                GridWork.run { ImageLoader.prefetch(ctx, forward + backward, px, 40) }
+                GridWork.run { ImageLoader.prefetch(ctx, forward + backward, px, 60) }
             }
         })
     }
@@ -449,6 +481,7 @@ abstract class BaseGridFragment : Fragment(), PageAware {
     private fun applySpan() {
         (recycler.layoutManager as? GridLayoutManager)?.spanCount = span
         adapter.setSpan(span)
+        recycler.requestLayout()
         syncControls()
     }
 }
@@ -619,7 +652,6 @@ class TagsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val recycler = view.findViewById<RecyclerView>(R.id.recycler)
         val empty = view.findViewById<View>(R.id.emptyView)
-        recycler.setHasFixedSize(true)
         recycler.itemAnimator = null
         adapter = CollectionAdapter { row -> onRow(row) }
         recycler.layoutManager = LinearLayoutManager(requireContext())
@@ -736,7 +768,6 @@ class FoldersFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val recycler = view.findViewById<RecyclerView>(R.id.recycler)
         val empty = view.findViewById<View>(R.id.emptyView)
-        recycler.setHasFixedSize(true)
         recycler.itemAnimator = null
         adapter = CollectionAdapter { row ->
             when {

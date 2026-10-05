@@ -62,13 +62,14 @@ class CollectionActivity : AppCompatActivity() {
         }
         host.addView(recycler)
         recycler.layoutManager = GridLayoutManager(this, 3)
-        val adapter = GridAdapter(3, false, { item ->
-            val index = items.indexOf(item)
-            if (index >= 0) {
-                startActivity(
-                    Intent(this, DetailActivity::class.java).putExtra(DetailActivity.EXTRA_POSITION, index)
-                )
-            }
+        val adapter = GridAdapter(3, false, { item, index ->
+            // Liste und Position immer gemeinsam übergeben – so öffnet sich sicher dieses Foto
+            ViewState.viewList = items
+            startActivity(
+                Intent(this, DetailActivity::class.java)
+                    .putExtra(DetailActivity.EXTRA_POSITION, index)
+                    .putExtra(DetailActivity.EXTRA_URI, item.uri)
+            )
         }, { item ->
             // Langes Drücken = direkt bearbeiten
             startActivity(

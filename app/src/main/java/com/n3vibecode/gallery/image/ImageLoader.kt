@@ -141,11 +141,11 @@ object ImageLoader {
     })
 
     /**
-     * Anzahl Dekodier-Threads: bewusst nur etwa die Hälfte der CPU-Kerne (2–5).
-     * Mehr Threads brachten keine spürbar schnelleren Vorschaubilder, aber deutlich
-     * ruckeligeres Scrollen, weil der Oberfläche CPU-Zeit fehlte.
+     * Anzahl Dekodier-Threads: etwa die Hälfte der CPU-Kerne plus einer (3–6).
+     * Die Threads laufen mit Hintergrund-Priorität, kosten die Oberfläche also kaum
+     * Reaktionszeit – mehr Threads bedeuten hier spürbar schneller gefüllte Kacheln.
      */
-    val WORKERS: Int = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 5)
+    val WORKERS: Int = (Runtime.getRuntime().availableProcessors() / 2 + 1).coerceIn(3, 6)
 
     // ------------------------------------------------------------------ Aufgaben
 
@@ -379,7 +379,7 @@ object ImageLoader {
         val key = keyFor(item, bucket)
         cache.get(key)?.let { return it }
 
-        // Festplatten-Cache
+        // Festplatten-Cache (genau diese Größenstufe)
         val file = diskFile(ctx, item, bucket)
         if (file.exists()) {
             val bmp = runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
@@ -388,6 +388,16 @@ object ImageLoader {
                 return bmp
             }
             runCatching { file.delete() }
+        }
+        if (signal?.isCanceled == true) return null
+
+        // Schon eine andere Größenstufe auf der Festplatte? Dann passend skalieren statt
+        // neu zu dekodieren. Das ist der Unterschied zwischen „Bild ist sofort da“ und
+        // mehreren Sekunden Wartezeit – besonders bei HEIC/RAW, wo Dekodieren teuer ist.
+        cachedThumbAnySize(ctx, item, bucket)?.let { reuse ->
+            cache.put(key, reuse)
+            writeDisk(ctx, file, reuse)
+            return reuse
         }
         if (signal?.isCanceled == true) return null
 
@@ -410,6 +420,34 @@ object ImageLoader {
             writeDisk(ctx, file, bmp)
         }
         return bmp
+    }
+
+    /**
+     * Sucht die nächstbeste schon vorhandene Vorschau (andere Größenstufe) und skaliert sie
+     * auf die gewünschte Kantenlänge. Nur brauchbare Größen werden verwendet – bei zu kleinen
+     * Vorschauen wird lieber richtig dekodiert (Qualität geht vor).
+     */
+    private fun cachedThumbAnySize(ctx: Context, item: MediaItem, bucket: Int): Bitmap? {
+        val candidates = BUCKETS.filter { it != bucket }.sortedBy { kotlin.math.abs(it - bucket) }
+        for (b in candidates) {
+            val f = diskFile(ctx, item, b)
+            if (!f.exists()) continue
+            val src = runCatching { BitmapFactory.decodeFile(f.absolutePath) }.getOrNull() ?: continue
+            val longest = maxOf(src.width, src.height)
+            if (longest <= 0) { continue }
+            // Zu klein für diese Kachel? Dann lieber weiter suchen / neu dekodieren.
+            if (longest < bucket * 0.75f) { src.recycle(); continue }
+            val scale = bucket.toFloat() / longest
+            val scaled = if (scale < 0.99f) {
+                val w = (src.width * scale).toInt().coerceAtLeast(1)
+                val h = (src.height * scale).toInt().coerceAtLeast(1)
+                runCatching { Bitmap.createScaledBitmap(src, w, h, true) }.getOrNull()?.also {
+                    if (it !== src) src.recycle()
+                }
+            } else src
+            if (scaled != null) return scaled
+        }
+        return null
     }
 
     private fun systemThumbnail(ctx: Context, item: MediaItem, bucket: Int, signal: CancellationSignal?): Bitmap? {
