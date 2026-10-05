@@ -9,6 +9,52 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kame
 
 ---
 
+## 🆕 Version 1.22 – flüssiges Scrollen + Foto-Editor
+
+**Zwei Dinge, die vorher gefehlt haben:**
+
+1. **Kein Scroll-Ruckeln mehr / nichts wartet mehr auf sich selbst.**
+   Was konkret geändert wurde:
+   * **Datums-Formatierung im Cache:** Vorher wurde für *jedes einzelne Foto* ein neuer
+     `SimpleDateFormat` gebaut – bei 20 000 Fotos blockierte das den Haupt-Thread sekundenlang.
+     Jetzt gibt es einen Formatierer je Muster und einen Zwischenspeicher für Tages-/Monats-Titel.
+   * **Raster-Aufbau im Hintergrund:** Die Liste (Fotos + Überschriften + Summen) wird auf einem
+     Hintergrund-Thread gebaut und über `DiffUtil` übergeben. Dadurch wird beim Aktualisieren
+     oder Zoomen nur noch gezeichnet, was sich wirklich geändert hat – kein kompletter Neuaufbau.
+   * **Favoriten/Notizen/Tags im Speicher:** Statt bei jedem Bild erneut in die Preferences zu
+     schauen, liegen die Daten als Index im Speicher (einmal im Hintergrund geladen).
+   * **Nur der sichtbare Tab rechnet:** Die vier Tabs wurden vorher alle gleichzeitig aufgebaut
+     und bei jeder Änderung komplett neu berechnet. Unsichtbare Tabs werden jetzt nur als
+     „schmutzig“ markiert und erst beim Wechsel wirklich aktualisiert.
+   * **Dekodieren mit Hintergrund-Priorität** und weniger Threads (vorher 8, jetzt 2–5) – die
+     Oberfläche bekommt dadurch jederzeit CPU-Zeit. Vorladen (Prefetch) der nächsten Bildschirme
+     läuft in der Warteschlange hinter den sichtbaren Bildern.
+   * **Sofort etwas zu sehen:** Beim Start wird zuerst nur der Android-Medienindex gelesen
+     (Galerie ist sofort gefüllt), eigene SAF-Ordner kommen kurz danach nach.
+2. **Foto-Editor: zuschneiden, zeichnen, Textfelder.**
+   Erreichbar über das **Pinsel-Symbol** in der Großansicht (oben) oder **langes Drücken** auf
+   eine Kachel.
+   * **Zuschneiden** mit Griffen, Drittel-Raster und Seitenverhältnissen (Frei, 1:1, 4:3, 3:4, 16:9, 9:16)
+   * **Zeichnen** freihand, 10 Farben, Strichstärke einstellbar
+   * **Textfelder** platzieren, verschieben, doppelt antippen zum Ändern, duplizieren, löschen
+   * **Rückgängig / Wiederholen** für alle Schritte, in das Bild zoomen mit zwei Fingern
+   * **Speichern** als neue Kopie (`Pictures/N3 Gallery`, erscheint sofort in der Galerie) **oder**
+     direkt in die Originaldatei (bei Bedarf mit Androids Bestätigungsdialog)
+
+### APK herunterladen (direkt auf dem Handy)
+
+**Releases → „Testbuild 1.22“** öffnen, dann eine der beiden Dateien antippen:
+
+| Datei | Was | Installation |
+|---|---|---|
+| `N3-Gallery-1.22-TEST.apk` | identische App, aber als zweite App „N3 Gallery TEST“ | **parallel** installierbar – die vorhandene App und alle Notizen/Favoriten bleiben unangetastet |
+| `N3-Gallery-1.22-release.apk` | die reguläre App (gleiche Kennung) | nur nach Deinstallieren der alten Version – dieser Automatik-Build ist mit dem CI-Schlüssel signiert, nicht mit `n3-release.jks` |
+
+> Für ein echtes Update „in place“ (ohne Deinstallieren) das Projekt wie gewohnt in Android Studio
+> bauen – dann wird automatisch mit `n3-release.jks` (siehe `keystore.properties`) signiert.
+
+---
+
 ## 🚀 Sofort ausprobieren (fertige APK)
 
 | Datei | Was | Größe |

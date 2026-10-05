@@ -46,28 +46,49 @@ object MediaSaver {
         return "${stem}_bearbeitet_$stamp.$ext"
     }
 
-    private fun format(bitmap: Bitmap): Bitmap.CompressFormat =
-        if (bitmap.hasAlpha()) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+    private fun format(bitmap: Bitmap, forceJpeg: Boolean, ext: String): Bitmap.CompressFormat = when {
+        forceJpeg -> Bitmap.CompressFormat.JPEG
+        ext == "png" -> Bitmap.CompressFormat.PNG
+        // WEBP gibt es schon lange; die neuen Varianten (LOSSY/LOSSLESS) erst ab Android 11
+        ext == "webp" -> Bitmap.CompressFormat.WEBP
+        bitmap.hasAlpha() -> Bitmap.CompressFormat.PNG
+        else -> Bitmap.CompressFormat.JPEG
+    }
 
-    private fun extension(bitmap: Bitmap): String = if (bitmap.hasAlpha()) "png" else "jpg"
+    private fun extension(fmt: Bitmap.CompressFormat): String = when (fmt) {
+        Bitmap.CompressFormat.PNG -> "png"
+        Bitmap.CompressFormat.WEBP -> "webp"
+        else -> "jpg"
+    }
 
-    private fun write(out: OutputStream, bitmap: Bitmap): Boolean =
-        bitmap.compress(format(bitmap), 96, out)
+    private fun mime(fmt: Bitmap.CompressFormat): String = when (fmt) {
+        Bitmap.CompressFormat.PNG -> "image/png"
+        Bitmap.CompressFormat.WEBP -> "image/webp"
+        else -> "image/jpeg"
+    }
 
-    /** Bearbeitetes Bild als neue Datei speichern (Original bleibt unangetastet). */
-    fun saveCopy(ctx: Context, bitmap: Bitmap, baseName: String): Result {
-        val name = fileName(baseName, extension(bitmap))
+    private fun write(out: OutputStream, bitmap: Bitmap, fmt: Bitmap.CompressFormat): Boolean =
+        bitmap.compress(fmt, 96, out)
+
+    /**
+     * Bearbeitetes Bild als neue Datei speichern (Original bleibt unangetastet).
+     * [jpeg] = true schreibt ein JPEG (klein, Standard für Fotos); bei Bildern mit
+     * Transparenz wird PNG verwendet.
+     */
+    fun saveCopy(ctx: Context, bitmap: Bitmap, baseName: String, jpeg: Boolean = true): Result {
+        val fmt = format(bitmap, jpeg, "")
+        val name = fileName(baseName, extension(fmt))
         return try {
             if (Build.VERSION.SDK_INT >= 29) {
                 val values = ContentValues().apply {
                     put(MediaStore.Images.Media.DISPLAY_NAME, name)
-                    put(MediaStore.Images.Media.MIME_TYPE, if (bitmap.hasAlpha()) "image/png" else "image/jpeg")
+                    put(MediaStore.Images.Media.MIME_TYPE, mime(fmt))
                     put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/$ALBUM")
                     put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
                 val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
                     ?: return Result.Failed("Kein Zugriff auf die Galerie")
-                ctx.contentResolver.openOutputStream(uri)?.use { write(it, bitmap) }
+                ctx.contentResolver.openOutputStream(uri)?.use { write(it, bitmap, fmt) }
                     ?: return Result.Failed("Datei konnte nicht geschrieben werden")
                 values.clear()
                 values.put(MediaStore.Images.Media.IS_PENDING, 0)
@@ -81,10 +102,9 @@ object MediaSaver {
                     ALBUM
                 ).apply { if (!exists()) mkdirs() }
                 val file = File(dir, name)
-                file.outputStream().use { out -> if (!write(out, bitmap)) throw IllegalStateException("Speichern fehlgeschlagen") }
+                file.outputStream().use { out -> if (!write(out, bitmap, fmt)) throw IllegalStateException("Speichern fehlgeschlagen") }
                 android.media.MediaScannerConnection.scanFile(
-                    ctx, arrayOf(file.absolutePath),
-                    arrayOf(if (bitmap.hasAlpha()) "image/png" else "image/jpeg"), null
+                    ctx, arrayOf(file.absolutePath), arrayOf(mime(fmt)), null
                 )
                 Result.Success(Uri.fromFile(file), name)
             }
@@ -99,9 +119,10 @@ object MediaSaver {
         if (!canOverwrite(item) || uri.scheme != "content") {
             return Result.Failed("unsupported")
         }
+        val fmt = format(bitmap, forceJpeg = item.ext.lowercase(Locale.ROOT) in setOf("jpg", "jpeg", "jpe", "jfif"), ext = item.ext.lowercase(Locale.ROOT))
         return try {
             ctx.contentResolver.openOutputStream(uri, "wt")?.use { out ->
-                if (!write(out, bitmap)) throw IllegalStateException("Speichern fehlgeschlagen")
+                if (!write(out, bitmap, fmt)) throw IllegalStateException("Speichern fehlgeschlagen")
             } ?: return Result.Failed("Datei konnte nicht geöffnet werden")
             ctx.contentResolver.notifyChange(uri, null)
             Result.Success(uri, item.name)
@@ -112,8 +133,8 @@ object MediaSaver {
         } catch (t: Throwable) {
             // Manche Provider können nicht direkt überschreiben – dann über eine Kopie schreiben
             try {
-                val tmp = File(ctx.cacheDir, "n3_edit_tmp." + extension(bitmap))
-                tmp.outputStream().use { out -> if (!write(out, bitmap)) throw IllegalStateException("Speichern fehlgeschlagen") }
+                val tmp = File(ctx.cacheDir, "n3_edit_tmp." + extension(fmt))
+                tmp.outputStream().use { out -> if (!write(out, bitmap, fmt)) throw IllegalStateException("Speichern fehlgeschlagen") }
                 ctx.contentResolver.openOutputStream(uri, "wt")?.use { out -> tmp.inputStream().use { it.copyTo(out) } }
                     ?: return Result.Failed("Datei konnte nicht geöffnet werden")
                 tmp.delete()

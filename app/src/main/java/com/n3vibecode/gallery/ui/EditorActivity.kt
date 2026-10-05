@@ -422,7 +422,9 @@ class EditorActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 val bmp = editor.renderResult() ?: return@withContext null
-                val res = MediaSaver.saveCopy(applicationContext, bmp, media.name)
+                // Fotos als JPEG (klein), Bilder mit Transparenz als PNG
+                val jpeg = !(editor.source?.hasAlpha() ?: false) && media.ext.lowercase() != "png"
+                val res = MediaSaver.saveCopy(applicationContext, bmp, media.name, jpeg)
                 bmp.recycle()
                 res
             }
