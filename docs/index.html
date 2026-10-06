@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>N3 Gallery – Apple-Screenshots endlich auf Android</title>
+<meta name="description" content="N3 Gallery öffnet Apples HEIC-Container mit Kachel-Raster, 10-Bit, HDR, 35 RAW-Formate, AVIF, SVG und HEVC-Video. Vollständig offline – ohne Internet-Berechtigung.">
+<meta name="theme-color" content="#0A0B0D">
+<meta property="og:title" content="N3 Gallery – Apple-Screenshots endlich auf Android">
+<meta property="og:description" content="HEIC/HEIF mit Kachel-Raster, 10-Bit und HDR · 79 Dateiendungen · 2–32 Spalten · offline, keine Konten.">
+<meta property="og:type" content="website">
+<link rel="icon" href="assets/img/mark.svg" type="image/svg+xml">
+<!-- Ohne Skript bleibt alles sichtbar; mit Skript übernehmen die Masken und Einblendungen -->
+<script>document.documentElement.classList.add('js');</script>
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Zum Inhalt springen</a>
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<!-- ============================ Kopfzeile ============================ -->
+<header class="top" id="top">
+  <div class="wrap top__inner">
+    <a class="mark" href="#top" aria-label="N3 Gallery – Startseite">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" rx="7" fill="none" stroke="currentColor" stroke-opacity=".28"/>
+        <rect x="6" y="6" width="9" height="9" rx="2.2" fill="currentColor" fill-opacity=".22"/>
+        <rect x="17" y="6" width="9" height="9" rx="2.2" fill="currentColor" fill-opacity=".22"/>
+        <rect x="6" y="17" width="9" height="9" rx="2.2" fill="currentColor" fill-opacity=".22"/>
+        <rect x="17" y="17" width="9" height="9" rx="2.2" fill="#A99BFF"/>
+      </svg>
+      <span>N3&nbsp;Gallery</span>
+    </a>
+
+    <nav class="nav" id="nav" aria-label="Abschnitte">
+      <a href="#decoder" data-i18n="nav.decoder">Technik</a>
+      <a href="#formats" data-i18n="nav.formats">Formate</a>
+      <a href="#speed" data-i18n="nav.speed">Tempo</a>
+      <a href="#features" data-i18n="nav.features">Bedienung</a>
+      <a href="#privacy" data-i18n="nav.privacy">Offline</a>
+      <a href="#install" data-i18n="nav.install">Installation</a>
+      <a href="#log" data-i18n="nav.log">Änderungen</a>
+    </nav>
+
+    <div class="top__actions">
+      <button class="lang" id="lang" type="button" aria-label="Sprache wechseln / switch language">EN</button>
+      <a class="btn btn--primary btn--small" href="https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/latest" rel="noopener">
+        <span data-i18n="cta.downloadShort">Herunterladen</span>
+      </a>
+      <button class="menu" id="menu" type="button" aria-expanded="false" aria-controls="navPanel" aria-label="Rubriken anzeigen">
+        <span class="menu__bars" aria-hidden="true"><i></i><i></i></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="top__panel" id="navPanel">
+    <div>
+      <ul>
+        <li><a href="#decoder" data-i18n="nav.decoder">Technik</a></li>
+        <li><a href="#formats" data-i18n="nav.formats">Formate</a></li>
+        <li><a href="#speed" data-i18n="nav.speed">Tempo</a></li>
+        <li><a href="#features" data-i18n="nav.features">Bedienung</a></li>
+        <li><a href="#privacy" data-i18n="nav.privacy">Offline</a></li>
+        <li><a href="#install" data-i18n="nav.install">Installation</a></li>
+        <li><a href="#log" data-i18n="nav.log">Änderungen</a></li>
+      </ul>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============================ Kopfbereich ============================ -->
+<section class="section hero" id="hero">
+  <div class="wrap hero__grid">
+
+    <div class="hero__text">
+      <p class="kicker" data-i18n="hero.kicker">Android 8.0+ · ohne Internet-Berechtigung</p>
+
+      <h1>
+        <span class="line"><span style="--i:0" data-i18n="hero.h1a">Apple-Screen&shy;shots.</span></span>
+        <span class="line"><span style="--i:1" data-i18n="hero.h1b">Endlich auf Android.</span></span>
+      </h1>
+
+      <p class="lead measure" style="margin-top:1.6rem" data-i18n="hero.lead">
+        N3 Gallery öffnet Apples HEIC-Container mit Kachel-Raster – inklusive 10-Bit, HDR und
+        Gain-Map. Dazu 35 RAW-Formate, AVIF, SVG und HEVC-Video. Vollständig offline.
+      </p>
+
+      <div class="cta-row hero__actions">
+        <a class="btn btn--primary" href="https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/latest" rel="noopener">
+          <span data-i18n="cta.download">APK herunterladen</span>
+          <span class="arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="btn btn--ghost" href="#decoder">
+          <span data-i18n="cta.demo">So arbeitet es</span>
+        </a>
+        <span class="cta-note" data-i18n="hero.note">Version 1.31 · 29 MB · quelloffen</span>
+      </div>
+
+      <div class="hero__facts">
+        <span data-i18n="hero.f1">Kein Internetzugriff</span>
+        <span data-i18n="hero.f2">Keine Konten</span>
+        <span data-i18n="hero.f3">Keine Werbung</span>
+        <span data-i18n="hero.f4">Signatur prüfbar</span>
+      </div>
+    </div>
+
+    <div class="wall parallax" id="wall" data-parallax="0.06">
+      <div class="wall__frame">
+        <div class="wall__tiles" id="tiles" role="img"
+             aria-label="Kachelwand aus Dateiformaten, die die App öffnet">
+          <!-- Kacheln entstehen im Skript (Angaben stammen aus Formats.kt);
+               dieser Satz steht nur, solange kein Skript läuft. -->
+          <p class="wall__fallback">HEIC · HEIF · HIF · AVIF · DNG · CR2 · CR3 · NEF · ARW ·
+            ORF · RW2 · RAF · PEF · SRW · X3F · IIQ · JPG · PNG · WEBP · GIF · BMP · TIFF ·
+            SVG · SVGZ · MP4 · MOV · HEVC · MKV · WEBM · MTS</p>
+        </div>
+      </div>
+      <div class="wall__readout">
+        <span class="readout__line"><span class="readout__text" id="readout">Container 8 × 6 · 10 Bit · HDR · Gain-Map</span><span class="caret" aria-hidden="true"></span></span>
+        <span class="mono" id="readoutHint" data-i18n="wall.hint">Zeigen zum Prüfen</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================ Formatband ============================ -->
+<div class="band" aria-hidden="true">
+  <div class="band__track" id="band"></div>
+</div>
+
+<!-- ============================ Zahlen ============================ -->
+<section class="section section--tight" id="numbers">
+  <div class="wrap">
+    <div class="stats" data-reveal>
+      <div class="stat">
+        <div class="stat__v"><span data-count="79">0</span></div>
+        <div class="stat__k" data-i18n="stat.k1">Dateiendungen, die die App erkennt – von heic bis x3f</div>
+      </div>
+      <div class="stat">
+        <div class="stat__v"><span data-count="35">0</span></div>
+        <div class="stat__k" data-i18n="stat.k2">Kamera-RAW-Formate über die eingebettete Vorschau</div>
+      </div>
+      <div class="stat">
+        <div class="stat__v"><span data-count="32">0</span><span class="stat__u" data-i18n="stat.u3">Spalten</span></div>
+        <div class="stat__k" data-i18n="stat.k3">Raster bis 32 Spalten – zwei Finger im Raster genügen</div>
+      </div>
+      <div class="stat">
+        <div class="stat__v"><span data-count="0">0</span></div>
+        <div class="stat__k" data-i18n="stat.k4">Internet-Berechtigungen in der App. Nicht eine.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ Dekoder ============================ -->
+<section class="section" id="decoder" style="padding-top:clamp(2rem,4vw,3rem)">
+  <div class="wrap">
+    <div class="head head--split" data-reveal>
+      <div>
+        <p class="kicker" data-i18n="decoder.kicker">Der Grund, warum es diese App gibt</p>
+        <h2 data-i18n="decoder.h2">iPhone-Fotos sind kein einzelnes Bild. Sie sind ein Container aus Kacheln.</h2>
+      </div>
+      <p class="muted" data-i18n="decoder.p">
+        Screenshots und viele iPhone-Fotos liegen als Kachel-Raster vor – zum Beispiel 8 × 6 Kacheln
+        à 512 px, oft 10-Bit oder mit Gain-Map für HDR. Der Standardweg von Android lehnt genau das
+        ab. Deshalb arbeitet N3 Gallery die Container in fünf Stufen ab – und merkt sich pro Datei,
+        welcher Weg funktioniert hat.
+      </p>
+    </div>
+
+    <div class="demo">
+      <div class="demo__viewer">
+        <div class="viewer" id="viewer">
+          <div class="viewer__bar">
+            <span class="mono">N3&nbsp;Gallery · 1.31</span>
+            <span class="badge mono" id="viewerBadge">Standardweg</span>
+          </div>
+          <div class="viewer__stage">
+            <div class="viewer__photo" aria-hidden="true">
+              <svg viewBox="0 0 600 400" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#161334"/>
+                    <stop offset="52%" stop-color="#3B2E77"/>
+                    <stop offset="100%" stop-color="#7C67C4"/>
+                  </linearGradient>
+                  <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0" stop-color="#F6EDDD" stop-opacity=".85"/>
+                    <stop offset="100%" stop-color="#F6EDDD" stop-opacity="0"/>
+                  </radialGradient>
+                  <linearGradient id="far" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#3A2C6E"/>
+                    <stop offset="100%" stop-color="#241C4C"/>
+                  </linearGradient>
+                  <linearGradient id="near" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#191338"/>
+                    <stop offset="100%" stop-color="#0C0A1D"/>
+                  </linearGradient>
+                </defs>
+                <rect width="600" height="400" fill="url(#sky)"/>
+                <circle cx="428" cy="132" r="120" fill="url(#glow)"/>
+                <circle cx="428" cy="132" r="34" fill="#F4EADA" opacity=".92"/>
+                <g fill="#EDE7FF" opacity=".5">
+                  <circle cx="96" cy="72" r="1.6"/><circle cx="182" cy="46" r="1.2"/>
+                  <circle cx="268" cy="88" r="1.4"/><circle cx="342" cy="54" r="1.1"/>
+                  <circle cx="520" cy="62" r="1.5"/><circle cx="561" cy="112" r="1.2"/>
+                  <circle cx="140" cy="126" r="1.1"/><circle cx="212" cy="150" r="1"/>
+                </g>
+                <path d="M0 262 L108 196 L196 252 L292 190 L404 258 L498 208 L600 254 L600 400 L0 400Z" fill="url(#far)"/>
+                <path d="M0 268 L108 202 L196 258 L292 196 L404 264 L498 214 L600 260" fill="none" stroke="#B7A8FF" stroke-opacity=".35" stroke-width="1.2"/>
+                <path d="M0 322 L92 286 L186 326 L300 276 L410 330 L512 292 L600 322 L600 400 L0 400Z" fill="url(#near)"/>
+                <path d="M0 328 L92 292 L186 332 L300 282 L410 336 L512 298 L600 328" fill="none" stroke="#9C8CF0" stroke-opacity=".28" stroke-width="1"/>
+                <rect y="366" width="600" height="34" fill="#080711"/>
+              </svg>
+            </div>
+            <div class="viewer__tiles" id="viewerTiles" aria-hidden="true"></div>
+            <div class="viewer__scan" aria-hidden="true"></div>
+          </div>
+          <div class="viewer__foot">
+            <span class="mono">8 × 6 Kacheln · 512 px · 10 Bit</span>
+            <span class="mono viewer__note" id="viewerNote">Ergebnis: schwarze Fläche</span>
+          </div>
+        </div>
+      </div>
+      <div class="demo__chain">
+      <div class="chain">
+      <div class="step" data-step>
+        <div class="step__t" data-i18n="step1.t">Android-Systemweg</div>
+        <div class="step__d" data-i18n="step1.d">Für gewöhnliche JPEG, PNG, WebP, GIF, BMP, TIFF und einfache HEICs. Kachel-Raster und 10-Bit-HEVC enden hier oft schwarz oder leer.</div>
+      </div>
+      <div class="step" data-step>
+        <div class="step__t" data-i18n="step2.t">Hardware-HEVC (Android 10+)</div>
+        <div class="step__d" data-i18n="step2.d">Der HEVC-Block des Geräts dekodiert mit derselben Technik wie das iPhone – deshalb zuerst. Ergebnisse, die nur schwarz sind, werden erkannt und nicht angezeigt.</div>
+      </div>
+      <div class="step" data-step>
+        <div class="step__t" data-i18n="step3.t">libheif in der App</div>
+        <div class="step__d" data-i18n="step3.d">Eigener HEIF-Decoder für gekachelte, 10-Bit-, 12-Bit- und HDR-Container: das Bild wird Kachel für Kachel zusammengesetzt.</div>
+      </div>
+      <div class="step" data-step>
+        <div class="step__t" data-i18n="step4.t">Eingebettete Kamera-Vorschau</div>
+        <div class="step__d" data-i18n="step4.d">Bei RAW (CR3, NEF, ARW, ORF, RW2, RAF, X3F …) wird die größte im Rohfile eingebettete JPEG-Vorschau gelesen – sofort und in voller Qualität.</div>
+      </div>
+      <div class="step" data-step>
+        <div class="step__t" data-i18n="step5.t">Systematische Suche im Container</div>
+        <div class="step__d" data-i18n="step5.d">Für Exoten sucht die App nach JPEG-Daten irgendwo im Container und zeigt sie an, statt aufzugeben.</div>
+      </div>
+    </div>
+      </div>
+    </div>
+
+    <p class="small muted demo__caption" data-i18n="demo.caption">
+      Schematische Darstellung: dasselbe Foto durch die fünf Wege – links ändert sich das Bild mit jedem Schritt.
+    </p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================ Formate ============================ -->
+<section class="section section--paper" id="formats">
+  <div class="wrap">
+    <div class="head" data-reveal>
+      <p class="kicker" data-i18n="formats.kicker">Umfang</p>
+      <h2 class="measure" data-i18n="formats.h2">79 Dateiendungen. Eine Liste.</h2>
+    </div>
+
+    <div class="tablewrap" data-reveal>
+    <table class="table">
+      <caption data-i18n="formats.caption">
+        Erkannt über Dateityp und Endung – auch in Verzeichnissen, die per „Ordner hinzufügen“
+        eingebunden wurden (SD-Karte, Download, NAS-Synchronisation).
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col" data-i18n="formats.h.group">Gruppe</th>
+          <th scope="col" class="c" data-i18n="formats.h.count">Anzahl</th>
+          <th scope="col" data-i18n="formats.h.examples">Beispiele</th>
+          <th scope="col" data-i18n="formats.h.note">Besonderheit</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>HEIC / HEIF</td>
+          <td class="c">7</td>
+          <td class="ext">heic heif hif heics heifs avci heicm</td>
+          <td data-i18n="formats.r1">Kachel-Raster, 10-Bit, HDR, Gain-Map – der Kern dieser App</td>
+        </tr>
+        <tr>
+          <td data-i18n="formats.g.raw">Kamera-RAW</td>
+          <td class="c">35</td>
+          <td class="ext">cr3 nef arw dng orf rw2 raf pef srw x3f …</td>
+          <td data-i18n="formats.r2">über die eingebettete Kamera-Vorschau, nicht interpoliert</td>
+        </tr>
+        <tr>
+          <td data-i18n="formats.g.avif">AVIF</td>
+          <td class="c">3</td>
+          <td class="ext">avif avifs aves</td>
+          <td data-i18n="formats.r3">eigener AV1-Decoder, unabhängig von der Android-Version</td>
+        </tr>
+        <tr>
+          <td data-i18n="formats.g.vector">Vektorgrafik</td>
+          <td class="c">2</td>
+          <td class="ext">svg svgz</td>
+          <td data-i18n="formats.r4">wird direkt in der gebrauchten Größe gezeichnet – in jeder Größe scharf</td>
+        </tr>
+        <tr>
+          <td data-i18n="formats.g.classic">Klassiker</td>
+          <td class="c">13</td>
+          <td class="ext">jpg png webp gif bmp tiff ico dib apng …</td>
+          <td data-i18n="formats.r5">Systemweg, mit eigenem Decoder als Rückfall</td>
+        </tr>
+        <tr>
+          <td data-i18n="formats.g.video">Video</td>
+          <td class="c">19</td>
+          <td class="ext">mp4 mov hevc h265 mkv webm mts m2ts …</td>
+          <td data-i18n="formats.r6">Einzelbild über HEVC/H.264, auch aus Container-Formaten</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ Tempo ============================ -->
+<section class="section" id="speed">
+  <div class="wrap grid grid--sidebar">
+    <div data-reveal>
+      <p class="kicker" data-i18n="speed.kicker">Tempo</p>
+      <h2 data-i18n="speed.h2">Geschwindigkeit ist eine Entscheidung, kein Zufall.</h2>
+      <p class="muted" style="margin-top:1.2rem" data-i18n="speed.p">
+        Die Zahlen unten sind keine Schätzungen: es sind die Änderungen, die in den letzten
+        Versionen gemessen wurden. Jede Zeile steht so im Änderungsprotokoll.
+      </p>
+    </div>
+
+    <div class="metrics" data-reveal>
+      <div class="metric">
+        <div class="metric__top">
+          <span class="metric__name" data-i18n="m1.name">Pixel pro Raster-Kachel</span>
+          <span class="metric__delta" data-i18n="m1.delta">Faktor 16 weniger</span>
+        </div>
+        <div class="bars">
+          <div class="bar"><span class="bar__label" data-i18n="m.before">vorher</span><span class="bar__track"><span class="bar__fill" style="--w:100%;--d:0ms"></span></span><span class="mono">256 px</span></div>
+          <div class="bar bar--now"><span class="bar__label" data-i18n="m.now">jetzt</span><span class="bar__track"><span class="bar__fill" style="--w:6%;--d:120ms"></span></span><span class="mono">64 px</span></div>
+        </div>
+      </div>
+
+      <div class="metric">
+        <div class="metric__top">
+          <span class="metric__name" data-i18n="m2.name">Speicher pro Vorschau</span>
+          <span class="metric__delta" data-i18n="m2.delta">~25× mehr Bilder im selben RAM</span>
+        </div>
+        <div class="bars">
+          <div class="bar"><span class="bar__label" data-i18n="m.before">vorher</span><span class="bar__track"><span class="bar__fill" style="--w:100%;--d:0ms"></span></span><span class="mono" data-i18n="m2.v1">1,0 MB</span></div>
+          <div class="bar bar--now"><span class="bar__label" data-i18n="m.now">jetzt</span><span class="bar__track"><span class="bar__fill" style="--w:4%;--d:120ms"></span></span><span class="mono">40 kB</span></div>
+        </div>
+      </div>
+
+      <div class="metric">
+        <div class="metric__top">
+          <span class="metric__name" data-i18n="m3.name">Dekodiervorgänge beim Öffnen eines Fotos</span>
+          <span class="metric__delta" data-i18n="m3.delta">keine Doppelarbeit mehr</span>
+        </div>
+        <div class="bars">
+          <div class="bar"><span class="bar__label" data-i18n="m.before">vorher</span><span class="bar__track"><span class="bar__fill" style="--w:100%;--d:0ms"></span></span><span class="mono">3 ×</span></div>
+          <div class="bar bar--now"><span class="bar__label" data-i18n="m.now">jetzt</span><span class="bar__track"><span class="bar__fill" style="--w:33%;--d:120ms"></span></span><span class="mono">1 ×</span></div>
+        </div>
+      </div>
+
+      <div class="metric">
+        <div class="metric__top">
+          <span class="metric__name" data-i18n="m4.name">Vorschauen nach App-Neustart</span>
+          <span class="metric__delta" data-i18n="m4.delta">dauerhaft abgelegt</span>
+        </div>
+        <div class="bars">
+          <div class="bar"><span class="bar__label" data-i18n="m.before">vorher</span><span class="bar__track"><span class="bar__fill" style="--w:1%;--d:0ms"></span></span><span class="mono">0 %</span></div>
+          <div class="bar bar--now"><span class="bar__label" data-i18n="m.now">jetzt</span><span class="bar__track"><span class="bar__fill" style="--w:100%;--d:120ms"></span></span><span class="mono">100 %</span></div>
+        </div>
+      </div>
+
+      <p class="small muted" data-i18n="speed.foot">
+        Der Hintergrund-Aufbau erzeugt Vorschauen in Kachelgröße und pausiert, solange der Finger
+        scrollt – die sichtbaren Bilder bekommen die Rechenzeit.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================ Bedienung ============================ -->
+<section class="section section--paper" id="features">
+  <div class="wrap">
+    <div class="head" data-reveal>
+      <p class="kicker" data-i18n="features.kicker">Bedienung</p>
+      <h2 class="measure" data-i18n="features.h2">Kleinigkeiten, die täglich auffallen.</h2>
+    </div>
+
+    <div class="list" data-reveal>
+      <div class="item">
+        <div class="item__n">01</div>
+        <div class="item__t" data-i18n="f1.t">Zuschneiden wie in der Apple-Fotos-App</div>
+        <div class="item__d" data-i18n="f1.d">Der Rahmen steht fest, das Foto bewegt sich darunter. Acht Griffe mit 30 dp Trefferfläche, Seitenverhältnisse füllen den Ausschnitt immer vollständig – kein schwarzer Rand im Ergebnis.</div>
+      </div>
+      <div class="item">
+        <div class="item__n">02</div>
+        <div class="item__t" data-i18n="f2.t">Speichern, das nachsieht</div>
+        <div class="item__d" data-i18n="f2.d">Nach dem Schreiben wird geprüft, ob wirklich Daten angekommen sind; misslungene Galerie-Einträge werden entfernt statt als leeres Bild liegen gelassen. Als letzter Ausweg ein Teilen-Dialog – nichts geht verloren.</div>
+      </div>
+      <div class="item">
+        <div class="item__n">03</div>
+        <div class="item__t" data-i18n="f3.t">Löschen überall erreichbar</div>
+        <div class="item__d" data-i18n="f3.d">Papierkorb in der Kopfzeile, im Detailblatt und per Langdruck im Raster – mit Rückfrage und der System-Bestätigung von Android.</div>
+      </div>
+      <div class="item">
+        <div class="item__n">04</div>
+        <div class="item__t" data-i18n="f4.t">Notizen und Tags in die Datei schreiben</div>
+        <div class="item__d" data-i18n="f4.d">Als echte EXIF-/XMP-Metadaten – nicht nur in der App-Datenbank. Zusätzlich automatische Sicherung außerhalb der App, damit eine Neuinstallation nichts kostet.</div>
+      </div>
+      <div class="item">
+        <div class="item__n">05</div>
+        <div class="item__t" data-i18n="f5.t">Ansichten nach Tag, Format, Ordner und Album</div>
+        <div class="item__d" data-i18n="f5.d">Zeitleiste nach Tag, Monat oder Jahr; Tags und Favoriten als Alben; Formate und Ordner mit Anzahl und Belegung.</div>
+      </div>
+      <div class="item">
+        <div class="item__n">06</div>
+        <div class="item__t" data-i18n="f6.t">Metadaten vollständig</div>
+        <div class="item__d" data-i18n="f6.d">EXIF, Sensor, Objektiv, GPS (auch unzensiert mit Freigabe) und XMP – kopierbar als Text.</div>
+      </div>
+      <div class="item">
+        <div class="item__n">07</div>
+        <div class="item__t" data-i18n="f7.t">Zwei Sprachen, ein Aufbau</div>
+        <div class="item__d" data-i18n="f7.d">Deutsch und Englisch, mit den Regeln der jeweiligen Sprache – inklusive Datums- und Größenformaten.</div>
+      </div>
+      <div class="item">
+        <div class="item__n">08</div>
+        <div class="item__t" data-i18n="f8.t">Große Sammlungen bleiben ruhig</div>
+        <div class="item__d" data-i18n="f8.d">Vorschauen entstehen einmal und bleiben erhalten; das Raster baut seine Zeilen im Hintergrund auf, damit Wischen und Tippen Vorrang haben.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ Offline ============================ -->
+<section class="section" id="privacy">
+  <div class="wrap trust">
+    <div data-reveal>
+      <p class="kicker" data-i18n="privacy.kicker">Offline</p>
+      <p class="trust__claim" data-i18n="privacy.claim">
+        Die App fordert <em>keine Internet-Berechtigung</em> an. Das ist kein Versprechen,
+        sondern eine Zeile, die im Manifest fehlt.
+      </p>
+    </div>
+
+    <div data-reveal>
+      <ul class="checks">
+        <li>
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M2.5 8.5l3.4 3.4L13.5 4.5"/></svg>
+          <span data-i18n="privacy.c1">Kein <code>android.permission.INTERNET</code> im Manifest – prüfbar direkt in der APK.</span>
+        </li>
+        <li>
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M2.5 8.5l3.4 3.4L13.5 4.5"/></svg>
+          <span data-i18n="privacy.c2">Kein Konto, keine Anmeldung, keine Cloud, kein Server.</span>
+        </li>
+        <li>
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M2.5 8.5l3.4 3.4L13.5 4.5"/></svg>
+          <span data-i18n="privacy.c3">Keine Werbung, keine Telemetrie, kein Analyse-SDK.</span>
+        </li>
+        <li>
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M2.5 8.5l3.4 3.4L13.5 4.5"/></svg>
+          <span data-i18n="privacy.c4">Notizen, Tags und Favoriten werden zusätzlich außerhalb der App gesichert – eine Neuinstallation kostet nichts.</span>
+        </li>
+      </ul>
+
+      <p class="small muted" style="margin-top:1.6rem" data-i18n="privacy.verify">
+        Selbst nachsehen: <code class="mono">aapt dump badging N3-Gallery-1.31-release.apk | grep uses-permission</code>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ Installation ============================ -->
+<section class="section section--paper" id="install">
+  <div class="wrap">
+    <div class="head head--split" data-reveal>
+      <div>
+        <p class="kicker" data-i18n="install.kicker">Installation</p>
+        <h2 data-i18n="install.h2">In drei Schritten auf dem Gerät.</h2>
+      </div>
+      <p class="muted" data-i18n="install.p">
+        Die App wird nicht über einen Store verteilt: die fertige APK kommt direkt aus dem
+        Build, der Signaturschlüssel bleibt derselbe. Deshalb lassen sich neue Versionen
+        einfach über die installierte legen.
+      </p>
+    </div>
+
+    <div class="steps3" data-reveal>
+      <div class="step3">
+        <div class="step3__t" data-i18n="i1.t">APK herunterladen</div>
+        <p class="small muted" data-i18n="i1.d">Von der Release-Seite: die normale Version oder die TEST-Version. Die TEST-Version installiert parallel (eigene Kennung) und rührt Ihre vorhandene App nicht an.</p>
+      </div>
+      <div class="step3">
+        <div class="step3__t" data-i18n="i2.t">Installation erlauben</div>
+        <p class="small muted" data-i18n="i2.d">Android fragt beim ersten Mal nach der Freigabe für diese Quelle – einmal bestätigen, danach läuft es wie gewohnt.</p>
+      </div>
+      <div class="step3">
+        <div class="step3__t" data-i18n="i3.t">Bibliothek einlesen</div>
+        <p class="small muted" data-i18n="i3.d">Die App liest den Medienindex. Für Verzeichnisse außerhalb (SD-Karte, Downloads, NAS) im Ordner-Tab „Ordner hinzufügen“ wählen.</p>
+      </div>
+    </div>
+
+    <div class="cta-row" style="margin-top:2.4rem" data-reveal>
+      <a class="btn btn--primary" href="https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/latest" rel="noopener">
+        <span data-i18n="cta.download">APK herunterladen</span><span class="arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="btn btn--ghost" href="https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/latest" rel="noopener">
+        <span data-i18n="cta.testApk">TEST-Version (parallel installierbar)</span>
+      </a>
+    </div>
+
+    <details class="footnote">
+      <summary data-i18n="foot.sum">Signatur und Updates – technische Angaben</summary>
+      <div>
+        <p class="small" data-i18n="foot.sig">
+          Alle Builds sind mit demselben Schlüssel signiert (SHA-256):
+        </p>
+        <p class="mono small" style="word-break:break-all">2fb36ac65d73a4b1e437c84784e0eb50442f123adb923bfd450da8eb24c848e0</p>
+        <p class="small muted" data-i18n="foot.sig2">
+          Ab Version 1.28 wird jede Version über dieselbe Kennung installiert – Updates kommen
+          ohne Deinstallation. Steht dort ein anderer Fingerabdruck, ist es nicht dieser Build.
+        </p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ============================ Änderungen ============================ -->
+<section class="section" id="log">
+  <div class="wrap">
+    <div class="head" data-reveal>
+      <p class="kicker" data-i18n="log.kicker">Änderungsprotokoll</p>
+      <h2 class="measure" data-i18n="log.h2">Was zuletzt passiert ist.</h2>
+    </div>
+
+    <div class="log" id="logList" data-reveal>
+      <!-- Einträge im Skript erzeugt (zweisprachig). Ohne Skript steht hier der
+           Verweis auf das vollständige Protokoll im Projekt. -->
+      <p class="small muted" style="padding:1.1rem 0">
+        Das vollständige Protokoll steht in
+        <a class="mono" href="https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/blob/arena/6f30802f-n3-gallery-open-iphone-screens/AENDERUNGEN.md" rel="noopener">AENDERUNGEN.md</a>.
+      </p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============================ Fuß ============================ -->
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <a class="mark" href="#top" style="margin-bottom:0.9rem">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="1" y="1" width="30" height="30" rx="7" fill="none" stroke="currentColor" stroke-opacity=".28"/>
+            <rect x="6" y="6" width="9" height="9" rx="2.2" fill="currentColor" fill-opacity=".22"/>
+            <rect x="17" y="6" width="9" height="9" rx="2.2" fill="currentColor" fill-opacity=".22"/>
+            <rect x="6" y="17" width="9" height="9" rx="2.2" fill="currentColor" fill-opacity=".22"/>
+            <rect x="17" y="17" width="9" height="9" rx="2.2" fill="#A99BFF"/>
+          </svg>
+          <span>N3&nbsp;Gallery</span>
+        </a>
+        <p class="small muted measure--tight" data-i18n="foot.about">
+          Eine Android-Galerie für Apple-HEIF-Container, RAW, AVIF, SVG und HEVC – gebaut von
+          N3 Vibecode. Ohne Cloud, ohne Konto, ohne Netzwerkzugriff.
+        </p>
+      </div>
+
+      <div>
+        <h4 data-i18n="foot.dl">Herunterladen</h4>
+        <ul>
+          <li><a href="https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/latest" rel="noopener" data-i18n="foot.dl1">Aktuelle Version (APK)</a></li>
+          <li><a href="https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases" rel="noopener" data-i18n="foot.dl2">Alle Releases</a></li>
+          <li><a href="https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF" rel="noopener" data-i18n="foot.dl3">Quelltext (GitHub)</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h4 data-i18n="foot.proj">Projekt</h4>
+        <ul>
+          <li><a href="#log" data-i18n="foot.p1">Änderungsprotokoll</a></li>
+          <li><a href="https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/blob/arena/6f30802f-n3-gallery-open-iphone-screens/SIGNIEREN.md" rel="noopener" data-i18n="foot.p2">Signatur &amp; eigener Schlüssel</a></li>
+          <li><a href="https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/blob/arena/6f30802f-n3-gallery-open-iphone-screens/LICENSE" rel="noopener" data-i18n="foot.p3">Lizenz (GNU GPL v3)</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="foot__base">
+      <span>© <span id="year">2026</span> N3 Vibecode</span>
+      <span data-i18n="foot.note">Statische Seite: keine Skripte von außen, keine Schriftarten aus dem Netz, kein Tracking.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+</body>
+</html>

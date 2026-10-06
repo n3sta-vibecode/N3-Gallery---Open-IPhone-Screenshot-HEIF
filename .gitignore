@@ -1,0 +1,23 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+.externalNativeBuild
+.cxx
+*.apk
+*.ap_
+*.dex
+release/
+keystore.properties
+*.jks
+
+# Nur der CI-Schluessel (nicht der private n3-release.jks) wird mitgeliefert:
+# er sorgt dafuer, dass jede neue Version ueber die vorherige installiert werden kann.
+!ci/n3-ci.p12
+!keystore.properties
+
+# Das Projekt-ZIP wird auf Wunsch direkt im Ordner abgelegt (nicht im Git):
+/N3Gallery-Projekt-*.zip
