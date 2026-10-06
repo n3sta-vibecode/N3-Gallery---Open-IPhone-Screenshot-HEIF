@@ -16,7 +16,15 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.28 – Updates lassen sich installieren + Sicherung von Notizen/Favoriten
+## 🆕 Version 1.29 – Löschen-Knopf überall erreichbar
+
+* **Papierkorb oben rechts** in der Großansicht (war vorher nur als letztes Element einer
+  seitlich scrollbaren Reihe im hochziehbaren Blatt versteckt).
+* **Im Blatt** steht „Löschen“ jetzt ganz vorne und rot eingefärbt.
+* **Im Raster:** langes Drücken → „Löschen“.
+* Immer mit Rückfrage und – ab Android 10 – der System-Bestätigung von Android.
+
+## Version 1.28 – Updates lassen sich installieren + Sicherung von Notizen/Favoriten
 
 * **„App ist nicht installiert“ behoben:** Jeder bisherige Build war mit einem anderen
   Schlüssel signiert (der Buildserver erzeugt seinen Debug-Schlüssel jedes Mal neu), daher

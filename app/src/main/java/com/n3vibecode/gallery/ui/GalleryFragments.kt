@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import android.view.ScaleGestureDetector
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
@@ -216,12 +217,13 @@ abstract class BaseGridFragment : Fragment(), PageAware {
     @Volatile
     private var lastVisible: List<MediaItem>? = null
 
-    /** Langes Drücken: Bearbeiten (Zuschneiden/Zeichnen/Text), Teilen, Details. */
+    /** Langes Drücken: Bearbeiten, Teilen, Details, Löschen. */
     private fun onItemLongPress(item: MediaItem) {
         val labels = arrayOf(
             getString(R.string.editor_title),
             getString(R.string.share),
-            getString(R.string.info)
+            getString(R.string.info),
+            getString(R.string.delete)
         )
         com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
             .setTitle(item.name)
@@ -229,14 +231,94 @@ abstract class BaseGridFragment : Fragment(), PageAware {
                 when (which) {
                     0 -> EditorActivity.start(requireContext(), item.uri)
                     1 -> share(item)
-                    else -> {
+                    2 -> {
                         val index = lastVisible?.indexOfFirst { it.uri == item.uri } ?: -1
                         if (index >= 0) openDetail(index, item.uri)
                     }
+                    else -> confirmDelete(item)
                 }
             }
             .show()
     }
+
+    // ------------------------------------------------------------------ Löschen
+
+    /** Löschen mit Rückfrage; ab Android 10 mit der System-Bestätigung. */
+    private fun confirmDelete(item: MediaItem) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.delete_confirm_title)
+            .setMessage(getString(R.string.delete_confirm_msg, item.name))
+            .setPositiveButton(R.string.delete) { _, _ -> deleteItem(item) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun deleteItem(item: MediaItem) {
+        val uri = android.net.Uri.parse(item.uri)
+        if (android.os.Build.VERSION.SDK_INT >= 29 && uri.scheme == "content") {
+            // Android 10+ verlangt eine Bestätigung des Systems – dann über den Launcher
+            pendingDelete = item
+            GridWork.run {
+                val sender = try {
+                    android.provider.MediaStore.createDeleteRequest(
+                        requireContext().contentResolver, listOf(uri)
+                    ).intentSender
+                } catch (t: Throwable) {
+                    null
+                }
+                main.post {
+                    if (!isAdded) return@post
+                    if (sender != null) {
+                        try {
+                            deleteLauncher.launch(IntentSenderRequest.Builder(sender).build())
+                        } catch (t: Throwable) {
+                            toast(getString(R.string.delete_failed, t.message ?: ""))
+                        }
+                    } else {
+                        deleteDirect(uri)
+                    }
+                }
+            }
+        } else {
+            deleteDirect(uri)
+        }
+    }
+
+    private fun deleteDirect(uri: android.net.Uri) {
+        try {
+            if (uri.scheme == "content") {
+                requireContext().contentResolver.delete(uri, null, null)
+            } else {
+                java.io.File(uri.path ?: return).delete()
+            }
+            toast(getString(R.string.deleted))
+            DataHub.requestRescan()
+            refresh()
+        } catch (t: Throwable) {
+            toast(getString(R.string.delete_failed, t.message ?: ""))
+        }
+    }
+
+    /** Foto, das gerade über die System-Bestätigung gelöscht wird. */
+    private var pendingDelete: MediaItem? = null
+
+    /** System-Bestätigung des Löschens (Android 10+). */
+    private val deleteLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val item = pendingDelete
+        pendingDelete = null
+        if (result.resultCode == android.app.Activity.RESULT_OK && item != null) {
+            toast(getString(R.string.deleted))
+            DataHub.requestRescan()
+            refresh()
+        }
+    }
+
+    private fun toast(text: String) {
+        android.widget.Toast.makeText(requireContext(), text, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
 
     private fun share(item: MediaItem) {
         try {

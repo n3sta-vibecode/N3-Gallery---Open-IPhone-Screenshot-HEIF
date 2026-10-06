@@ -252,6 +252,7 @@ class DetailActivity : AppCompatActivity() {
         }
         findViewById<MaterialButton>(R.id.btnCopy).setOnClickListener { copyMetadata() }
         findViewById<MaterialButton>(R.id.btnDelete).setOnClickListener { confirmDelete() }
+        findViewById<ImageButton>(R.id.btnTrash).setOnClickListener { confirmDelete() }
     }
 
     // ------------------------------------------------------------------ Anzeige

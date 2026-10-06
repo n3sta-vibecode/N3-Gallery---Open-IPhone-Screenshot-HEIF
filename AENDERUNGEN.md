@@ -1,5 +1,24 @@
 # N3 Gallery – was neu ist
 
+## 1.29 – Löschen-Knopf ist jetzt da, wo man ihn sucht
+
+Rückmeldung war: „Der Foto löschen Knopf fehlt.“ Er war vorhanden, aber an einer Stelle,
+an die man praktisch nicht kommt: als **letztes Element einer seitlich scrollbaren Reihe**
+im **hochziehbaren Info-Blatt**. Man musste also erst das Blatt aufziehen und die Reihe
+seitlich schieben – daher wirkte er nicht existent.
+
+Jetzt gibt es drei gut erreichbare Wege:
+
+* **Papierkorb-Symbol oben rechts** in der Großansicht – direkt neben Teilen, immer sichtbar
+  (wie in der Apple-Fotos-App).
+* **Im Blatt steht „Löschen“ jetzt ganz vorne** in der Reihe und ist rot eingefärbt.
+* **Im Raster:** langes Drücken auf ein Foto → „Löschen“ im Menü.
+
+In allen Fällen kommt zuerst eine Rückfrage mit dem Dateinamen; ab Android 10 anschließend
+die **System-Bestätigung** von Android (die kann man nicht umgehen – das ist Absicht, damit
+nichts versehentlich verschwindet). Danach wird die Mediathek neu eingelesen und das Raster
+aktualisiert.
+
 ## 1.28 – Updates installieren wieder (fester Signaturschlüssel) + Sicherung von Notizen/Favoriten
 
 ### a) Warum „App ist nicht installiert“ kam – und was geändert wurde

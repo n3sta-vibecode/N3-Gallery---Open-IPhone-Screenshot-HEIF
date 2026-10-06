@@ -72,6 +72,18 @@
             android:src="@drawable/ic_share"
             android:tint="#FFFFFFFF" />
 
+        <!-- Löschen immer erreichbar: vorher gab es den Knopf nur als letztes Element
+             einer seitlich scrollbaren Reihe im hochziehbaren Blatt – also praktisch
+             unsichtbar. -->
+        <ImageButton
+            android:id="@+id/btnTrash"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/delete"
+            android:src="@drawable/ic_delete"
+            android:tint="#FFFFFFFF" />
+
         <ImageButton
             android:id="@+id/btnInfo"
             android:layout_width="44dp"
@@ -173,6 +185,18 @@
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDelete"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="@string/delete"
+                    android:textColor="?attr/colorError"
+                    android:textSize="12sp"
+                    app:icon="@drawable/ic_delete"
+                    app:iconTint="?attr/colorError"
+                    app:iconSize="16dp" />
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnMetaPage"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="wrap_content"
@@ -183,7 +207,6 @@
                     android:textStyle="bold"
                     app:icon="@drawable/ic_info"
                     app:iconSize="16dp" />
-
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnPhotoEdit"
                     style="@style/Widget.Material3.Button.TonalButton"
@@ -195,7 +218,6 @@
                     android:textStyle="bold"
                     app:icon="@drawable/ic_brush"
                     app:iconSize="16dp" />
-
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnNote"
                     style="@style/Widget.Material3.Button.TonalButton"
@@ -206,7 +228,6 @@
                     android:textSize="12sp"
                     app:icon="@drawable/ic_edit"
                     app:iconSize="16dp" />
-
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnCopy"
                     style="@style/Widget.Material3.Button.TonalButton"
@@ -216,17 +237,6 @@
                     android:text="EXIF kopieren"
                     android:textSize="12sp"
                     app:icon="@drawable/ic_copy"
-                    app:iconSize="16dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnDelete"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp"
-                    android:text="@string/delete"
-                    android:textSize="12sp"
-                    app:icon="@drawable/ic_delete"
                     app:iconSize="16dp" />
             </LinearLayout>
         </HorizontalScrollView>
