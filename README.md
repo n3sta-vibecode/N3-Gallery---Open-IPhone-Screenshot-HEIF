@@ -16,8 +16,8 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.31-release.apk` | [letzte Version](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/latest) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.31-TEST.apk` | [Release testbuild-1.31](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/tag/testbuild-1.31) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.31-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3-Gallery-1.31-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.31-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3-Gallery-1.31-TEST.apk) |
 | **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.31.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3Gallery-Projekt-1.31.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
