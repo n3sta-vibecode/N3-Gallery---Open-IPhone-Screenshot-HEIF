@@ -38,6 +38,17 @@ Dinge jetzt automatisch:
   Start gleich selbst an, damit sie schon existiert, bevor jemand deinstalliert.
 * Die **Bilddateien** werden nie verändert; bearbeitete Kopien liegen ohnehin in der Galerie.
 
+### c) Signatur: Schlüssel und Anleitung im Projekt
+
+* **`SIGNIEREN.md`** beschreibt alles: Schlüsseldaten, Fingerabdrücke und wie man mit
+  Android Studio, Gradle oder `apksigner` signiert – plus wie man einen **eigenen privaten
+  Schlüssel** für Google Play erstellt.
+* **`tools/signieren.sh`** signiert eine vorhandene APK mit dem Projekt-Schlüssel und prüft
+  den Fingerabdruck, **`tools/keystore-neu.sh`** erzeugt einen eigenen Schlüssel,
+  **`tools/keystore-info.sh`** zeigt Inhaber und Fingerabdrücke an.
+* Das Projekt-ZIP im Release enthält jetzt **Schlüssel, Anleitung und Skripte**, sodass
+  eigene Builds dieselbe Signatur haben und sich weiterhin aktualisieren lassen.
+
 ## 1.27 – Speichern-Knopf sichtbar, HEIC deutlich schneller
 
 ### a) „Kein Speichern-Knopf“ – jetzt ist er unmissverständlich

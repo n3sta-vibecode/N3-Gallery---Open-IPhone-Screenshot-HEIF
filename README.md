@@ -9,6 +9,13 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kame
 
 ---
 
+## 🔑 Signieren / eigener Schlüssel
+
+Welcher Schlüssel verwendet wird, wie man selbst APKs signiert und wie man einen **eigenen
+privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.md](SIGNIEREN.md)**.
+Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
+`tools/keystore-neu.sh` erzeugt einen eigenen.
+
 ## 🆕 Version 1.28 – Updates lassen sich installieren + Sicherung von Notizen/Favoriten
 
 * **„App ist nicht installiert“ behoben:** Jeder bisherige Build war mit einem anderen

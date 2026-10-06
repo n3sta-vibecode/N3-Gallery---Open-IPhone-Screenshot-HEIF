@@ -108,7 +108,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="testbuild-1.28"
-          git archive --format=zip -o /tmp/N3Gallery-Projekt-1.28.zip HEAD app build.gradle.kts settings.gradle.kts gradle.properties gradlew gradlew.bat gradle tools .github || true
+          git archive --format=zip -o /tmp/N3Gallery-Projekt-1.28.zip HEAD app build.gradle.kts settings.gradle.kts gradle.properties gradlew gradlew.bat gradle tools .github ci keystore.properties SIGNIEREN.md README.md AENDERUNGEN.md || true
           if ! gh release view "$TAG" > /dev/null 2>&1; then
             gh release create "$TAG" --title "Testbuild 1.28 – Updates installieren wieder + Sicherung" \
               --notes "Automatisch gebaut. Zwei APKs: \"N3-Gallery-1.28-release.apk\" (gleiche App wie bisher, neue Version) und \"N3-Gallery-1.28-TEST.apk\" (installiert parallel zur vorhandenen App, nichts geht verloren). Quelle: Branch ${{ github.ref_name }}." \
