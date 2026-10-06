@@ -177,13 +177,66 @@
   /* ------------------------------------------------------------------
      4. Ablauf der Dekoder-Kette: die Stufen werden nacheinander „live“
      ------------------------------------------------------------------ */
+  /* Jede Stufe schaltet das Fenster links weiter. Die Stufe selbst wird
+     nur „live“ markiert, wenn sie die Mitte des Schirms erreicht. */
+
+  const STAGES = [
+    { state: 'dark',     de: ['Android-Systemweg', 'Ergebnis: schwarze Fläche'], en: ['Android system path', 'Result: a black frame'] },
+    { state: 'dark',     de: ['Hardware-HEVC', 'verworfen – nur schwarz'],       en: ['Hardware HEVC', 'discarded – black only'] },
+    { state: 'assemble', de: ['libheif', 'Kachel für Kachel gesetzt'],           en: ['libheif', 'assembled tile by tile'] },
+    { state: 'ready',    de: ['Kamera-Vorschau', 'sofort, volle Qualität'],      en: ['Camera preview', 'instantly, full quality'] },
+    { state: 'scan',     de: ['Suche im Container', 'JPEG-Daten gefunden'],      en: ['Container search', 'JPEG data found'] }
+  ];
+  let stageIndex = -1;
+
+  function buildViewer() {
+    const host = $('#viewerTiles');
+    const viewer = $('#viewer');
+    if (!host || !viewer) return;
+    const cols = 6, rows = 4;
+    const frag = document.createDocumentFragment();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'shutter';
+        cell.style.setProperty('--d', String(c + r)); // Diagonale von links oben
+        frag.appendChild(cell);
+      }
+    }
+    host.appendChild(frag);
+    viewer.dataset.state = 'dark';
+    setStage(0);
+  }
+
+  function setStage(i, force) {
+    const viewer = $('#viewer');
+    if (!viewer) return;
+    const next = Math.max(0, Math.min(STAGES.length - 1, i));
+    if (next === stageIndex && !force) return;
+    stageIndex = next;
+    const stage = STAGES[stageIndex];
+    const words = langOf() === 'en' ? stage.en : stage.de;
+    viewer.dataset.state = stage.state;
+    const badge = $('#viewerBadge');
+    if (badge) badge.textContent = words[0];
+    const note = $('#viewerNote');
+    if (note) note.textContent = words[1];
+  }
+
   function observeChain() {
     const steps = $$('[data-step]');
-    if (!steps.length || reduce) return;
+    if (!steps.length) return;
+    if (!('IntersectionObserver' in window)) { setStage(STAGES.length - 1); return; }
     const io = new IntersectionObserver((entries) => {
-      entries.forEach(entry => entry.target.classList.toggle('is-live', entry.isIntersecting));
+      entries.forEach(entry => {
+        const i = steps.indexOf(entry.target);
+        entry.target.classList.toggle('is-live', entry.isIntersecting);
+        if (entry.isIntersecting && i >= 0) setStage(i);
+      });
     }, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
     steps.forEach(el => io.observe(el));
+    // Beim Klick springt das Fenster direkt auf diese Stufe
+    steps.forEach((el, i) => el.addEventListener('click', () => setStage(i)));
   }
 
   /* ------------------------------------------------------------------
@@ -473,6 +526,7 @@
     'cta.download': 'Download APK',
     'cta.downloadShort': 'Download',
     'cta.log': "What's new",
+    'cta.demo': 'How it works',
     'cta.testApk': 'TEST build (installs alongside)',
     'hero.kicker': 'Android 8.0+ · no internet permission',
     'hero.h1a': 'Apple screenshots.',
@@ -582,6 +636,7 @@
     'foot.p2': 'Signing &amp; your own key',
     'foot.p3': 'Licence (GNU GPL v3)',
     'foot.note': 'Static page: no scripts from outside, no web fonts, no tracking.',
+    'demo.caption': 'Schematic: the same photo through all five paths – the window on the left follows every step.',
     'log.kicker': 'Changelog',
     'log.h2': 'What happened recently.',
     'meta.title': 'N3 Gallery – Apple screenshots finally on Android',
@@ -617,6 +672,7 @@
     const readout = $('#readout');
     if (readout) readout.textContent = DEFAULT_READOUT();
     setHint();
+    if (stageIndex >= 0) setStage(stageIndex, true); // Beschriftung des Fensters nachziehen
     buildLog();
     try { localStorage.setItem('n3.lang', lang); } catch (_) {}
   }
@@ -627,6 +683,7 @@
   function boot() {
     buildWall();
     buildBand();
+    buildViewer();
     snapshotGerman();
 
     // Zuerst die Sprache des Browsers, dann eine frühere Auswahl.

@@ -93,8 +93,8 @@
           <span data-i18n="cta.download">APK herunterladen</span>
           <span class="arrow" aria-hidden="true">→</span>
         </a>
-        <a class="btn btn--ghost" href="#log">
-          <span data-i18n="cta.log">Was neu ist</span>
+        <a class="btn btn--ghost" href="#decoder">
+          <span data-i18n="cta.demo">So arbeitet es</span>
         </a>
         <span class="cta-note" data-i18n="hero.note">Version 1.31 · 29 MB · quelloffen</span>
       </div>
@@ -172,7 +172,62 @@
       </p>
     </div>
 
-    <div class="chain" data-reveal>
+    <div class="demo">
+      <div class="demo__viewer">
+        <div class="viewer" id="viewer">
+          <div class="viewer__bar">
+            <span class="mono">N3&nbsp;Gallery · 1.31</span>
+            <span class="badge mono" id="viewerBadge">Standardweg</span>
+          </div>
+          <div class="viewer__stage">
+            <div class="viewer__photo" aria-hidden="true">
+              <svg viewBox="0 0 600 400" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#161334"/>
+                    <stop offset="52%" stop-color="#3B2E77"/>
+                    <stop offset="100%" stop-color="#7C67C4"/>
+                  </linearGradient>
+                  <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0" stop-color="#F6EDDD" stop-opacity=".85"/>
+                    <stop offset="100%" stop-color="#F6EDDD" stop-opacity="0"/>
+                  </radialGradient>
+                  <linearGradient id="far" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#3A2C6E"/>
+                    <stop offset="100%" stop-color="#241C4C"/>
+                  </linearGradient>
+                  <linearGradient id="near" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#191338"/>
+                    <stop offset="100%" stop-color="#0C0A1D"/>
+                  </linearGradient>
+                </defs>
+                <rect width="600" height="400" fill="url(#sky)"/>
+                <circle cx="428" cy="132" r="120" fill="url(#glow)"/>
+                <circle cx="428" cy="132" r="34" fill="#F4EADA" opacity=".92"/>
+                <g fill="#EDE7FF" opacity=".5">
+                  <circle cx="96" cy="72" r="1.6"/><circle cx="182" cy="46" r="1.2"/>
+                  <circle cx="268" cy="88" r="1.4"/><circle cx="342" cy="54" r="1.1"/>
+                  <circle cx="520" cy="62" r="1.5"/><circle cx="561" cy="112" r="1.2"/>
+                  <circle cx="140" cy="126" r="1.1"/><circle cx="212" cy="150" r="1"/>
+                </g>
+                <path d="M0 262 L108 196 L196 252 L292 190 L404 258 L498 208 L600 254 L600 400 L0 400Z" fill="url(#far)"/>
+                <path d="M0 268 L108 202 L196 258 L292 196 L404 264 L498 214 L600 260" fill="none" stroke="#B7A8FF" stroke-opacity=".35" stroke-width="1.2"/>
+                <path d="M0 322 L92 286 L186 326 L300 276 L410 330 L512 292 L600 322 L600 400 L0 400Z" fill="url(#near)"/>
+                <path d="M0 328 L92 292 L186 332 L300 282 L410 336 L512 298 L600 328" fill="none" stroke="#9C8CF0" stroke-opacity=".28" stroke-width="1"/>
+                <rect y="366" width="600" height="34" fill="#080711"/>
+              </svg>
+            </div>
+            <div class="viewer__tiles" id="viewerTiles" aria-hidden="true"></div>
+            <div class="viewer__scan" aria-hidden="true"></div>
+          </div>
+          <div class="viewer__foot">
+            <span class="mono">8 × 6 Kacheln · 512 px · 10 Bit</span>
+            <span class="mono viewer__note" id="viewerNote">Ergebnis: schwarze Fläche</span>
+          </div>
+        </div>
+      </div>
+      <div class="demo__chain">
+      <div class="chain">
       <div class="step" data-step>
         <div class="step__t" data-i18n="step1.t">Android-Systemweg</div>
         <div class="step__d" data-i18n="step1.d">Für gewöhnliche JPEG, PNG, WebP, GIF, BMP, TIFF und einfache HEICs. Kachel-Raster und 10-Bit-HEVC enden hier oft schwarz oder leer.</div>
@@ -194,6 +249,12 @@
         <div class="step__d" data-i18n="step5.d">Für Exoten sucht die App nach JPEG-Daten irgendwo im Container und zeigt sie an, statt aufzugeben.</div>
       </div>
     </div>
+      </div>
+    </div>
+
+    <p class="small muted demo__caption" data-i18n="demo.caption">
+      Schematische Darstellung: dasselbe Foto durch die fünf Wege – links ändert sich das Bild mit jedem Schritt.
+    </p>
   </div>
 </section>
 
