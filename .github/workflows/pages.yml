@@ -1,7 +1,10 @@
 name: Produktseite veröffentlichen
 
 # Veröffentlicht den Ordner docs/ als statische Seite (GitHub Pages).
-# Läuft bei jeder Änderung an der Seite, sonst nichts.
+#
+# Einmal nötig: Repository → Settings → Pages → Source: "GitHub Actions".
+# Danach läuft dieser Workflow bei jeder Änderung an der Seite automatisch
+# (oder von Hand über "Run workflow").
 
 on:
   push:
@@ -33,16 +36,36 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Pages vorbereiten
+        id: pages
         uses: actions/configure-pages@v5
-        with:
-          # versucht Pages automatisch einzuschalten, falls es noch aus ist
-          enablement: true
+        continue-on-error: true
+
+      - name: Hinweis, falls Pages noch ausgeschaltet ist
+        if: steps.pages.outcome != 'success'
+        run: |
+          {
+            echo "### Produktseite noch nicht veröffentlicht"
+            echo ""
+            echo "GitHub Pages ist für dieses Repository noch nicht eingeschaltet."
+            echo "Einmal hier umstellen, dann diesen Workflow erneut starten:"
+            echo ""
+            echo "1. **Settings → Pages** öffnen: https://github.com/${{ github.repository }}/settings/pages"
+            echo "2. Unter **Build and deployment** als **Source** die Option **GitHub Actions** wählen."
+            echo "3. **Actions → Produktseite veröffentlichen → Run workflow** (Branch \`${GITHUB_REF_NAME}\`)."
+            echo ""
+            echo "Danach ist die Seite unter https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/ erreichbar."
+            echo ""
+            echo "Ohne Pages: \`docs/index.html\` herunterladen und im Browser öffnen – die Seite braucht kein Netz."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::warning::GitHub Pages ist noch nicht eingeschaltet – siehe Schritt-Zusammenfassung."
 
       - name: Seite einpacken
+        if: steps.pages.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
 
       - name: Veröffentlichen
+        if: steps.pages.outcome == 'success'
         id: deploy
         uses: actions/deploy-pages@v4
