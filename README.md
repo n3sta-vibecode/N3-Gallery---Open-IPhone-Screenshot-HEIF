@@ -16,7 +16,17 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.29 – Löschen-Knopf überall erreichbar
+## 🆕 Version 1.30 – Ordner-Zähler korrekt, flüssiges Scrollen
+
+* **„0 Dateien“ behoben:** Der Text wurde einmal mit 0 aufgebaut und danach nur noch
+  wiederverwendet – jetzt steht bei Geräteordnern, SAF-Ordnern, Favoriten, Notizen und Tags
+  die richtige Zahl.
+* **Scrollen mit geladenen Bildern ruckelt nicht mehr:** Die komprimiert gespeicherten
+  Vorschauen wurden im Haupt-Thread ausgepackt (ein JPEG pro Kachel und Bildaufbau) – das
+  passiert jetzt im Hintergrund. Vorladen läuft nur noch, wenn der Finger ruht, und pro
+  Kachel entfällt ein unnötiger Layout-Durchlauf.
+
+## Version 1.29 – Löschen-Knopf überall erreichbar
 
 * **Papierkorb oben rechts** in der Großansicht (war vorher nur als letztes Element einer
   seitlich scrollbaren Reihe im hochziehbaren Blatt versteckt).

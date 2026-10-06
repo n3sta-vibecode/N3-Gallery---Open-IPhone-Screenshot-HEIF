@@ -99,7 +99,9 @@ object ImageLoader {
 
     /** Vorschau als Bytes ablegen – nur für Rastergrößen, nie für das Vollbild. */
     private fun cacheBytes(key: String, bmp: Bitmap) {
-        if (maxOf(bmp.width, bmp.height) > 1024) return
+        // Nur Größen, die als Kacheln vorkommen. Das Komprimieren kostet Rechenzeit, die
+        // beim Scrollen fehlt – für die 1024er-Stufe (nur Großansicht) lohnt es sich nicht.
+        if (maxOf(bmp.width, bmp.height) > 512) return
         if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) return
         try {
             val out = java.io.ByteArrayOutputStream(16 * 1024)
@@ -297,9 +299,15 @@ object ImageLoader {
         target.alpha = 1f
 
         // 1) passende oder größere Stufe im Speicher → fertig
+        //
+        // WICHTIG: Hier darf **nur** nach fertigen Bildern gesucht werden. Vorher wurden
+        // auch die komprimierten Vorschauen (siehe [bytes]) im Haupt-Thread ausgepackt –
+        // beim Scrollen mit bereits geladenen Bildern bedeutete das ein JPEG-Dekodieren
+        // pro Kachel und Bildaufbau. Genau daher ruckelte das Wischen. Fehlt das fertige
+        // Bild, wird die Vorschau jetzt im Hintergrund ausgepackt und danach gesetzt.
         for (b in BUCKETS) {
             if (b < bucket) continue
-            val hit = memGet(keyFor(item, b))
+            val hit = cache.get(keyFor(item, b))
             if (hit != null) {
                 target.setImageBitmap(hit)
                 return
@@ -312,7 +320,7 @@ object ImageLoader {
         var shown = false
         for (b in BUCKETS.reversed()) {
             if (b >= bucket || b * 2 < bucket) continue
-            val low = memGet(keyFor(item, b))
+            val low = cache.get(keyFor(item, b))
             if (low != null) {
                 target.setImageBitmap(low)
                 shown = true

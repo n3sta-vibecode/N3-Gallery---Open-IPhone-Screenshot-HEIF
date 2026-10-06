@@ -1,5 +1,39 @@
 # N3 Gallery – was neu ist
 
+## 1.30 – Ordnergrößen stimmen wieder, Scrollen mit geladenen Bildern flüssig
+
+### a) „Bei allen Ordnern steht 0 Dateien“ – ein Fehler in der Zahl
+
+Die Anzeige baute den Text einmal mit **0** auf (`„0 Dateien“`) und setzte danach nur noch
+diese fertige Zeichenkette ein. Der Platzhalter war also schon verbraucht – deshalb stand
+überall 0, egal wie viele Fotos drin waren. Jetzt wird die Zahl pro Zeile richtig
+eingesetzt: bei **Geräteordnern**, **eigenen (SAF-)Ordnern**, **Favoriten**, **Mit Notiz**
+und **Tags**.
+
+### b) Scrollen: die Ursache war Dekodieren im Haupt-Thread
+
+Die Vorschauen liegen seit 1.26 zusätzlich **komprimiert** im Arbeitsspeicher (das spart
+viel Platz). Beim Anzeigen einer Kachel wurden diese Bytes aber **im Haupt-Thread**
+ausgepackt – also mitten im Bildaufbau ein JPEG entpacken, pro Kachel. Genau das ruckelte:
+je mehr Bilder schon geladen waren, desto mehr Arbeit pro Bildschirm.
+
+Jetzt:
+
+* Im Haupt-Thread werden nur noch **fertige Bilder** gesucht. Fehlt eines, wird die
+  Vorschau im **Hintergrund** ausgepackt und dann eingesetzt (das dauert 1–3 ms, es wird
+  nur eine stille Fläche gezeigt statt eines Rucklers).
+* **Vorladen nur noch, wenn der Finger ruht.** Vorher wurden mitten im Wischen alle 220 ms
+  bis zu 60 Vorladeaufträge abgeschickt und nahmen den sichtbaren Kacheln die Rechenzeit.
+  Jetzt wird direkt nach dem Wischen vorgeladen (doppelte Menge), während des Wischens
+  gehört die CPU den sichtbaren Kacheln.
+* **Kein Layout-Durchlauf pro Kachel:** Der Kachelabstand wird nur noch gesetzt, wenn er
+  sich wirklich ändert (vorher rief jede Kachel beim Binden ein `setPadding` auf und löste
+  damit einen kompletten Layout-Durchlauf des Rasters aus).
+* **Rastergröße ist fest** (`setHasFixedSize`) – die RecyclerView überspringt dadurch
+  unnötiges Neuvermessen.
+* Die komprimierte Ablage wird nur noch bis 512 px geführt (Kachelgrößen). Das
+  Komprimieren der 1024er-Stufe kostete Rechenzeit, die beim Scrollen fehlt.
+
 ## 1.29 – Löschen-Knopf ist jetzt da, wo man ihn sucht
 
 Rückmeldung war: „Der Foto löschen Knopf fehlt.“ Er war vorhanden, aber an einer Stelle,

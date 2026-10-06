@@ -158,6 +158,9 @@ abstract class BaseGridFragment : Fragment(), PageAware {
         recycler.recycledViewPool.setMaxRecycledViews(1, 400)
         recycler.setItemViewCacheSize(48)
         recycler.itemAnimator = null
+        // Alle Kacheln sind gleich groß: Damit muss die RecyclerView bei Änderungen nicht
+        // jedes Mal die komplette Liste neu vermessen (spürbar beim Scrollen).
+        recycler.setHasFixedSize(true)
         setupPrefetch()
         setupPinchZoom()
         maybeShowPinchHint()
@@ -429,25 +432,35 @@ abstract class BaseGridFragment : Fragment(), PageAware {
                 // Beim Wischen pausiert der Hintergrund-Aufbau: die sichtbaren Kacheln
                 // bekommen die CPU allein (wie bei Apple Fotos).
                 ImageLoader.setScrolling(newState != RecyclerView.SCROLL_STATE_IDLE)
-            }
-
-            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
-                if (dy == 0 || !isAdded) return
-                val now = SystemClock.uptimeMillis()
-                if (now - lastPrefetchAt < 220) return
-                lastPrefetchAt = now
-                val lm = rv.layoutManager as? LinearLayoutManager ?: return
-                val first = lm.findFirstVisibleItemPosition()
-                val last = lm.findLastVisibleItemPosition()
-                if (first < 0 || last < 0) return
-                val spread = currentSpanForPrefetch()
-                val forward = adapter.itemsBetween(last + 1, last + spread * 3)
-                val backward = if (dy < 0 && first > spread) adapter.itemsBetween(first - spread * 2, first - 1) else emptyList()
-                val ctx = requireContext().applicationContext
-                val px = adapter.tilePx()
-                GridWork.run { ImageLoader.prefetch(ctx, forward + backward, px, 60) }
+                // Sobald der Finger ruht, in Ruhe die nächsten Kacheln fertigstellen.
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) prefetchAround(rv)
             }
         })
+    }
+
+    /**
+     * Die nächsten Kacheln rund um die aktuelle Position vorbereiten.
+     *
+     * Das läuft **nur**, wenn gerade nicht gewischt wird. Vorher wurden die Vorladeaufträge
+     * mitten im Scrollen abgeschickt (alle 220 ms bis zu 60 Stück) und nahmen den
+     * sichtbaren Kacheln die Rechenzeit weg – das war der Grund, warum das Wischen mit
+     * schon geladenen Bildern nicht flüssig war.
+     */
+    private fun prefetchAround(rv: RecyclerView) {
+        if (!isAdded) return
+        val now = SystemClock.uptimeMillis()
+        if (now - lastPrefetchAt < 150) return
+        lastPrefetchAt = now
+        val lm = rv.layoutManager as? LinearLayoutManager ?: return
+        val first = lm.findFirstVisibleItemPosition()
+        val last = lm.findLastVisibleItemPosition()
+        if (first < 0 || last < 0) return
+        val spread = currentSpanForPrefetch()
+        val forward = adapter.itemsBetween(last + 1, last + spread * 4)
+        val backward = if (first > spread) adapter.itemsBetween(first - spread * 2, first - 1) else emptyList()
+        val ctx = requireContext().applicationContext
+        val px = adapter.tilePx()
+        GridWork.run { ImageLoader.prefetch(ctx, forward + backward, px, 90) }
     }
 
     private fun currentSpanForPrefetch(): Int = maxOf(1, currentSpan())
@@ -781,14 +794,16 @@ class TagsFragment : Fragment() {
         if (adapter == null || !isAdded) return
         val myToken = ++token
         val all = DataHub.all
-        val countFmt = getString(R.string.count_files, 0)
+        // WICHTIG: Die Vorlage darf NICHT vorab mit 0 formatiert werden – dabei wird der
+        // Platzhalter ersetzt und jede Zeile zeigt danach für immer „0 Dateien“.
+        val ctx = requireContext().applicationContext
         GridWork.run {
             val entries = mutableListOf<ListEntry>()
             val favs = all.filter { MetaStore.isFavorite(it.uri) }
             entries += ListEntry.Section("Alben")
             entries += ListEntry.Row(
                 title = "Favoriten",
-                sub = countFmt.format(favs.size),
+                sub = ctx.getString(R.string.count_files, favs.size),
                 formats = favs.map { it.format }.distinct().take(6).joinToString(", "),
                 cover = favs.firstOrNull(),
                 key = "favorites"
@@ -797,7 +812,7 @@ class TagsFragment : Fragment() {
             if (noteItems.isNotEmpty()) {
                 entries += ListEntry.Row(
                     title = "Mit Notiz",
-                    sub = countFmt.format(noteItems.size),
+                    sub = ctx.getString(R.string.count_files, noteItems.size),
                     formats = "Notizen & Beschriftungen",
                     cover = noteItems.firstOrNull(),
                     key = "notes"
@@ -812,7 +827,7 @@ class TagsFragment : Fragment() {
                     val items = MetaStore.itemsForTag(tag).mapNotNull { byUri[it] }
                     entries += ListEntry.Row(
                         title = tag,
-                        sub = countFmt.format(items.size),
+                        sub = ctx.getString(R.string.count_files, items.size),
                         formats = items.map { it.format }.distinct().take(6).joinToString(", "),
                         cover = items.firstOrNull(),
                         key = "tag:$tag"
@@ -898,7 +913,8 @@ class FoldersFragment : Fragment() {
         val treeUris = store.treeUris()
         val names: Map<String, String> =
             treeUris.associateWith { tree -> runCatching { store.displayName(tree) }.getOrElse { tree } }
-        val countFmt = getString(R.string.count_files, 0)
+        // Siehe oben: Vorlage erst mit der echten Zahl formatieren.
+        val ctx = requireContext().applicationContext
         val addTitle = getString(R.string.add_folder)
         val pickHint = getString(R.string.folder_pick)
         val emptyHint = getString(R.string.folders_empty)
@@ -936,7 +952,7 @@ class FoldersFragment : Fragment() {
                     val items = safByTree[uriString].orEmpty().ifEmpty { safAll }
                     entries += ListEntry.Row(
                         title = names[uriString] ?: uriString,
-                        sub = countFmt.format(items.size),
+                        sub = ctx.getString(R.string.count_files, items.size),
                         formats = "SAF-Ordner · dauerhafter Lesezugriff",
                         cover = items.firstOrNull(),
                         treeUri = uriString,
@@ -951,7 +967,7 @@ class FoldersFragment : Fragment() {
                 buckets.forEach { (name, items) ->
                     entries += ListEntry.Row(
                         title = name.ifEmpty { "Unbekannt" },
-                        sub = countFmt.format(items.size) + " · " + Fmt.bytes(items.sumOf { it.size }),
+                        sub = ctx.getString(R.string.count_files, items.size) + " · " + Fmt.bytes(items.sumOf { it.size }),
                         formats = items.map { it.format }.distinct().take(8).joinToString(", "),
                         cover = items.firstOrNull(),
                         key = "bucket:$name"

@@ -223,7 +223,11 @@ class GridAdapter(
                     measureTiles(holder.itemView)
                 }
 
-                h.itemView.setPadding(padPx, padPx, padPx, padPx)
+                // setPadding löst jedes Mal einen Layout-Durchlauf aus – beim Scrollen
+                // unnötige Arbeit, deshalb nur bei echter Änderung setzen.
+                if (h.itemView.paddingLeft != padPx) {
+                    h.itemView.setPadding(padPx, padPx, padPx, padPx)
+                }
                 // ImageLoader zeigt sofort eine vorhandene Stufe oder den Platzhalter und
                 // lädt dann nach – das Bild wird NICHT vorher geleert.
                 ImageLoader.into(holder.itemView.context, item, thumbPx, h.image)
