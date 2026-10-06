@@ -4,18 +4,21 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
+import android.graphics.Canvas
 import android.graphics.Matrix
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import androidx.exifinterface.media.ExifInterface
+import com.caverock.androidsvg.SVG
 import com.n3vibecode.gallery.data.Formats
 import com.n3vibecode.gallery.data.MediaItem
 import java.io.InputStream
+import kotlin.math.roundToInt
 
 /** Über welchen Weg das Bild entstanden ist (für den Hinweis in der Detailansicht). */
 enum class DecodePath {
-    VIDEO, NATIVE, HEIF_LIB, RAW_PREVIEW, EMBEDDED_JPEG, NONE
+    VIDEO, NATIVE, HEIF_LIB, RAW_PREVIEW, EMBEDDED_JPEG, VECTOR, NONE
 }
 
 data class DecodeResult(val bitmap: Bitmap?, val path: DecodePath)
@@ -116,6 +119,13 @@ object Decoder {
                 return DecodeResult(null, DecodePath.NONE)
             }
 
+            // 0) Vektorgrafik (SVG/SVGZ): wird in der gewünschten Größe gezeichnet.
+            //    Android kann das nicht selbst – dafür ist der SVG-Renderer eingebaut.
+            if (Formats.isVector(item.ext)) {
+                svgDecode(ctx, item, maxPx)?.let { return DecodeResult(it, DecodePath.VECTOR) }
+                return DecodeResult(null, DecodePath.NONE)
+            }
+
             val isHeifFamily = item.isHeif || item.isAvif || Formats.isHeif(item.ext) || Formats.isAvif(item.ext)
 
             // 2) RAW: zuerst die eingebettete Kamera-Vorschau (volle Qualität), dann System, dann libheif
@@ -193,6 +203,70 @@ object Decoder {
             return null
         } finally {
             runCatching { mmr.release() }
+        }
+    }
+
+    // ------------------------------------------------------------------ SVG (Vektorgrafik)
+
+    /**
+     * SVG rendern – verlustfrei in genau der Größe, die gebraucht wird.
+     *
+     * Ein SVG ist keine Bilddatei mit Pixeln, sondern eine Zeichenanleitung. Deshalb wird
+     * hier nicht „dekodiert“, sondern **in der Zielgröße gezeichnet**: Für eine Kachel
+     * rechnet der Renderer nur die Kachelgröße, für die Großansicht die Bildschirmgröße.
+     * Das Ergebnis ist in jeder Größe gestochen scharf – und weil nur die nötigen Pixel
+     * entstehen, bleibt der Arbeitsspeicher klein (ein 2000 × 2000 px großes SVG belegt
+     * als Kachel nur wenige Kilobyte).
+     *
+     * Unterstützt auch **SVGZ** (gzip-gepacktes SVG) – das ist der einzige Unterschied:
+     * vor dem Einlesen auspacken.
+     */
+    private fun svgDecode(ctx: Context, item: MediaItem, maxPx: Int): Bitmap? {
+        val target = maxPx.coerceIn(16, 4096)
+        return try {
+            ctx.contentResolver.openInputStream(Uri.parse(item.uri))?.use { input ->
+                val buffered = buffered(input)
+                // SVGZ = gzip-gepacktes SVG: an den zwei Kennbytes erkennen und auspacken
+                buffered.mark(2)
+                val b0 = buffered.read()
+                val b1 = buffered.read()
+                buffered.reset()
+                val stream = if (b0 == 0x1f && b1 == 0x8b) {
+                    java.util.zip.GZIPInputStream(buffered)
+                } else {
+                    buffered
+                }
+                val svg = SVG.getFromInputStream(stream)
+
+                // Dokumentsgröße bestimmen. Fehlt sie (z. B. nur Prozentangaben), wird
+                // eine quadratische Fläche angenommen – das Bild bleibt in jedem Fall
+                // vollständig sichtbar.
+                var docW = svg.documentWidth
+                var docH = svg.documentHeight
+                if (docW <= 0f || docH <= 0f || docW.isNaN() || docH.isNaN()) {
+                    svg.setDocumentWidth(1024f)
+                    svg.setDocumentHeight(1024f)
+                    docW = 1024f
+                    docH = 1024f
+                }
+
+                // Seitenverhältnis erhalten, längste Kante = Zielgröße
+                val scale = target.toFloat() / maxOf(docW, docH)
+                val w = (docW * scale).roundToInt().coerceIn(1, 4096)
+                val h = (docH * scale).roundToInt().coerceIn(1, 4096)
+
+                val picture = svg.renderToPicture(w, h)
+                val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                // Transparenz erhalten: SVG-Flächen ohne Hintergrund bleiben durchsichtig
+                bmp.eraseColor(android.graphics.Color.TRANSPARENT)
+                val canvas = Canvas(bmp)
+                canvas.drawPicture(picture)
+                bmp
+            }
+        } catch (_: OutOfMemoryError) {
+            null
+        } catch (_: Throwable) {
+            null
         }
     }
 
@@ -440,6 +514,7 @@ object Decoder {
     // ------------------------------------------------------------------ Hinweise
 
     fun hintFor(item: MediaItem): String? = when {
+        item.isVector -> "SVG-Vektorgrafik – in jeder Größe scharf"
         item.isRaw -> "RAW – Anzeige über die eingebettete Kamera-Vorschau"
         item.isAvif && HeifSupport.available -> null
         item.isAvif && Build.VERSION.SDK_INT < 31 -> "AVIF-Vorschau ab Android 12 – Metadaten unten trotzdem vollständig"
@@ -451,6 +526,7 @@ object Decoder {
         DecodePath.HEIF_LIB -> "Angezeigt mit dem integrierten HEIF-Decoder (libheif) – gekachelte & 10-Bit-Apple-Container"
         DecodePath.RAW_PREVIEW -> "Angezeigt aus der eingebetteten Kamera-Vorschau"
         DecodePath.EMBEDDED_JPEG -> "Angezeigt aus dem eingebetteten JPEG im Container"
+        DecodePath.VECTOR -> "Als Vektorgrafik in Bildschirmgröße gezeichnet – verlustfrei scharf"
         else -> null
     }
 }

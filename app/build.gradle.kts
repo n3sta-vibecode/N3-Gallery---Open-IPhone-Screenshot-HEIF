@@ -22,8 +22,8 @@ android {
         applicationId = "com.n3vibecode.gallery"
         minSdk = 26
         targetSdk = 35
-        versionCode = 31
-        versionName = "1.30"
+        versionCode = 32
+        versionName = "1.31"
         resourceConfigurations += listOf("de", "en")
         vectorDrawables.useSupportLibrary = true
 
@@ -122,6 +122,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // SVG-Renderer (Apache 2.0). Android kann SVG nicht von sich aus anzeigen –
+    // damit werden SVG/SVGZ-Dateien in der gewünschten Größe gerendert (verlustfrei,
+    // weil Vektorgrafik).
+    implementation("com.caverock:androidsvg-aar:1.4")
 
     // Eingebauter HEIF/AVIF-Decoder (libheif + libde265 + libdav1d).
     // Ohne ihn kann Android nur "einfache" HEICs öffnen – gekachelte Apple-Container

@@ -235,7 +235,7 @@ class GridAdapter(
                 val badgeText = when {
                     item.isVideoFile && item.durationMs > 0 -> Fmt.duration(item.durationMs)
                     item.isVideoFile -> "VIDEO"
-                    item.isRaw || item.isHeif || item.isAvif -> item.format
+                    item.isRaw || item.isHeif || item.isAvif || item.isVector -> item.format
                     else -> null
                 }
                 if (badgeText != null && !tiny) {

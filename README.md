@@ -2,7 +2,7 @@
 
 Eine Android-Galerie, die aussieht und sich anfühlt wie **Apple Fotos / Samsung Gallery / Google Fotos** –
 aber **fast jedes Fotoformat öffnet**: JPEG, PNG, WebP, GIF, BMP, TIFF, **HEIC/HEIF** (inkl. Apple-Screenshot-Container
-mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kamera-RAWs**
+mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **SVG/SVGZ** (Vektorgrafik), **DNG** und alle gängigen **Kamera-RAWs**
 (CR2/CR3, NEF, ARW, ORF, RW2, RAF, PEF, SRW, 3FR, IIQ, X3F …) sowie **HEVC/H.265-Video**.
 
 **Kein Internet, keine Cloud, keine Konten.** Alles bleibt auf dem Gerät.
@@ -16,7 +16,17 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.30 – Ordner-Zähler korrekt, flüssiges Scrollen
+## 🆕 Version 1.31 – SVG wird angezeigt
+
+* **SVG und SVGZ öffnen** – Android kann das von sich aus nicht, dafür ist ein SVG-Renderer
+  eingebaut.
+* Vektorgrafik wird **in der jeweils gebrauchten Größe gezeichnet**: Kacheln in Kachelgröße,
+  die Großansicht in Bildschirmgröße – dadurch **in jeder Größe scharf** und sehr sparsam
+  im Arbeitsspeicher (kein 16-MB-Rasterbild für eine kleine Kachel).
+* Formatecke „SVG“, eigene Gruppe im Format-Tab; Bearbeiten speichert als JPEG-Kopie
+  (Original bleibt unverändert).
+
+## Version 1.30 – Ordner-Zähler korrekt, flüssiges Scrollen
 
 * **„0 Dateien“ behoben:** Der Text wurde einmal mit 0 aufgebaut und danach nur noch
   wiederverwendet – jetzt steht bei Geräteordnern, SAF-Ordnern, Favoriten, Notizen und Tags

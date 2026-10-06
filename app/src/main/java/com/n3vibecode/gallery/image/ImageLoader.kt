@@ -721,8 +721,9 @@ object ImageLoader {
 
     private fun systemThumbnail(ctx: Context, item: MediaItem, bucket: Int, signal: CancellationSignal?): Bitmap? {
         if (Build.VERSION.SDK_INT < 29) return null
-        // RAW und HEIF-Exoten lieber über die eigene Engine (gleiche Darstellung wie in der Großansicht)
-        if (item.isRaw || item.isAvif) return null
+        // RAW, AVIF und SVG lieber über die eigene Engine: bei SVG gibt es keine
+        // Systemvorschau (Android kennt das Format nicht) und die eigene ist schärfer.
+        if (item.isRaw || item.isAvif || item.isVector) return null
         val uri = Uri.parse(item.uri)
         if (uri.scheme != "content" || uri.authority != "media") return null
         return try {

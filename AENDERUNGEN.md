@@ -1,5 +1,31 @@
 # N3 Gallery – was neu ist
 
+## 1.31 – SVG (Vektorgrafik) wird angezeigt
+
+**Neu:** Die App öffnet jetzt **SVG-Dateien** – und auch **SVGZ** (gzip-gepackt).
+
+Android kann SVG nicht von sich aus anzeigen (es kennt nur die eigene VectorDrawable-Form),
+deshalb ist ein schlanker SVG-Renderer mit eingebaut (Apache-2.0-Lizenz, ca. 190 kB).
+
+**Wie es arbeitet:** Ein SVG ist keine Bilddatei mit Pixeln, sondern eine Zeichenanleitung.
+Statt zu „dekodieren“ zeichnet die App das Bild **direkt in der gebrauchten Größe**:
+
+* Kachel im Raster (z. B. 64 oder 256 px) → es entstehen nur diese Pixel.
+* Großansicht → Bildschirmgröße.
+* Ergebnis: **in jeder Größe gestochen scharf**, und der Speicherbedarf bleibt winzig
+  (ein 2000 × 2000 px großes SVG belegt als Kachel nur wenige Kilobyte – statt 16 MB als
+  volles Rasterbild).
+* Transparenz bleibt erhalten; fehlt eine Größenangabe im SVG, wird eine quadratische
+  Fläche angenommen, damit nichts abgeschnitten wird.
+
+**Wo SVG-Dateien auftauchen:** im Medienindex (Dateien mit MIME-Typ `image/svg+xml`) und in
+allen per „Ordner hinzufügen“ eingebundenen Ordnern (SD-Karte, Download, NAS-Sync). Die
+Formatecke zeigt „SVG“, und im Format-Tab gibt es die Gruppe „SVG (Vektorgrafik)“.
+
+Bearbeiten/Speichern: SVG lässt sich wie gewohnt bearbeiten; gespeichert wird die Bearbeitung
+als **neue Kopie als JPEG** (SVG kann die App nicht zurückschreiben) – das Original bleibt
+unverändert. Das steht auch so im Speichern-Dialog.
+
 ## 1.30 – Ordnergrößen stimmen wieder, Scrollen mit geladenen Bildern flüssig
 
 ### a) „Bei allen Ordnern steht 0 Dateien“ – ein Fehler in der Zahl

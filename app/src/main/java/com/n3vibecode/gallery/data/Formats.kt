@@ -23,7 +23,10 @@ object Formats {
 
     val VIDEO = setOf("mp4", "m4v", "mov", "qt", "hevc", "h265", "265", "h264", "mkv", "webm", "avi", "wmv", "3gp", "3g2", "mts", "m2ts", "mpg", "mpeg", "ts")
 
-    val ALL: Set<String> = RAW + HEIF + AVIF + SIMPLE + VIDEO
+    /** Vektorgrafik: wird nicht „dekodiert“, sondern in der gewünschten Größe gezeichnet. */
+    val VECTOR = setOf("svg", "svgz")
+
+    val ALL: Set<String> = RAW + HEIF + AVIF + SIMPLE + VIDEO + VECTOR
 
     fun extOf(name: String): String {
         val i = name.lastIndexOf('.')
@@ -36,6 +39,7 @@ object Formats {
     fun isAvif(ext: String) = AVIF.contains(ext)
     fun isVideo(ext: String) = VIDEO.contains(ext)
     fun isSimple(ext: String) = SIMPLE.contains(ext)
+    fun isVector(ext: String) = VECTOR.contains(ext)
 
     /** Apple-Screenshots & Co. liegen als HEIF/HEIC mit Kachel-Container vor. */
     fun looksApple(name: String, ext: String): Boolean {
@@ -51,6 +55,7 @@ object Formats {
                 "heif", "hif" -> "HEIF"
                 "tiff" -> "TIF"
                 "apng" -> "PNG"
+                "svg", "svgz" -> "SVG"
                 "h265", "265" -> "H.265"
                 "h264" -> "H.264"
                 else -> ext.uppercase(Locale.ROOT)
@@ -76,6 +81,7 @@ object Formats {
         isRaw(ext) -> "RAW (Kamera-Rohdaten)"
         isHeif(ext) -> "HEIC / HEIF (Apple & Android)"
         isAvif(ext) -> "AVIF"
+        isVector(ext) -> "SVG (Vektorgrafik)"
         ext == "jpg" || ext == "jpeg" || ext == "jpe" || ext == "jfif" -> "JPEG"
         ext == "png" -> "PNG"
         ext == "webp" -> "WebP"
@@ -98,6 +104,7 @@ object Formats {
         "heic", "heics" -> "image/heic"
         "heif", "hif", "heifs" -> "image/heif"
         "avif", "avifs" -> "image/avif"
+        "svg", "svgz" -> "image/svg+xml"
         "dng" -> "image/x-adobe-dng"
         "cr2", "cr3" -> "image/x-canon-cr$ext"
         "nef", "nrw" -> "image/x-nikon-nef"
@@ -119,6 +126,7 @@ object Formats {
 
     /** Ist dieses Format auf dieser Android-Version dekodierbar? (Metadaten gehen immer.) */
     fun decodableNatively(ext: String, sdk: Int): Boolean = when {
+        isVector(ext) -> true              // wird von der App selbst gezeichnet
         isSimple(ext) -> true
         isHeif(ext) -> true                 // Android 8+ (API 26) kann HEIC
         isRaw(ext) -> false                 // wird über eingebettete Vorschau gelöst
@@ -132,6 +140,7 @@ object Formats {
         isAvif(ext) -> "AVIF (AV1-codiert)"
         ext == "jpg" || ext == "jpeg" -> "JPEG, verlustbehaftet"
         ext == "png" -> "PNG, verlustfrei"
+        isVector(ext) -> "SVG-Vektorgrafik – beliebig scharf skalierbar"
         else -> ""
     }
 }

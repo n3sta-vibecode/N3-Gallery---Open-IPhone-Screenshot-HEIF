@@ -34,7 +34,7 @@
     <string name="add_folder">Ordner hinzufügen</string>
     <string name="remove_folder">Ordner entfernen</string>
     <string name="folders_empty">Noch keine eigenen Ordner hinzugefügt</string>
-    <string name="folder_pick">Ordner wählen (RAW, HEIC, AVIF …)</string>
+    <string name="folder_pick">Ordner wählen (RAW, HEIC, AVIF, SVG …)</string>
     <string name="refresh">Neu einlesen</string>
     <string name="search">Suchen</string>
     <string name="search_hint">Name, Tag, Format …</string>
@@ -145,10 +145,10 @@
     <string name="m_none">–</string>
     <string name="sheet_hint">Liste frei scrollbar · ✕, Zurück oder Griff nach unten = schließen · „Metadaten-Seite“ = eigene Vollbild-Seite</string>
     <string name="banner_title">iPhone-Screenshots &amp; HEIC/HEIF öffnen – wie am iPhone</string>
-    <string name="banner_sub">Kachel-Raster (Grid-Container), 10-Bit &amp; HDR inklusive · RAW/DNG, AVIF, JPEG, PNG · App by N3 Vibecode</string>
+    <string name="banner_sub">Kachel-Raster (Grid-Container), 10-Bit &amp; HDR inklusive · RAW/DNG, AVIF, SVG, JPEG, PNG · App by N3 Vibecode</string>
     <string name="banner_tap">Tippen für Details</string>
     <string name="welcome_head">Willkommen bei N3 Gallery</string>
-    <string name="welcome_body">★ iPhone-Screenshots &amp; HEIC/HEIF öffnen ★\nDie meisten Galerien scheitern an Apple-HEIF-Containern: Screenshots und iPhone-Fotos liegen als Kachel-Raster (Grid, z. B. 8 × 6 Kacheln à 512 px) vor, oft 10-Bit oder HDR. N3 Gallery bringt dafür einen eigenen HEIF-Decoder (libheif) mit – die Bilder öffnen sich wie am iPhone, Kachel für Kachel zusammengesetzt.\n\nAußerdem dabei:\n• RAW/DNG (CR2/CR3, NEF, ARW, ORF, RW2, RAF …) über die eingebettete Kamera-Vorschau\n• AVIF, JPEG, PNG, WebP, GIF, BMP, TIFF, HEVC-Video\n• Zeitleiste nach Tag, Tags &amp; Alben, Ansicht nach Format und Ordner\n• Vollständige EXIF-, Sensor-, GPS- und XMP-Anzeige\n• Notizen &amp; Tags direkt in die Bilddatei schreiben (EXIF/XMP)\n• Raster mit 2–32 Spalten: „+“/„−“ in der Zeitleiste oder zwei Finger im Raster\n• Zeitleiste nach Tag, Monat oder Jahr gruppieren (Chips oben) – oder alles am Stück\n• Im Vollbild zoomen: Pinch bis 6×, Doppeltipp = 2×</string>
+    <string name="welcome_body">★ iPhone-Screenshots &amp; HEIC/HEIF öffnen ★\nDie meisten Galerien scheitern an Apple-HEIF-Containern: Screenshots und iPhone-Fotos liegen als Kachel-Raster (Grid, z. B. 8 × 6 Kacheln à 512 px) vor, oft 10-Bit oder HDR. N3 Gallery bringt dafür einen eigenen HEIF-Decoder (libheif) mit – die Bilder öffnen sich wie am iPhone, Kachel für Kachel zusammengesetzt.\n\nAußerdem dabei:\n• RAW/DNG (CR2/CR3, NEF, ARW, ORF, RW2, RAF …) über die eingebettete Kamera-Vorschau\n• AVIF, SVG (verlustfrei skalierbar), JPEG, PNG, WebP, GIF, BMP, TIFF, HEVC-Video\n• Zeitleiste nach Tag, Tags &amp; Alben, Ansicht nach Format und Ordner\n• Vollständige EXIF-, Sensor-, GPS- und XMP-Anzeige\n• Notizen &amp; Tags direkt in die Bilddatei schreiben (EXIF/XMP)\n• Raster mit 2–32 Spalten: „+“/„−“ in der Zeitleiste oder zwei Finger im Raster\n• Zeitleiste nach Tag, Monat oder Jahr gruppieren (Chips oben) – oder alles am Stück\n• Im Vollbild zoomen: Pinch bis 6×, Doppeltipp = 2×</string>
     <string name="welcome_footer">App by N3 Vibecode · Alle Funktionen offline, ohne Konto, ohne Cloud</string>
     <string name="welcome_ok">Los geht’s</string>
     <string name="meta_page_title">Metadaten</string>
@@ -177,7 +177,7 @@
     <string name="heic_badge_avif">★ AVIF geöffnet (N3-Decoder)</string>
 
     <!-- Über -->
-    <string name="about_text">N3 Gallery- Open HEIF iPhone Screenshots %1$s\n\n★ iPhone-Screenshots &amp; HEIC/HEIF ★\nDie App öffnet Apple-HEIF-Container mit Kachel-Raster (Grid, z. B. 8 × 6 Kacheln), 10-Bit-, 12-Bit- und HDR-Bildern – auch dort, wo der Android-Systemdecoder versagt. Dafür ist libheif (HEVC) direkt in der App eingebaut.\n\nEine Galerie-App, die praktisch jedes Fotoformat anzeigt: JPEG, PNG, WebP, GIF, BMP, TIFF, HEIC/HEIF (inkl. Apple-Screenshots, 10-Bit-HDR und Gain-Map-HEIF), AVIF, DNG und alle gängigen RAW-Formate (CR2/CR3, NEF, ARW, ORF, RW2, RAF, PEF, SRW …) über die eingebettete Kameravorschau.\n\n• Zeitleiste nach Tag gruppiert\n• Tags/Alben mit Filter-Chips\n• Ansicht nach Dateiformat und Ordner\n• Vollständige EXIF-, Sensor-, GPS- und XMP-Anzeige\n• Notizen schreiben echte EXIF/XMP-Metadaten in die Datei\n\nKein Internet, keine Cloud, keine Konten. Alles bleibt auf dem Gerät.\n\nApp by N3 Vibecode</string>
+    <string name="about_text">N3 Gallery- Open HEIF iPhone Screenshots %1$s\n\n★ iPhone-Screenshots &amp; HEIC/HEIF ★\nDie App öffnet Apple-HEIF-Container mit Kachel-Raster (Grid, z. B. 8 × 6 Kacheln), 10-Bit-, 12-Bit- und HDR-Bildern – auch dort, wo der Android-Systemdecoder versagt. Dafür ist libheif (HEVC) direkt in der App eingebaut.\n\nEine Galerie-App, die praktisch jedes Fotoformat anzeigt: JPEG, PNG, WebP, GIF, BMP, TIFF, HEIC/HEIF (inkl. Apple-Screenshots, 10-Bit-HDR und Gain-Map-HEIF), AVIF, SVG (Vektorgrafik), DNG und alle gängigen RAW-Formate (CR2/CR3, NEF, ARW, ORF, RW2, RAF, PEF, SRW …) über die eingebettete Kameravorschau.\n\n• Zeitleiste nach Tag gruppiert\n• Tags/Alben mit Filter-Chips\n• Ansicht nach Dateiformat und Ordner\n• Vollständige EXIF-, Sensor-, GPS- und XMP-Anzeige\n• Notizen schreiben echte EXIF/XMP-Metadaten in die Datei\n\nKein Internet, keine Cloud, keine Konten. Alles bleibt auf dem Gerät.\n\nApp by N3 Vibecode</string>
     <string name="legal_no_liability">Rechtlicher Hinweis: Diese App wird kostenlos und ohne jede Gewährleistung bereitgestellt. Es wird keine Haftung übernommen – insbesondere nicht für Datenverluste oder Schäden, die durch die Nutzung der App entstehen. Nutzung auf eigene Verantwortung.</string>
     <string name="contact_email">Kontakt: n3-vibecode@programmer.net</string>
     <string name="language_toggle">DE</string>

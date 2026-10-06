@@ -30,6 +30,7 @@ data class MediaItem(
     val isRaw: Boolean get() = Formats.isRaw(ext)
     val isHeif: Boolean get() = Formats.isHeif(ext)
     val isAvif: Boolean get() = Formats.isAvif(ext)
+    val isVector: Boolean get() = Formats.isVector(ext)
     val isVideoFile: Boolean get() = kind == MediaKind.VIDEO
     val time: Long get() = if (takenAt > 0) takenAt else modifiedAt
     val family: String get() = Formats.family(ext, mime)
