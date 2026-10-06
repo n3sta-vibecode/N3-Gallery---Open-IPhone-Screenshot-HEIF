@@ -226,17 +226,48 @@
   function observeChain() {
     const steps = $$('[data-step]');
     if (!steps.length) return;
-    if (!('IntersectionObserver' in window)) { setStage(STAGES.length - 1); return; }
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        const i = steps.indexOf(entry.target);
-        entry.target.classList.toggle('is-live', entry.isIntersecting);
-        if (entry.isIntersecting && i >= 0) setStage(i);
-      });
-    }, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
-    steps.forEach(el => io.observe(el));
-    // Beim Klick springt das Fenster direkt auf diese Stufe
-    steps.forEach((el, i) => el.addEventListener('click', () => setStage(i)));
+    const mark = (i) => steps.forEach((el, j) => el.classList.toggle('is-live', j === i));
+
+    if (reduce) {                 // ohne Bewegung: alles sichtbar, letzte Stufe im Fenster
+      mark(steps.length - 1);
+      setStage(steps.length - 1);
+      return;
+    }
+
+    // Genau eine Stufe ist aktiv: die, deren Mitte der Bildmitte am nächsten
+    // liegt. Das ist ehrlicher als ein Beobachterband, das zwei Stufen
+    // gleichzeitig als sichtbar melden kann.
+    let raf = 0, last = -1;
+    const demo = $('#decoder');
+    const update = () => {
+      raf = 0;
+      if (demo) {
+        const dr = demo.getBoundingClientRect();
+        if (dr.bottom < 0 || dr.top > window.innerHeight) return; // außerhalb: Stand halten
+      }
+      const mid = window.innerHeight * 0.5;
+      let active = 0, best = Infinity;
+      for (let i = 0; i < steps.length; i++) {
+        const r = steps[i].getBoundingClientRect();
+        const d = Math.abs(r.top + r.height / 2 - mid);
+        if (d < best) { best = d; active = i; }
+      }
+      if (active === last) return;
+      last = active;
+      mark(active);
+      setStage(active);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    update();
+
+    // Ein Klick auf eine Stufe zeigt sie sofort – auch ohne Scrollen
+    steps.forEach((el, i) => el.addEventListener('click', () => {
+      last = i;
+      mark(i);
+      setStage(i);
+    }));
   }
 
   /* ------------------------------------------------------------------
