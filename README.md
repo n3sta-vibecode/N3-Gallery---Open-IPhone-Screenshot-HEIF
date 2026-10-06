@@ -17,9 +17,9 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kame
   – ab dieser Version klappen Updates direkt über die installierte App.
   *Einmalig* muss dafür die alte Version deinstalliert und 1.28 frisch installiert werden
   (oder die TEST-APK, die parallel installiert).
-* **Notizen, Tags und Favoriten werden automatisch gesichert** (`Downloads/N3 Gallery/n3-sicherung.json`)
-  und nach einer Neuinstallation automatisch zurückgeholt – die Bilder selbst bleiben
-  ohnehin unangetastet.
+* **Notizen, Tags und Favoriten werden automatisch gesichert** (`Downloads/N3 Gallery/n3-sicherung.json`,
+  angelegt beim ersten Start) und nach einer Neuinstallation automatisch zurückgeholt –
+  die Bilder selbst bleiben ohnehin unangetastet.
 
 ## Version 1.27 – Speichern-Knopf sichtbar, HEIC viel schneller
 

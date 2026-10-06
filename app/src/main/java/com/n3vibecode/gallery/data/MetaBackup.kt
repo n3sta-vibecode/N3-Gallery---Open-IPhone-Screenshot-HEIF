@@ -49,6 +49,14 @@ object MetaBackup {
         }, 3000)
     }
 
+    /** Beim Start aufrufen: schreibt die Sicherung, wenn es etwas zu sichern gibt. */
+    fun saveIfAny(): Boolean {
+        if (MetaStore.favorites().isEmpty() && MetaStore.noteCount() == 0 &&
+            MetaStore.taggedUris().isEmpty()
+        ) return false
+        return save()
+    }
+
     /** Sicherung sofort schreiben (z. B. vor dem Teilen/Beenden). */
     fun save(): Boolean {
         val ctx = GalleryApp.instance

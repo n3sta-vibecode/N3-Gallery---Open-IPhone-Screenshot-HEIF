@@ -34,7 +34,8 @@ Dinge jetzt automatisch:
 * Nach jeder Änderung (verzögert, im Hintergrund) schreibt sie eine kleine JSON-Datei
   `n3-sicherung.json` nach `Downloads/N3 Gallery/`.
 * Beim Start holt sie die Sicherung automatisch zurück, wenn die App noch keine eigenen
-  Notizen/Favoriten hat (also nach einer frischen Installation).
+  Notizen/Favoriten hat (also nach einer frischen Installation) – und legt sie beim ersten
+  Start gleich selbst an, damit sie schon existiert, bevor jemand deinstalliert.
 * Die **Bilddateien** werden nie verändert; bearbeitete Kopien liegen ohnehin in der Galerie.
 
 ## 1.27 – Speichern-Knopf sichtbar, HEIC deutlich schneller
