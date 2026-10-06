@@ -1,5 +1,16 @@
 # N3 Gallery – was neu ist
 
+## Produktseite im Projekt (`docs/`)
+
+Neu ist eine **Produktseite** als reine HTML-Seite ohne Bauwerkzeuge: `docs/index.html`.
+Sie liegt im Projektarchiv (ZIP) bei und lässt sich über **GitHub Pages** (Quelle: Ordner `/docs`)
+veröffentlichen – oder direkt im Browser öffnen.
+
+Bewusst ohne Fremdes: **keine Web-Schriften, keine CDNs, keine Tracker, keine Cookies** –
+Schriften kommen vom Gerät, alles andere aus `docs/assets/`. Die Seite hat eine
+Sprachumschaltung Deutsch/Englisch, animierte Kachelwand, Zähler und Messbalken; bei
+`prefers-reduced-motion` steht alles still.
+
 ## 1.31 – SVG (Vektorgrafik) wird angezeigt
 
 **Neu:** Die App öffnet jetzt **SVG-Dateien** – und auch **SVGZ** (gzip-gepackt).

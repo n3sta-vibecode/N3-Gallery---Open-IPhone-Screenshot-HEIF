@@ -7,6 +7,9 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **SVG/SVGZ** (Vektorgrafik), **DN
 
 **Kein Internet, keine Cloud, keine Konten.** Alles bleibt auf dem Gerät.
 
+**Produktseite:** `docs/index.html` – reine HTML-Seite (ohne Fremd-Ressourcen), lässt sich über
+GitHub Pages (Quelle: Ordner `/docs`) veröffentlichen oder direkt im Browser öffnen.
+
 ---
 
 ## 🔑 Signieren / eigener Schlüssel
