@@ -7,8 +7,24 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **SVG/SVGZ** (Vektorgrafik), **DN
 
 **Kein Internet, keine Cloud, keine Konten.** Alles bleibt auf dem Gerät.
 
-**Produktseite:** `docs/index.html` – reine HTML-Seite (ohne Fremd-Ressourcen), lässt sich über
-GitHub Pages (Quelle: Ordner `/docs`) veröffentlichen oder direkt im Browser öffnen.
+---
+
+## ⬇️ Direkt herunterladen
+
+Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
+(im Dateilisten-Baum des Repos steht nur der Quelltext, die fertigen Dateien liegen bei den Releases):
+
+| Was | Datei | Link |
+| --- | --- | --- |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.31-release.apk` | [letzte Version](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/latest) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.31-TEST.apk` | [Release testbuild-1.31](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/tag/testbuild-1.31) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.31.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3Gallery-Projekt-1.31.zip) |
+
+Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
+
+**Produktseite (Webauftritt):** `docs/index.html` – reine HTML-Seite ohne Fremd-Ressourcen.
+Wird automatisch als GitHub Pages veröffentlicht, sobald die Seite freigeschaltet ist
+(Einstellungen → *Pages* → *Source: GitHub Actions*); sonst genügt ein Doppelklick auf die Datei.
 
 ---
 

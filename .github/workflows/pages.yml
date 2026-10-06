@@ -1,0 +1,48 @@
+name: Produktseite veröffentlichen
+
+# Veröffentlicht den Ordner docs/ als statische Seite (GitHub Pages).
+# Läuft bei jeder Änderung an der Seite, sonst nichts.
+
+on:
+  push:
+    branches:
+      - 'arena/**'
+      - main
+      - master
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Pages vorbereiten
+        uses: actions/configure-pages@v5
+        with:
+          # versucht Pages automatisch einzuschalten, falls es noch aus ist
+          enablement: true
+
+      - name: Seite einpacken
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Veröffentlichen
+        id: deploy
+        uses: actions/deploy-pages@v4
