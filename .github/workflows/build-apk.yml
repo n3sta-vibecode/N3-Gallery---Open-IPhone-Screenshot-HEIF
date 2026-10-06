@@ -66,22 +66,39 @@ jobs:
             app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
 
-      # Prüfen, dass wirklich installierbare APKs entstanden sind
+      # Prüfen, dass wirklich installierbare APKs entstanden sind – und dass alle mit
+      # demselben festen Schlüssel signiert wurden. Nur dann lässt sich die App später
+      # über die bereits installierte Version aktualisieren.
       - name: APK prüfen
         if: always()
         run: |
           ls -la app/build/outputs/apk/release/ app/build/outputs/apk/tryout/ 2>/dev/null || true
           AAPT="$SDK/build-tools/36.0.0/aapt2"
+          SIGNER="$SDK/build-tools/36.0.0/apksigner"
+          EXPECTED="2FB36AC65D73A4B1E437C84784E0EB50442F123ADB923BFD450DA8EB24C848E0"
+          FAIL_SIG=0
           for apk in app/build/outputs/apk/release/*.apk app/build/outputs/apk/tryout/*.apk; do
             [ -f "$apk" ] || continue
             echo "== $apk =="
             sha256sum "$apk"
             [ -x "$AAPT" ] && "$AAPT" dump badging "$apk" | head -6 || true
-            # Signatur-Fingerabdruck: muss bei jeder Version gleich bleiben, sonst lässt
-            # sich die App nicht über die vorhandene Installation aktualisieren.
-            SIGNER="$SDK/build-tools/36.0.0/apksigner"
-            [ -x "$SIGNER" ] && "$SIGNER" verify --print-certs "$apk" 2>/dev/null | grep -i "SHA-256" | head -2 || true
+            if [ -x "$SIGNER" ]; then
+              FP=$("$SIGNER" verify --print-certs "$apk" 2>/dev/null | awk -F': ' '/SHA-256 digest/{print $2; exit}')
+              NORM=$(echo "$FP" | tr -d ':' | tr '[:lower:]' '[:upper:]')
+              if [ "$NORM" = "$EXPECTED" ]; then
+                echo "Signatur SHA-256: $NORM  (fest, Updates moeglich)"
+              else
+                echo "SIGNATUR-FEHLER: $NORM  erwartet: $EXPECTED"
+                FAIL_SIG=1
+              fi
+            fi
           done
+          if [ "$FAIL_SIG" = "1" ]; then
+            echo ""
+            echo "Die APKs sind NICHT mit dem festen Schluessel signiert - so laesst sich die"
+            echo "App nicht ueber eine vorhandene Installation aktualisieren."
+            exit 1
+          fi
 
       # Fertige APKs als Release bereitstellen – dann lässt sich die neue Version
       # direkt auf dem Handy herunterladen und antippen.
@@ -112,10 +129,13 @@ jobs:
             grep -nE "^(e: |FAILURE|\* What went wrong|Caused by|Execution failed)|error:|Could not|Unresolved" /tmp/build.log | tail -40 || true
             echo '--- APK-Daten ---'
             AAPT="$SDK/build-tools/36.0.0/aapt2"
+            SIGNER="$SDK/build-tools/36.0.0/apksigner"
             for apk in app/build/outputs/apk/release/N3-Gallery-1.28-release.apk app/build/outputs/apk/tryout/N3-Gallery-1.28-TEST.apk; do
               [ -f "$apk" ] || continue
               echo "$apk"
               [ -x "$AAPT" ] && "$AAPT" dump badging "$apk" | grep -E "^package:|^application-label:|^launchable-activity:|^sdkVersion:|^targetSdkVersion:" || true
+              # Signatur-Fingerabdruck – muss bleiben, damit Updates installierbar sind
+              [ -x "$SIGNER" ] && "$SIGNER" verify --print-certs "$apk" 2>/dev/null | grep -i "SHA-256 digest" | head -1 || true
             done
             echo '--- letzte Zeilen ---'
             tail -12 /tmp/build.log || true
