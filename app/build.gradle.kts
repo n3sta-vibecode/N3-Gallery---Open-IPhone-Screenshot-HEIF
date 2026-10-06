@@ -22,8 +22,8 @@ android {
         applicationId = "com.n3vibecode.gallery"
         minSdk = 26
         targetSdk = 35
-        versionCode = 28
-        versionName = "1.27"
+        versionCode = 29
+        versionName = "1.28"
         resourceConfigurations += listOf("de", "en")
         vectorDrawables.useSupportLibrary = true
 
@@ -43,6 +43,10 @@ android {
                 storePassword = keystoreProps.getProperty("storePassword")
                 keyAlias = keystoreProps.getProperty("keyAlias")
                 keyPassword = keystoreProps.getProperty("keyPassword")
+                // PKCS12 für den CI-Schlüssel (aus openssl), JKS als Standard
+                val type = keystoreProps.getProperty("storeType")
+                    ?: if (storeFile?.name?.endsWith(".p12") == true || storeFile?.name?.endsWith(".pfx") == true) "PKCS12" else "JKS"
+                storeType = type
             }
         }
     }
@@ -66,7 +70,9 @@ android {
             initWith(getByName("release"))
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-test"
-            signingConfig = signingConfigs.getByName("debug")
+            // Derselbe feste Schlüssel wie Release: sonst ließe sich auch die Test-App
+            // nicht über eine frühere Version installieren.
+            signingConfig = if (hasKeystore) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
             // Manche Bibliotheken (z. B. der HEIF-Decoder) liefern nur debug/release –
             // für den Testbuild auf die release-Varianten zurückfallen.
             matchingFallbacks += listOf("release")

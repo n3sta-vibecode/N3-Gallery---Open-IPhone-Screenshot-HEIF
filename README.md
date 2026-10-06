@@ -9,7 +9,19 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **DNG** und alle gängigen **Kame
 
 ---
 
-## 🆕 Version 1.27 – Speichern-Knopf sichtbar, HEIC viel schneller
+## 🆕 Version 1.28 – Updates lassen sich installieren + Sicherung von Notizen/Favoriten
+
+* **„App ist nicht installiert“ behoben:** Jeder bisherige Build war mit einem anderen
+  Schlüssel signiert (der Buildserver erzeugt seinen Debug-Schlüssel jedes Mal neu), daher
+  lehnte Android jedes Update ab. Jetzt signieren alle Builds mit einem **festen Schlüssel**
+  – ab dieser Version klappen Updates direkt über die installierte App.
+  *Einmalig* muss dafür die alte Version deinstalliert und 1.28 frisch installiert werden
+  (oder die TEST-APK, die parallel installiert).
+* **Notizen, Tags und Favoriten werden automatisch gesichert** (`Downloads/N3 Gallery/n3-sicherung.json`)
+  und nach einer Neuinstallation automatisch zurückgeholt – die Bilder selbst bleiben
+  ohnehin unangetastet.
+
+## Version 1.27 – Speichern-Knopf sichtbar, HEIC viel schneller
 
 * **Klarer Speichern-Knopf:** oben rechts jetzt ein beschrifteter, gefüllter Knopf
   „Speichern“ (vorher nur ein kleines lila Häkchen ohne Text), und der Speichern-Dialog

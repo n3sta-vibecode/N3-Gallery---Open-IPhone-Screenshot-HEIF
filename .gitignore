@@ -13,3 +13,8 @@ captures/
 release/
 keystore.properties
 *.jks
+
+# Nur der CI-Schluessel (nicht der private n3-release.jks) wird mitgeliefert:
+# er sorgt dafuer, dass jede neue Version ueber die vorherige installiert werden kann.
+!ci/n3-ci.p12
+!keystore.properties

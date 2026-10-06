@@ -99,6 +99,7 @@ object MetaStore {
         val map = HashMap(notes() as Map<String, String>)
         if (text.isBlank()) map.remove(uri) else map[uri] = text
         noteCache.set(map)
+        MetaBackup.scheduleSave()
     }
 
     // ---------- Tags ----------
@@ -111,6 +112,7 @@ object MetaStore {
         val map = HashMap(tagsMap())
         if (clean.isEmpty()) map.remove(uri) else map[uri] = clean
         tagCache.set(map)
+        MetaBackup.scheduleSave()
     }
 
     /** Alle Tag-Namen der Bibliothek (sortiert). */
@@ -147,6 +149,7 @@ object MetaStore {
         }
         prefs.edit().putStringSet(K_FAVS, cur).apply()
         favCache.set(java.util.Collections.unmodifiableSet(cur))
+        MetaBackup.scheduleSave()
         return nowFav
     }
 

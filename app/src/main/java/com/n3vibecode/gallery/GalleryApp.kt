@@ -16,6 +16,11 @@ class GalleryApp : Application() {
         super.onCreate()
         instance = this
         Fmt.appContext = this
+        // Notizen/Tags/Favoriten im Hintergrund wiederherstellen, falls die App neu
+        // installiert wurde (sie liegen sonst nur in den App-Einstellungen).
+        Thread({
+            runCatching { com.n3vibecode.gallery.data.MetaBackup.restoreIfEmpty() }
+        }, "n3-meta-restore").apply { priority = Thread.MIN_PRIORITY; isDaemon = true }.start()
     }
 
     companion object {

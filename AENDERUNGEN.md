@@ -1,5 +1,42 @@
 # N3 Gallery – was neu ist
 
+## 1.28 – Updates installieren wieder (fester Signaturschlüssel) + Sicherung von Notizen/Favoriten
+
+### a) Warum „App ist nicht installiert“ kam – und was geändert wurde
+
+Android erlaubt ein Update **nur**, wenn die neue APK mit **demselben Schlüssel** signiert ist
+wie die bereits installierte App. Bisher signierte der Buildserver mit dem *Debug*-Schlüssel,
+den er **bei jedem Lauf neu erzeugt** – jede Version hatte also eine andere Signatur. Folge:
+Das Update wurde abgelehnt („App wurde nicht installiert“), obwohl die App installiert war.
+
+Jetzt:
+
+* Ein **fester Schlüssel** liegt im Projekt (`ci/n3-ci.p12`, dazu `keystore.properties`).
+  Er ist **nicht** der private Release-Schlüssel, sondern nur für die Testbuilds gedacht.
+* **Release und Test** werden damit signiert – Updates funktionieren damit auch für die
+  TEST-App.
+* Der Build schreibt den **Signatur-Fingerabdruck** ins Protokoll. Daran sieht man sofort,
+  dass er bei jeder Version gleich bleibt.
+
+**Einmalig:** Die gerade installierte Version stammt noch vom alten Schlüssel. Deshalb
+einmal **deinstallieren** und 1.28 frisch installieren (oder die TEST-APK nehmen, die
+parallel installiert). Ab 1.28 lassen sich Updates dann direkt über die App installieren.
+
+Ehrlich dazu: Der CI-Schlüssel liegt im Repository, damit die Builds ohne Zugangsdaten
+laufen. Für dieses Projekt ist das in Ordnung; wer später eine geheim gehaltene Signatur
+möchte, kann den Schlüssel in ein GitHub-Secret verschieben.
+
+### b) Notizen, Tags und Favoriten überleben die Neuinstallation
+
+Da für den Schlüsselwechsel einmal deinstalliert werden muss, sichert die App diese drei
+Dinge jetzt automatisch:
+
+* Nach jeder Änderung (verzögert, im Hintergrund) schreibt sie eine kleine JSON-Datei
+  `n3-sicherung.json` nach `Downloads/N3 Gallery/`.
+* Beim Start holt sie die Sicherung automatisch zurück, wenn die App noch keine eigenen
+  Notizen/Favoriten hat (also nach einer frischen Installation).
+* Die **Bilddateien** werden nie verändert; bearbeitete Kopien liegen ohnehin in der Galerie.
+
 ## 1.27 – Speichern-Knopf sichtbar, HEIC deutlich schneller
 
 ### a) „Kein Speichern-Knopf“ – jetzt ist er unmissverständlich
