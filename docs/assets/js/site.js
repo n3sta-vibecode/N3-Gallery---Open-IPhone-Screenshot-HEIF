@@ -86,7 +86,6 @@
 
     // Lichtfläche folgt der Maus, Fakten erscheinen in der Zeile darunter
     const readout = $('#readout');
-    const hint = $('#readoutHint');
     host.addEventListener('pointermove', (e) => {
       const tile = e.target.closest('.tile');
       if (!tile) return;
@@ -265,30 +264,33 @@
     const frame = wall && $('.wall__frame', wall);
     if (!wall || !frame || reduce) return;
 
-    // Neigung zur Zeigerposition (max. gut 3 Grad – mehr wirkt billig)
-    let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0, running = false;
+    // Neigung zur Zeigerposition (max. gut 5 Grad – mehr wirkt billig).
+    // Die Bewegung läuft nur, solange sich etwas ändert – kein Dauer-rAF.
+    let tx = 0, ty = 0, cx = 0, cy = 0, running = false;
     const tick = () => {
       cx += (tx - cx) * 0.08;
       cy += (ty - cy) * 0.08;
       frame.style.setProperty('--tilt-y', cx.toFixed(3) + 'deg');
       frame.style.setProperty('--tilt-x', cy.toFixed(3) + 'deg');
       if (Math.abs(tx - cx) > 0.01 || Math.abs(ty - cy) > 0.01) {
-        raf = requestAnimationFrame(tick);
+        requestAnimationFrame(tick);
       } else { running = false; }
     };
-    const kick = () => { if (!running) { running = true; raf = requestAnimationFrame(tick); } };
+    const kick = () => { if (!running) { running = true; requestAnimationFrame(tick); } };
 
     const hero = $('#hero');
-    hero.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'touch') return;
-      const r = hero.getBoundingClientRect();
-      const px = (e.clientX - r.left) / r.width - 0.5;
-      const py = (e.clientY - r.top) / r.height - 0.5;
-      tx = px * 5.5;
-      ty = -py * 4.5;
-      kick();
-    });
-    hero.addEventListener('pointerleave', () => { tx = 0; ty = 0; kick(); });
+    if (hero) {
+      hero.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') return;
+        const r = hero.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        tx = px * 5.5;
+        ty = -py * 4.5;
+        kick();
+      });
+      hero.addEventListener('pointerleave', () => { tx = 0; ty = 0; kick(); });
+    }
 
     // leichte Schnittbewegung beim Scrollen
     let sraf = 0;
@@ -627,13 +629,15 @@
     buildBand();
     snapshotGerman();
 
+    // Zuerst die Sprache des Browsers, dann eine frühere Auswahl.
     let lang = 'de';
-    try {
-      const saved = localStorage.getItem('n3.lang');
-      if (saved) lang = saved;
-      else if ((navigator.language || '').toLowerCase().startsWith('en')) lang = 'en';
-    } catch (_) {}
-    if (lang !== 'de') applyLang(lang); else buildLog();
+    let saved = null;
+    try { saved = localStorage.getItem('n3.lang'); } catch (_) {}
+    if (saved === 'de' || saved === 'en') lang = saved;
+    else if ((navigator.language || '').toLowerCase().startsWith('en')) lang = 'en';
+    if (lang !== 'de') applyLang(lang); // schreibt die Wahl auch in den Speicher
+    else if (saved) { try { localStorage.setItem('n3.lang', lang); } catch (_) {} }
+    buildLog();
 
     const langBtn = $('#lang');
     if (langBtn) {

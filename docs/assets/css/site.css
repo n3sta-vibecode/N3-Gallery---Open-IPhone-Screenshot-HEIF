@@ -473,7 +473,8 @@ h1 { hyphens: auto; }
   background: linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0));
   padding: clamp(0.7rem, 1.6vw, 1.1rem);
   transform: perspective(1200px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
-  transition: transform 0.9s var(--ease);
+  /* Die Glättung macht das Skript (rAF); eine CSS-Transition würde nur
+     nachziehen und die Bewegung weich spülen. */
   will-change: transform;
 }
 
