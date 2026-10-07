@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="n3_bg">#FFF7F7F9</color>
+    <color name="n3_surface">#FFFFFFFF</color>
+    <color name="n3_surface_variant">#FFEFEFF3</color>
+    <color name="n3_on_bg">#FF14141A</color>
+    <color name="n3_on_surface_variant">#FF6C6C78</color>
+    <color name="n3_accent">#FF6C4CF1</color>
+    <color name="n3_accent_dark">#FF4B2ED0</color>
+    <color name="n3_divider">#22000000</color>
+    <color name="n3_scrim">#000000</color>
+    <color name="n3_badge">#B3000000</color>
+    <color name="n3_icon">#FF3A3A44</color>
+</resources>

@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF000000">
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/pager"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Kopfzeile (sichtbar, solange das Info-Blatt geschlossen ist) -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#66000000"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/close"
+            android:src="@drawable/ic_arrow_back"
+            android:tint="#FFFFFFFF" />
+
+        <TextView
+            android:id="@+id/tvCounter"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_weight="1"
+            android:ellipsize="middle"
+            android:paddingStart="6dp"
+            android:singleLine="true"
+            android:textColor="#FFFFFFFF"
+            android:textSize="15sp" />
+
+        <ImageButton
+            android:id="@+id/btnEdit"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/editor_title"
+            android:src="@drawable/ic_brush"
+            android:tint="#FFFFFFFF" />
+
+        <ImageButton
+            android:id="@+id/btnFav"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/favorite"
+            android:src="@drawable/ic_heart_outline"
+            android:tint="#FFFFFFFF" />
+
+        <ImageButton
+            android:id="@+id/btnShare"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/share"
+            android:src="@drawable/ic_share"
+            android:tint="#FFFFFFFF" />
+
+        <!-- Löschen immer erreichbar: vorher gab es den Knopf nur als letztes Element
+             einer seitlich scrollbaren Reihe im hochziehbaren Blatt – also praktisch
+             unsichtbar. -->
+        <ImageButton
+            android:id="@+id/btnTrash"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/delete"
+            android:src="@drawable/ic_delete"
+            android:tint="#FFFFFFFF" />
+
+        <ImageButton
+            android:id="@+id/btnInfo"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/info"
+            android:src="@drawable/ic_info"
+            android:tint="#FFFFFFFF" />
+    </LinearLayout>
+
+    <!-- Info-/EXIF-Blatt: Ziehen nach oben = alle Details, nach unten = schließen -->
+    <LinearLayout
+        android:id="@+id/sheet"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_sheet"
+        android:orientation="vertical"
+        app:behavior_fitToContents="false"
+        app:behavior_hideable="true"
+        app:behavior_peekHeight="0dp"
+        app:behavior_skipCollapsed="true"
+        app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
+
+        <View
+            android:id="@+id/sheetHandle"
+            android:layout_width="44dp"
+            android:layout_height="10dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="2dp"
+            android:background="@drawable/bg_handle" />
+
+        <LinearLayout
+            android:id="@+id/sheetHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="18dp"
+            android:paddingEnd="6dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvSheetTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="middle"
+                    android:paddingTop="2dp"
+                    android:singleLine="true"
+                    android:textColor="@color/n3_on_bg"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvSheetSub"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="4dp"
+                    android:textColor="@color/n3_on_surface_variant"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvSheetHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="4dp"
+                    android:text="@string/sheet_hint"
+                    android:textColor="@color/n3_accent"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnSheetClose"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/close"
+                android:src="@drawable/ic_close"
+                android:tint="@color/n3_on_surface_variant" />
+        </LinearLayout>
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDelete"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="@string/delete"
+                    android:textColor="?attr/colorError"
+                    android:textSize="12sp"
+                    app:icon="@drawable/ic_delete"
+                    app:iconTint="?attr/colorError"
+                    app:iconSize="16dp" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMetaPage"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="@string/meta_page"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    app:icon="@drawable/ic_info"
+                    app:iconSize="16dp" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPhotoEdit"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="@string/editor_title"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    app:icon="@drawable/ic_brush"
+                    app:iconSize="16dp" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnNote"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="@string/note_edit"
+                    android:textSize="12sp"
+                    app:icon="@drawable/ic_edit"
+                    app:iconSize="16dp" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCopy"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="EXIF kopieren"
+                    android:textSize="12sp"
+                    app:icon="@drawable/ic_copy"
+                    app:iconSize="16dp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:background="@color/n3_divider" />
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:overScrollMode="ifContentScrolls"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:paddingBottom="40dp"
+            android:scrollbars="vertical">
+
+            <LinearLayout
+                android:id="@+id/metaContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </androidx.core.widget.NestedScrollView>
+    </LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

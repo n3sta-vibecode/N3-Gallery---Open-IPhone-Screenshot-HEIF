@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider-Pfade.
+
+  So eng wie möglich: FileProvider kann nur Dateien innerhalb der hier deklarierten
+  Wurzeln herausgeben. Jede zusätzliche Wurzel vergrößert die Menge der Dateien, die
+  eine andere App über eine erteilte URI-Grant lesen könnte.
+
+  * cache-path "share"    → Kopien, die beim Teilen/Export bearbeiteter Bilder entstehen
+  * cache-path "n3export" → vom Nutzer exportierte/geänderte Kopien (seit der Härtung
+                            von Repository.appExportItems() über FileProvider statt
+                            Uri.fromFile() referenziert)
+
+  NICHT deklariert – und das bleibt so:
+  * files-path  (private Daten, SharedPreferences)
+  * external-path (geteilter Speicher)
+  * root-path   (gesamtes Dateisystem – würde der FileProvider Geräteweit-Zugriff geben)
+-->
+<paths>
+    <cache-path name="share" path="share/" />
+    <cache-path name="n3export" path="n3export/" />
+</paths>

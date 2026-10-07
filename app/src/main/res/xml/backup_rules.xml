@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 und älter (android:fullBackupContent).
+
+  Grundsatz: NICHTS aus dem privaten App-Speicher wird gesichert.
+
+  Begründung: MetaStore schreibt Notizen, Tags und Favoriten als Klartext in die
+  SharedPreferences "n3_gallery_meta.xml". FolderStore legt die per SAF freigegebenen
+  Ordnerpfade ab. Beides sind personenbezogene Daten, die in einem Cloud-Backup oder bei
+  einer Geräte-Migration nichts zu suchen haben – die Bilder selbst sind ohnehin schon
+  auf dem Gerät bzw. in der Cloud gesichert.
+
+  Zusammen mit android:allowBackup="false" im Manifest ist das doppelte Absicherung:
+  allowBackup=false schaltet Backup komplett ab, diese Datei greift zusätzlich, falls ein
+  OEM-Backup-Weg oder ein künftiger Manifest-Merge allowBackup wieder auf true setzt.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="root" path="." />
+    <exclude domain="external" path="." />
+
+    <exclude domain="sharedpref" path="n3_gallery_meta.xml" />
+    <exclude domain="sharedpref" path="n3_folders.xml" />
+    <exclude domain="sharedpref" path="n3_grid.xml" />
+    <exclude domain="sharedpref" path="n3_labels.xml" />
+</full-backup-content>

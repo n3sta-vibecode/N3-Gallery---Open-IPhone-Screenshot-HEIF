@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF101014"
+    android:orientation="vertical">
+
+    <!-- Kopfzeile: zurück · Rückgängig · Wiederholen · Speichern -->
+    <LinearLayout
+        android:id="@+id/editorTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp">
+
+        <ImageButton
+            android:id="@+id/btnClose"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cancel"
+            android:src="@drawable/ic_close"
+            android:tint="#FFFFFFFF" />
+
+        <TextView
+            android:id="@+id/tvEditorTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="middle"
+            android:paddingStart="6dp"
+            android:singleLine="true"
+            android:text="@string/editor_title"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btnUndo"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/editor_undo"
+            android:src="@drawable/ic_undo"
+            android:tint="#FFFFFFFF" />
+
+        <ImageButton
+            android:id="@+id/btnRedo"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/editor_redo"
+            android:src="@drawable/ic_redo"
+            android:tint="#FFFFFFFF" />
+
+        <!-- Deutlich sichtbar und beschriftet: Vorher war das Speichern nur ein kleines
+             lila Häkchen ohne Text – leicht zu übersehen. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSave"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="2dp"
+            android:contentDescription="@string/save"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="16dp"
+            android:text="@string/save"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFFFF"
+            android:textSize="14sp"
+            app:backgroundTint="@color/n3_accent"
+            app:cornerRadius="20dp"
+            app:icon="@drawable/ic_check"
+            app:iconGravity="textStart"
+            app:iconPadding="6dp"
+            app:iconTint="#FFFFFFFF" />
+    </LinearLayout>
+
+    <!-- Bildfläche -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <com.n3vibecode.gallery.widget.PhotoEditorView
+            android:id="@+id/editor"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <ProgressBar
+            android:id="@+id/progress"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="@color/n3_accent" />
+
+        <TextView
+            android:id="@+id/tvEditorHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/bg_pinch_label"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="12sp"
+            android:visibility="gone"
+            tools:text="@string/editor_hint_draw" />
+    </FrameLayout>
+
+    <!-- Werkzeugeinstellungen je Modus -->
+    <LinearLayout
+        android:id="@+id/optionsPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FF1A1A20"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp">
+
+        <!-- Zuschneiden: Seitenverhältnisse -->
+        <HorizontalScrollView
+            android:id="@+id/cropOptions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipAspectFree"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checkable="true"
+                    android:text="@string/editor_crop_free" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipAspect1x1"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checkable="true"
+                    android:text="1:1" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipAspect4x3"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checkable="true"
+                    android:text="4:3" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipAspect3x4"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checkable="true"
+                    android:text="3:4" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipAspect16x9"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checkable="true"
+                    android:text="16:9" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipAspect9x16"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checkable="true"
+                    android:text="9:16" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCropReset"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/editor_reset"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- Zeichnen: Farben + Strichstärke -->
+        <LinearLayout
+            android:id="@+id/drawOptions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/drawColors"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/editor_stroke"
+                    android:textColor="#FFB9B9C6"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/seekStroke"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="40"
+                    android:progress="10" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Text: Farben, Größe, hinzufügen -->
+        <LinearLayout
+            android:id="@+id/textOptions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/textColors"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/editor_text_size"
+                    android:textColor="#FFB9B9C6"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/seekText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="40"
+                    android:progress="12" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddText"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/editor_add_text"
+                    android:textSize="12sp"
+                    app:icon="@drawable/ic_text"
+                    app:iconSize="16dp" />
+            </LinearLayout>
+
+            <!-- Sichtbar, wenn ein Textfeld ausgewählt ist -->
+            <LinearLayout
+                android:id="@+id/textSelectionActions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="4dp"
+                android:visibility="gone">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnEditText"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/editor_edit_text"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDuplicateText"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/editor_duplicate"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDeleteText"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/editor_delete_text"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Werkzeugauswahl -->
+    <LinearLayout
+        android:id="@+id/toolBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FF1A1A20"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingTop="2dp"
+        android:paddingBottom="8dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeCrop"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/editor_crop"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            app:icon="@drawable/ic_crop"
+            app:iconTint="#FFFFFFFF" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeDraw"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/editor_draw"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            app:icon="@drawable/ic_brush"
+            app:iconTint="#FFFFFFFF" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeText"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/editor_text"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            app:icon="@drawable/ic_text"
+            app:iconTint="#FFFFFFFF" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeReset"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/editor_reset_all"
+            android:textColor="#FFB9B9C6"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

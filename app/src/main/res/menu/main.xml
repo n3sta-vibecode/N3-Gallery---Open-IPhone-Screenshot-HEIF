@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_search"
+        android:icon="@drawable/ic_search"
+        android:title="@string/search"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_refresh"
+        android:icon="@drawable/ic_refresh"
+        android:title="@string/refresh"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_grid"
+        android:icon="@drawable/ic_grid"
+        android:title="@string/grid_size"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_lang_toggle"
+        android:title="@string/language_toggle"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_overview"
+        android:title="@string/overview_open"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_language"
+        android:title="@string/language"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_about"
+        android:title="@string/about"
+        app:showAsAction="never" />
+</menu>

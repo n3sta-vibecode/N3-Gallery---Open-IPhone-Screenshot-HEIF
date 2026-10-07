@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default = English. German lives in values-de/strings.xml. -->
+    <string name="app_name">N3 Gallery- Open HEIF iPhone Screenshots</string>
+    <!-- Short form for the app bar, dialogs and footers -->
+    <string name="brand_name">N3 Gallery</string>
+    <string name="brand_short_en">N3 Gallery - Open HEIF iPhone Screenshots</string>
+    <string name="app_subtitle">App by N3 Vibecode</string>
+
+    <!-- Tabs -->
+    <string name="tab_timeline">Timeline</string>
+    <string name="tab_tags">Tags</string>
+    <string name="tab_formats">Formats</string>
+    <string name="tab_folders">Folders</string>
+
+    <!-- General -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="close">Close</string>
+    <string name="delete">Delete</string>
+    <string name="share">Share</string>
+    <string name="info">Details &amp; EXIF</string>
+    <string name="edit">Edit</string>
+    <string name="favorite">Favorite</string>
+    <string name="copy">Copied to clipboard</string>
+    <string name="added">Added</string>
+    <string name="about">About the app</string>
+    <string name="scanning">Reading media …</string>
+    <string name="empty">No media found</string>
+    <string name="empty_hint">Allow access to your photos or add a folder via "Folders".\n\n★ iPhone screenshots (HEIC/HEIF) are supported – including tiled grids, 10-bit and HDR.</string>
+    <string name="permission_needed">Photo access is needed to show your gallery. Nothing ever leaves your device.</string>
+    <string name="grant">Allow access</string>
+    <string name="partial_access_hint">Limited access: you only see selected photos. Use "Folders" to add more sources.</string>
+    <string name="add_folder">Add folder</string>
+    <string name="remove_folder">Remove folder</string>
+    <string name="folders_empty">No folders added yet</string>
+    <string name="folder_pick">Choose folder (RAW, HEIC, AVIF, SVG …)</string>
+    <string name="refresh">Rescan</string>
+    <string name="search">Search</string>
+    <string name="search_hint">Name, tag, format …</string>
+    <string name="filter_all">All</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="count_files">%1$d files</string>
+    <string name="count_files_size">%1$d files · %2$s</string>
+    <string name="not_writable">This format cannot be written by the app – the note is stored internally only.</string>
+    <string name="saved_to_file">Note &amp; tags written into the file ✓</string>
+    <string name="saved_internal">Saved (internally) ✓</string>
+    <string name="save_failed">Saving failed: %1$s</string>
+    <string name="write_request_explanation">Android needs a quick confirmation to write into this photo.</string>
+    <string name="write_request_denied">Without confirmation nothing can be written into the file.</string>
+    <string name="deleted">Deleted</string>
+    <string name="delete_confirm_title">Delete for good?</string>
+    <string name="delete_confirm_msg">%1$s will be removed from the device permanently.</string>
+    <!-- Shows name AND path so a caller cannot disguise which file is really deleted. -->
+    <string name="delete_confirm_msg_path">%1$s\n\nLocation: %2$s\n\nThis file will be removed from the device permanently.</string>
+    <string name="view_rejected">This file cannot be opened: %1$s</string>
+    <string name="share_blocked">Sharing blocked: the target path is not permitted.</string>
+    <string name="bucket_shared">Shared</string>
+
+    <!-- Metadata sections -->
+    <string name="sec_file">File &amp; format</string>
+    <string name="sec_camera">Camera &amp; lens</string>
+    <string name="sec_sensor">Sensor &amp; capture</string>
+    <string name="sec_gps">Location (GPS)</string>
+    <string name="sec_tech">HEIF/AVIF details</string>
+    <string name="sec_xmp">Notes, tags &amp; XMP</string>
+    <string name="sec_raw">RAW / DNG details</string>
+
+    <string name="m_name">File name</string>
+    <string name="m_format">Format</string>
+    <string name="m_mime">MIME type</string>
+    <string name="m_size">File size</string>
+    <string name="m_resolution">Resolution</string>
+    <string name="m_megapixel">Megapixels</string>
+    <string name="m_aspect">Aspect ratio</string>
+    <string name="m_folder">Folder</string>
+    <string name="m_path">Path</string>
+    <string name="m_taken">Taken</string>
+    <string name="m_added">Added / modified</string>
+    <string name="m_orientation">Orientation</string>
+    <string name="m_bitdepth">Bit depth</string>
+    <string name="m_colorspace">Color space</string>
+    <string name="m_compression">Compression</string>
+    <string name="m_source">Source</string>
+
+    <string name="m_make">Make</string>
+    <string name="m_model">Model</string>
+    <string name="m_lens">Lens</string>
+    <string name="m_lens_spec">Lens specification</string>
+    <string name="m_lens_serial">Lens serial number</string>
+    <string name="m_body_serial">Camera serial number</string>
+    <string name="m_owner">Owner</string>
+    <string name="m_software">Software</string>
+    <string name="m_exif_version">EXIF version</string>
+
+    <string name="m_exposure">Exposure time</string>
+    <string name="m_aperture">Aperture</string>
+    <string name="m_iso">ISO</string>
+    <string name="m_focal">Focal length</string>
+    <string name="m_focal35">Focal length (35 mm)</string>
+    <string name="m_exposure_program">Exposure program</string>
+    <string name="m_exposure_bias">Exposure bias</string>
+    <string name="m_metering">Metering mode</string>
+    <string name="m_whitebalance">White balance</string>
+    <string name="m_flash">Flash</string>
+    <string name="m_scene">Scene mode</string>
+    <string name="m_max_aperture">Largest aperture</string>
+    <string name="m_subject_distance">Subject distance</string>
+    <string name="m_digital_zoom">Digital zoom</string>
+    <string name="m_sensing">Sensor type</string>
+    <string name="m_cfa">CFA pattern (Bayer)</string>
+    <string name="m_cfa_dim">CFA grid</string>
+    <string name="m_black_level">Black level</string>
+    <string name="m_white_level">White level</string>
+    <string name="m_dng_version">DNG version</string>
+    <string name="m_unique_camera">Camera ID (DNG)</string>
+    <string name="m_as_shot_neutral">AsShotNeutral (white balance)</string>
+    <string name="m_illuminant">Calibration illuminant</string>
+    <string name="m_preview">Embedded preview</string>
+    <string name="m_color_matrix">Color matrix</string>
+    <string name="m_active_area">Active sensor area</string>
+
+    <string name="m_lat">Latitude</string>
+    <string name="m_lon">Longitude</string>
+    <string name="m_altitude">Altitude</string>
+    <string name="m_gps_time">GPS time</string>
+    <string name="m_gps_precision">Accuracy</string>
+    <string name="m_map">Show on map</string>
+
+    <string name="m_brand">Container brand</string>
+    <string name="m_items">Images in container</string>
+    <string name="m_item_types">Coded image types</string>
+    <string name="m_grid">Tile grid</string>
+    <string name="m_hdr_gainmap">HDR gain map (Apple/Google)</string>
+    <string name="m_hdr_transfer">HDR transfer function</string>
+    <string name="m_primaries">Color primaries</string>
+    <string name="m_alpha">Alpha channel</string>
+    <string name="m_heif_variants">HEIF variants</string>
+    <string name="m_xmp_items">XMP metadata</string>
+    <string name="m_note">Note / image description</string>
+    <string name="m_keywords">Tags (keywords)</string>
+    <string name="m_note_hint">Note for this image …</string>
+    <string name="m_keywords_hint">Separate tags with commas, e.g. family, vacation 2026</string>
+    <string name="m_tags_title">Tags / albums</string>
+    <string name="m_write_to_file">Write note &amp; tags into the image file (EXIF/XMP)</string>
+    <string name="m_write_hint">Saved as EXIF image description (ImageDescription) and XP keywords – Apple Photos, Google Photos, Lightroom &amp; co. will read it.</string>
+    <string name="m_show_all">Show all metadata</string>
+    <string name="m_raw_only">Technical raw data</string>
+    <string name="m_none">–</string>
+    <string name="sheet_hint">List scrolls freely · ✕, back or swipe down on the handle = close · "Metadata page" = full-screen view</string>
+    <string name="banner_title">Open iPhone screenshots &amp; HEIC/HEIF – just like on iPhone</string>
+    <string name="banner_sub">Tiled grid containers, 10-bit &amp; HDR included · RAW/DNG, AVIF, SVG, JPEG, PNG · App by N3 Vibecode</string>
+    <string name="banner_tap">Tap for details</string>
+    <string name="welcome_head">Welcome to N3 Gallery</string>
+    <string name="welcome_body">★ Open iPhone screenshots &amp; HEIC/HEIF ★\nMost galleries fail on Apple HEIF containers: screenshots and iPhone photos are stored as tile grids (e.g. 8 × 6 tiles of 512 px), often 10-bit or HDR. N3 Gallery ships its own HEIF decoder (libheif) – images open just like on iPhone, tile by tile.\n\nAlso included:\n• RAW/DNG (CR2/CR3, NEF, ARW, ORF, RW2, RAF …) via the embedded camera preview\n• AVIF, SVG (scales losslessly), JPEG, PNG, WebP, GIF, BMP, TIFF, HEVC video\n• Timeline grouped by day, tags &amp; albums, views by format and folder\n• Full EXIF, sensor, GPS and XMP display\n• Write notes &amp; tags straight into the image file (EXIF/XMP)\n• Grid with 2–32 columns: "+"/"−" in the timeline or pinch with two fingers\n• Group the timeline by day, month or year (chips at the top)\n• Zoom in the full-screen view: pinch up to 6×, double tap = 2×</string>
+    <string name="welcome_footer">App by N3 Vibecode · Everything offline, no account, no cloud</string>
+    <string name="welcome_ok">Let\'s go</string>
+    <string name="meta_page_title">Metadata</string>
+    <string name="note_edit">Note &amp; tags</string>
+    <string name="copy_exif">Copy EXIF</string>
+    <string name="share_text">Share as text</string>
+    <string name="open_meta_page">Open metadata page (fully scrollable)</string>
+    <string name="meta_page">Metadata page</string>
+    <string name="group_day">Day</string>
+    <string name="group_month">Month</string>
+    <string name="group_year">Year</string>
+    <string name="group_all">All photos</string>
+    <string name="grid_cols">%1$d columns</string>
+    <string name="grid_fewer">Fewer columns</string>
+    <string name="grid_more">More columns</string>
+    <string name="pinch_hint">Pinch with two fingers = more photos at once · spread = bigger</string>
+    <string name="grid_size_hint">More than 3 photos per row: tap "+" or pinch with two fingers in the grid</string>
+    <string name="zoom_hint">Two fingers = zoom · double tap = 2× · pinch out or swipe down = all photos</string>
+    <string name="grid_size">Grid size (more photos)</string>
+    <string name="grid_size_title">Grid size – more photos at once</string>
+    <string name="grid_zoom_more">Grid: %1$d columns – more photos visible</string>
+    <string name="grid_zoom_less">Grid: %1$d columns – larger preview</string>
+    <string name="grid_zoom_limit">Grid limit reached (2–32 columns)</string>
+    <string name="promo_bar">★ Open iPhone screenshots &amp; HEIC/HEIF – just like on iPhone</string>
+    <string name="heic_badge">★ iPhone HEIC opened (N3 decoder)</string>
+    <string name="heic_badge_avif">★ AVIF opened (N3 decoder)</string>
+
+    <!-- About -->
+    <string name="about_text">N3 Gallery- Open HEIF iPhone Screenshots %1$s\n\n★ iPhone screenshots &amp; HEIC/HEIF ★\nThe app opens Apple HEIF containers with tile grids (e.g. 8 × 6 tiles), 10-bit, 12-bit and HDR images – even where the Android system decoder fails. libheif (HEVC) is built right into the app.\n\nA gallery app that displays practically every photo format: JPEG, PNG, WebP, GIF, BMP, TIFF, HEIC/HEIF (incl. Apple screenshots, 10-bit HDR and gain-map HEIF), AVIF, SVG (vector graphics), DNG and all common RAW formats (CR2/CR3, NEF, ARW, ORF, RW2, RAF, PEF, SRW …) via the embedded camera preview.\n\n• Timeline grouped by day\n• Tags/albums with filter chips\n• Views by file format and folder\n• Full EXIF, sensor, GPS and XMP display\n• Notes write real EXIF/XMP metadata into the file\n\nNo internet, no cloud, no accounts. Everything stays on the device.\n\nApp by N3 Vibecode</string>
+    <string name="legal_no_liability">Legal notice: this app is provided free of charge and without any warranty. No liability is accepted – in particular not for data loss or any damage arising from the use of the app. Use at your own risk.</string>
+    <string name="contact_email">Contact: n3-vibecode@programmer.net</string>
+    <string name="language_toggle">EN</string>
+    <string name="about_legal">Metadata: EXIF, XMP, IPTC · Offline · v1.0</string>
+    <string name="unsupported_preview">There is no decoder for this format on this Android version. All metadata is still shown.</string>
+    <string name="avif_preview_hint">An AVIF preview is available from Android 12. Metadata and tags work anyway.</string>
+    <string name="raw_preview_hint">RAW is displayed via the embedded camera preview.</string>
+    <string name="video">Video</string>
+    <string name="live_photo">Live</string>
+
+    <!-- New in 1.13 -->
+    <string name="language">Language</string>
+    <string name="language_title">App language</string>
+    <string name="lang_system">System language</string>
+    <string name="lang_german">Deutsch</string>
+    <string name="lang_english">English</string>
+    <string name="day_today">Today</string>
+    <string name="day_yesterday">Yesterday</string>
+    <string name="day_before_yesterday">Day before yesterday</string>
+    <string name="date_unknown">Unknown date</string>
+    <string name="year_unknown">Unknown year</string>
+    <string name="raw_fields">All EXIF fields (raw values)</string>
+    <string name="meta_footer">N3 Gallery · metadata read directly from the file</string>
+    <string name="jpeg_from_heif">Shown from the JPEG image inside the HEIF container</string>
+    <string name="fav_added">Added to favorites ★</string>
+    <string name="fav_removed">Removed from favorites</string>
+    <string name="meta_loading">Metadata is still being read …</string>
+    <string name="exif_copied">EXIF data copied</string>
+    <string name="sidecar_saved">XMP sidecar saved ✓</string>
+    <string name="sidecar_failed">Sidecar failed: %1$s</string>
+    <string name="save_sidecar">Save XMP sidecar</string>
+    <string name="format_not_writable">Format cannot be written</string>
+    <string name="share_failed">Sharing not possible: %1$s</string>
+    <string name="delete_failed">Deleting not possible: %1$s</string>
+    <string name="reset">Reset</string>
+    <string name="grid_size_2">2 columns – very large</string>
+    <string name="grid_size_3">3 columns</string>
+    <string name="grid_size_4">4 columns – default</string>
+    <string name="grid_size_5">5 columns</string>
+    <string name="grid_size_6">6 columns</string>
+    <string name="grid_size_8">8 columns – many photos</string>
+    <string name="grid_size_10">10 columns</string>
+    <string name="grid_size_12">12 columns</string>
+    <string name="grid_size_16">16 columns</string>
+    <string name="grid_size_20">20 columns</string>
+    <string name="grid_size_24">24 columns</string>
+    <string name="grid_size_32">32 columns – everything at a glance</string>
+    <string name="overview_title">All photos at a glance</string>
+    <string name="overview_hint">Tap a tile = open photo · two fingers = zoom · back = close</string>
+    <string name="overview_done">%1$d of %2$d photos shown</string>
+    <string name="overview_open">Overview – all photos on one screen</string>
+    <string name="grid_limit_overview">Overview opened – all photos on one screen</string>
+
+    <!-- Foto-Editor (Zuschneiden, Zeichnen, Text) -->
+    <string name="editor_title">Edit photo</string>
+    <string name="editor_crop">Crop</string>
+    <string name="editor_draw">Draw</string>
+    <string name="editor_text">Text</string>
+    <string name="editor_add_text">Add text</string>
+    <string name="editor_edit_text">Edit text</string>
+    <string name="editor_duplicate">Duplicate</string>
+    <string name="editor_delete_text">Delete</string>
+    <string name="editor_undo">Undo</string>
+    <string name="editor_redo">Redo</string>
+    <string name="editor_reset">Reset crop</string>
+    <string name="editor_reset_all">Reset all</string>
+    <string name="editor_crop_free">Free</string>
+    <string name="editor_crop_hint_frame">Frame = final photo</string>
+    <string name="editor_stroke">Stroke width</string>
+    <string name="editor_text_size">Text size</string>
+    <string name="editor_loading">Loading photo …</string>
+    <string name="editor_load_failed">This photo could not be loaded for editing.</string>
+    <string name="editor_hint_draw">Draw with one finger · two fingers = zoom</string>
+    <string name="editor_hint_crop">Drag the photo with one finger · drag corners/edges for the crop · two fingers = zoom</string>
+    <string name="editor_hint_text">Tap to place text · drag to move · double tap to change</string>
+    <string name="editor_text_hint">Text …</string>
+    <string name="editor_save_title">Save changes</string>
+    <string name="editor_save_copy">Save as new copy</string>
+    <string name="editor_save_copy_hint">The edited photo is added to your gallery (Pictures/N3 Gallery). The original stays untouched.</string>
+    <string name="editor_save_overwrite">Overwrite original</string>
+    <string name="editor_save_overwrite_hint">The original file is replaced.</string>
+    <string name="editor_saved_copy">Saved as copy: %1$s</string>
+    <string name="editor_saved_original">Changes saved in the file ✓</string>
+    <string name="editor_save_failed">Saving failed: %1$s</string>
+    <string name="editor_not_writable">This format can only be saved as a new copy.</string>
+    <string name="editor_video">Videos cannot be edited yet.</string>
+    <string name="editor_discard_title">Discard changes?</string>
+    <string name="editor_discard_msg">Your edits are not saved.</string>
+    <string name="editor_discard">Discard</string>
+    <string name="editor_nothing_to_save">Nothing to save yet – crop, draw or add text first.</string>
+    <string name="editor_no_write_permission">Without the storage permission the photo cannot be saved.</string>
+    <string name="editor_save_failed_title">Saving not possible</string>
+    <string name="editor_save_heif_note">HEIC/HEIF cannot be overwritten – the copy is saved as JPEG.</string>
+    <string name="editor_share_only_msg">The gallery did not accept the file. The photo is therefore in the sharing folder of the app – via “Share” you can keep it in Photos or send it. The original stays untouched.</string>
+    <string name="editor_render_failed">The edited photo could not be prepared (not enough memory?). Try a smaller crop.</string>
+</resources>

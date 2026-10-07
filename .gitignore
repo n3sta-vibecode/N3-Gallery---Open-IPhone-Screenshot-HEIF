@@ -1,0 +1,49 @@
+# ---------------------------------------------------------------- Build
+*.iml
+.gradle/
+build/
+captures/
+.externalNativeBuild
+.cxx
+release/
+
+# ---------------------------------------------------------------- Lokale Pfade
+local.properties
+.idea/
+.DS_Store
+*.log
+
+# ---------------------------------------------------------------- Artefakte
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# ================================================================ GEHEIMNISSE
+# Signaturschluessel und ihre Passwoerter duerfen NIEMALS versioniert werden.
+# Der Signaturschluessel IST die Identitaet der App: Wer ihn besitzt, kann als
+# dieselbe App veroeffentlichen – Android akzeptiert das als legitimes Update.
+#
+# WICHTIG: Die fruehere Fassung dieser Datei enthielt die Zeilen
+#     !ci/n3-ci.p12
+#     !keystore.properties
+# und hat den Schluessel + sein Passwort damit BEWUSST wieder eingecheckt.
+# Diese Negationen wurden entfernt. Es gibt keine Ausnahme mehr.
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+signing.properties
+ci/
+n3-release*
+*secret*
+*.gpg
+*.asc
+
+# Vorlagen duerfen versioniert bleiben (enthalten keine echten Zugangsdaten)
+!keystore.properties.template
+!*.template
+
+# Das Projekt-ZIP wird auf Wunsch direkt im Ordner abgelegt (nicht im Git):
+/N3Gallery-Projekt-*.zip

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Eigener App-Name, damit Test- und Haupt-App nebeneinander erkennbar sind. -->
+    <string name="app_name">N3 Gallery TEST</string>
+    <string name="brand_short_en">N3 Gallery TEST</string>
+</resources>

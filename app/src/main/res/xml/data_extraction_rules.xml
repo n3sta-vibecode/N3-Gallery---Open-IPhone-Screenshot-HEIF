@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (android:dataExtractionRules).
+
+  Trennt die beiden Backup-Wege, die Android kennt:
+  * cloud-backup    : Sicherung ins Google-Konto / OEM-Cloud
+  * device-transfer : direkte Geräte-Migration (z. B. auf ein neues Handy)
+
+  Für beide gilt: keine privaten App-Daten. Notizen und Tags sind Klartext und
+  beschreiben den Inhalt privater Fotos – sie gehören nicht in ein Backup, das auf einem
+  fremden Konto oder einem Second-Hand-Gerät landen kann.
+
+  WICHTIG: Diese Datei wird ab API 31 ausgewertet und ersetzt dort
+  android:fullBackupContent. Fehlt sie, sichert Android den KOMPLETTEN privaten
+  App-Speicher (Befund V4 in security/SICHERHEITS-ANALYSE.md).
+-->
+<data-extraction-rules>
+
+    <cloud-backup>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="root" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+
+    <device-transfer>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="root" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+
+</data-extraction-rules>

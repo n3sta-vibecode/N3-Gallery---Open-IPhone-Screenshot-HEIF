@@ -1,0 +1,200 @@
+name: APK bauen
+
+# =============================================================================
+#  GEHÄRTET (siehe security/SICHERHEITS-ANALYSE.md, Befunde V5/V6).
+#
+#  Die alte Fassung hatte drei kritische Eigenschaften:
+#    1. Sie signierte mit dem im Repo liegenden ci/n3-ci.p12 + keystore.properties.
+#       Beide waren öffentlich → jeder konnte ein legitimes „Update" signieren.
+#    2. Der Schritt „APKs als Release bereitstellen" packte `ci` und
+#       keystore.properties in ein öffentlich herunterladbares Projekt-ZIP.
+#    3. Der Signatur-Check verglich gegen den FINGERABDRUCK DES GELEAKTEN Schlüssels
+#       und bestand damit nur, wenn weiter mit dem kompromittierten Key gebaut wurde.
+#
+#  Jetzt: Signatur ausschließlich aus Secrets, kein Debug-Fallback, kein Publishen
+#  von Schlüsseldateien, und der Check stellt sicher, dass NICHT mit dem Debug-Key
+#  und NICHT mit dem bekannt-kompromittierten CI-Key signiert wurde.
+#
+#  Benötigte Repository-Secrets (Settings → Secrets and variables → Actions):
+#    N3_KEYSTORE_BASE64   base64 des KEYSTORES:  base64 -w0 n3-release.jks
+#    N3_STORE_PASSWORD    Keystore-Passwort
+#    N3_KEY_ALIAS         Schlüssel-Alias
+#    N3_KEY_PASSWORD      Schlüssel-Passwort
+#    N3_STORE_TYPE        optional: JKS (Standard) oder PKCS12
+#    N3_EXPECTED_SHA256   optional: erwarteter Zertifikats-Fingerabdruck (Großbuchstaben,
+#                         ohne Doppelpunkte). Leer lassen → nur Debug-/CI-Key-Check.
+# =============================================================================
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'arena/**'
+  workflow_dispatch:
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # für Release-Upload auf Nicht-main-Branches
+      pull-requests: write   # für den Build-Kommentar am PR
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Android SDK prüfen/ergänzen
+        run: |
+          set -x
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "SDK=$SDK" >> "$GITHUB_ENV"
+          SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SM" ]; then
+            yes | "$SM" --licenses > /dev/null 2>&1 || true
+            "$SM" --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" || true
+          fi
+
+      # ---- Sicherheits-Gates VOR dem Build -----------------------------------
+      - name: Signatur-Geheimnisse prüfen (kein Debug-Fallback)
+        env:
+          KS: ${{ secrets.N3_KEYSTORE_BASE64 }}
+          SP: ${{ secrets.N3_STORE_PASSWORD }}
+          AL: ${{ secrets.N3_KEY_ALIAS }}
+          KP: ${{ secrets.N3_KEY_PASSWORD }}
+        run: |
+          missing=0
+          [ -z "$KS" ] && { echo "::error::Secret N3_KEYSTORE_BASE64 fehlt"; missing=1; }
+          [ -z "$SP" ] && { echo "::error::Secret N3_STORE_PASSWORD fehlt"; missing=1; }
+          [ -z "$AL" ] && { echo "::error::Secret N3_KEY_ALIAS fehlt"; missing=1; }
+          [ -z "$KP" ] && { echo "::error::Secret N3_KEY_PASSWORD fehlt"; missing=1; }
+          if [ "$missing" = "1" ]; then
+            echo "::error::Release-Signatur unvollstaendig. Es wird bewusst KEINE"
+            echo "::error::debug-signierte APK als Ersatz gebaut (Befund V6)."
+            exit 1
+          fi
+          echo "Signatur-Geheimnisse vorhanden."
+
+      - name: Prüfen, dass kein Keystore im Repo liegt
+        run: |
+          if find . -path ./.git -prune -o \( -name '*.jks' -o -name '*.p12' -o -name '*.pfx' \
+              -o -name '*.keystore' -o -name 'keystore.properties' \) -print | grep -q .; then
+            echo "::error::Es liegt eine Schluessel- oder keystore.properties-Datei im Repository."
+            echo "::error::Signaturschluessel gehoeren in Secrets, nicht in die Versionsverwaltung (Befund V5)."
+            find . -path ./.git -prune -o \( -name '*.jks' -o -name '*.p12' -o -name '*.pfx' \
+              -o -name '*.keystore' -o -name 'keystore.properties' \) -print
+            exit 1
+          fi
+          echo "Kein Keystore im Repo – OK."
+
+      # ---- Build -------------------------------------------------------------
+      - name: Release-APK bauen (signiert)
+        shell: bash
+        env:
+          N3_KEYSTORE_BASE64: ${{ secrets.N3_KEYSTORE_BASE64 }}
+          N3_STORE_PASSWORD: ${{ secrets.N3_STORE_PASSWORD }}
+          N3_KEY_ALIAS: ${{ secrets.N3_KEY_ALIAS }}
+          N3_KEY_PASSWORD: ${{ secrets.N3_KEY_PASSWORD }}
+          N3_STORE_TYPE: ${{ secrets.N3_STORE_TYPE }}
+        run: bash ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+
+      - name: Test-APK bauen (installiert parallel zur normalen App)
+        shell: bash
+        env:
+          N3_KEYSTORE_BASE64: ${{ secrets.N3_KEYSTORE_BASE64 }}
+          N3_STORE_PASSWORD: ${{ secrets.N3_STORE_PASSWORD }}
+          N3_KEY_ALIAS: ${{ secrets.N3_KEY_ALIAS }}
+          N3_KEY_PASSWORD: ${{ secrets.N3_KEY_PASSWORD }}
+          N3_STORE_TYPE: ${{ secrets.N3_STORE_TYPE }}
+        run: bash ./gradlew assembleTryout --no-daemon --stacktrace 2>&1 | tee -a /tmp/build.log
+
+      - name: APK umbenennen
+        run: |
+          [ -f app/build/outputs/apk/release/app-release.apk ] && cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/N3-Gallery-release.apk || true
+          [ -f app/build/outputs/apk/tryout/app-tryout.apk ] && cp app/build/outputs/apk/tryout/app-tryout.apk app/build/outputs/apk/tryout/N3-Gallery-TEST.apk || true
+
+      # ---- Signatur NACH dem Build verifizieren ------------------------------
+      - name: Signatur verifizieren (kein Debug-Key, kein geleakter CI-Key)
+        env:
+          EXPECTED: ${{ secrets.N3_EXPECTED_SHA256 }}
+        run: |
+          SIGNER="$SDK/build-tools/36.0.0/apksigner"
+          # Fingerabdruck des öffentlich kompromittierten CI-Schlüssels (SIGNIEREN.md).
+          LEAKED="2FB36AC65D73A4B1E437C84784E0EB50442F123ADB923BFD450DA8EB24C848E0"
+          FAIL=0
+          for apk in app/build/outputs/apk/release/*.apk app/build/outputs/apk/tryout/*.apk; do
+            [ -f "$apk" ] || continue
+            echo "== $apk =="
+            OUT=$("$SIGNER" verify --print-certs "$apk" 2>/dev/null)
+            echo "$OUT" | grep -iE "Verified using|SHA-256 digest" | head -4
+            # v2-Schema muss vorhanden sein
+            echo "$OUT" | grep -qi "v2 scheme" || { echo "::error::$apk: kein v2-Signaturschema"; FAIL=1; }
+            # Debug-Key darf nie in einem Release auftauchen
+            if echo "$OUT" | grep -qi "Android Debug"; then
+              echo "::error::$apk: mit dem oeffentlichen DEBUG-Key signiert!"; FAIL=1
+            fi
+            FP=$(echo "$OUT" | awk -F': ' '/SHA-256 digest/{print $2; exit}' | tr -d ':' | tr '[:lower:]' '[:upper:]')
+            # Der geleakte CI-Key darf nicht mehr verwendet werden
+            if [ "$FP" = "$LEAKED" ]; then
+              echo "::error::$apk: mit dem OEFFENTLICH BEKANNTEN CI-Schluessel signiert (kompromittiert)."; FAIL=1
+            fi
+            # Falls ein erwarteter Fingerabdruck hinterlegt ist, muss er passen
+            if [ -n "$EXPECTED" ] && [ "$FP" != "$EXPECTED" ]; then
+              echo "::error::$apk: Fingerabdruck $FP != erwartet $EXPECTED"; FAIL=1
+            fi
+          done
+          [ "$FAIL" = "1" ] && exit 1
+          echo "Signatur-Check bestanden."
+
+      - name: APK hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: N3-Gallery-APK
+          path: |
+            app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+      # ---- Release auf Nicht-main-Branches -----------------------------------
+      # WICHTIG: Es werden NUR die APKs veröffentlicht – KEIN Projekt-ZIP mehr, das
+      # früher ci/ und keystore.properties (also den Signaturschlüssel) enthielt.
+      - name: APKs als Release bereitstellen
+        if: github.ref_name != 'main' && github.ref_name != 'master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="testbuild-hardened"
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --title "Testbuild (gehärtet)" \
+              --notes "Automatisch gebaut und mit dem Release-Schluessel aus den CI-Secrets signiert. Quelle: Branch ${{ github.ref_name }}." \
+              --prerelease
+          fi
+          gh release upload "$TAG" \
+            app/build/outputs/apk/release/N3-Gallery-release.apk \
+            app/build/outputs/apk/tryout/N3-Gallery-TEST.apk --clobber
+
+      - name: Build-Protokoll in den Pull Request schreiben
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### Build-Protokoll (${{ job.status }})"
+            echo '```'
+            grep -nE "^(e: |FAILURE|\* What went wrong|Caused by|Execution failed)|error:|Could not|Unresolved" /tmp/build.log | tail -40 || true
+            echo '```'
+          } > /tmp/report.md
+          PR=$(gh pr list --head "${{ github.ref_name }}" --json number --jq '.[0].number' || true)
+          if [ -n "$PR" ]; then
+            gh pr comment "$PR" --body-file /tmp/report.md --edit-last || gh pr comment "$PR" --body-file /tmp/report.md || true
+          fi

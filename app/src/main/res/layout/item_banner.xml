@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="10dp"
+    android:background="@drawable/bg_banner"
+    android:orientation="vertical"
+    android:paddingBottom="12dp">
+
+    <ImageView
+        android:id="@+id/bannerImage"
+        android:layout_width="match_parent"
+        android:layout_height="112dp"
+        android:contentDescription="@string/banner_title"
+        android:scaleType="centerCrop"
+        android:src="@drawable/n3_brand" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:text="@string/banner_title"
+        android:textColor="@color/n3_on_bg"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="3dp"
+        android:text="@string/banner_sub"
+        android:textColor="@color/n3_on_surface_variant"
+        android:textSize="12sp" />
+</LinearLayout>
