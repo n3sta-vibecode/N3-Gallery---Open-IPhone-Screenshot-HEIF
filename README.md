@@ -9,18 +9,29 @@ mit Kachel-Raster und Gain-Map-HDR), **AVIF**, **SVG/SVGZ** (Vektorgrafik), **DN
 
 ---
 
-## ⬇️ Direkt herunterladen
+## ⚠️ Downloads vorübergehend zurückgezogen — Sicherheitshinweis (2026-10-08)
 
-Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
-(im Dateilisten-Baum des Repos steht nur der Quelltext, die fertigen Dateien liegen bei den Releases):
+Alle bisherigen Release-APKs und Projekt-ZIPs wurden **offline genommen** und sind bewusst
+**nicht** mehr herunterladbar. Eine Sicherheitsanalyse
+([security/SICHERHEITS-ANALYSE.md](security/SICHERHEITS-ANALYSE.md)) hat mehrere ausnutzbare
+Schwachstellen gefunden (u. a. willkürliches Löschen/Überschreiben über `file://`,
+Path Traversal beim Schreiben, Klartext-Notizen im geteilten Speicher) sowie einen
+**kompromittierten Signaturschlüssel**, mit dem alle bisherigen Builds signiert sind.
 
-| Was | Datei | Link |
-| --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.31-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3-Gallery-1.31-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.31-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3-Gallery-1.31-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.31.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3Gallery-Projekt-1.31.zip) |
+**Installiere keine ältere Version dieser App.** Ältere APKs sind unsicher, und ihre Signatur
+ist kompromittiert — eine fremde APK könnte sich gegenüber Android als legitimes „Update"
+dieser App ausgeben.
 
-Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
+Eine **geprüfte, gehärtete Version (`1.32-hardened`)** wird nach Schlüssel-Rotation und Build
+auf der [Release-Seite](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
+veröffentlicht — inklusive **Zertifikat-Fingerprint und APK-SHA-256** zur Echtheitsprüfung.
+Bis dahin gilt: installiere **keine** APK, die nicht von dieser Release-Seite stammt **und**
+deren Fingerprint nicht mit dem dort veröffentlichten übereinstimmt
+(`apksigner verify --print-certs deine.apk`).
+
+Hintergrund, Befunde und Nachweise: [security/SICHERHEITS-ANALYSE.md](security/SICHERHEITS-ANALYSE.md) ·
+Rückzug der Releases: [security/RELEASE-RUECKZUG.md](security/RELEASE-RUECKZUG.md) ·
+Sanierungsplan für `main`: [security/HOTFIX-MAIN.md](security/HOTFIX-MAIN.md)
 
 **Produktseite (Webauftritt):** `docs/index.html` – reine HTML-Seite ohne Fremd-Ressourcen.
 Wird automatisch als GitHub Pages veröffentlicht, sobald die Seite freigeschaltet ist
