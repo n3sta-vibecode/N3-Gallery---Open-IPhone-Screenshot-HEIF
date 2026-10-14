@@ -85,11 +85,10 @@ object Fmt {
             today - oneDay -> ctx(R.string.day_yesterday, "Yesterday")
             today - 2 * oneDay -> ctx(R.string.day_before_yesterday, "Day before yesterday")
             else -> {
-                val cal = calendar(ms)
-                val pattern =
-                    if (cal.get(Calendar.YEAR) == calendar(System.currentTimeMillis()).get(Calendar.YEAR)) "EEEE, d. MMMM"
-                    else "d. MMMM yyyy"
-                sdf(pattern).format(Date(ms)).replaceFirstChar { it.uppercase() }
+                // Jahr IMMER anzeigen (frueher nur bei fremden Jahren): sonst sind
+                // Abschnitte aus verschiedenen Jahren nicht unterscheidbar und die
+                // Liste wirkt, als waere sie "nur nach Tag ohne Jahr" sortiert.
+                sdf("EEEE, d. MMMM yyyy").format(Date(ms)).replaceFirstChar { it.uppercase() }
             }
         }
         dayTitleCache.put(d, out)

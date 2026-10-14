@@ -1,5 +1,16 @@
 # N3 Gallery – was neu ist
 
+## 1.32-hardened – Sicherheits-Härtung + Timeline mit Jahr
+
+* **Sicherheits-Härtung** (Details & Nachweise: `security/SICHERHEITS-ANALYSE.md`): fremde URIs
+  werden geprüft (nur `content://`, kein Path Traversal), Löschen/Überschreiben läuft nur noch
+  über den ContentResolver, Backups ausgeschlossen, Build bricht ohne echten Signierschlüssel ab.
+* **Timeline zeigt immer das Jahr:** Tages-Überschriften stehen jetzt vollständig als
+  „Wochentag, Tag. Monat **Jahr**" da (bisher wurde das Jahr im laufenden Jahr weggelassen),
+  und die Unterzeile jeder Tages-Sektion zeigt das Datum mit Jahr. Dadurch sind Abschnitte aus
+  verschiedenen Jahren eindeutig unterscheidbar; sortiert wird weiterhin absteigend nach dem
+  vollen Aufnahme-/Änderungszeitstempel (Jahr inklusive).
+
 ## Produktseite im Projekt (`docs/`)
 
 Neu ist eine **Produktseite** als reine HTML-Seite ohne Bauwerkzeuge: `docs/index.html`.

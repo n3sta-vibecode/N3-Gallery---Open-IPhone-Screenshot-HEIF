@@ -674,7 +674,9 @@ class TimelineFragment : BaseGridFragment() {
                     when (currentMode) {
                         GridPrefs.MODE_MONTH -> if (item.time > 0) append(" · ").append(Fmt.monthRange(item.time))
                         GridPrefs.MODE_YEAR -> Unit
-                        else -> if (item.time > 0) append(" · ").append(Fmt.weekday(item.time))
+                        // Unterzeile im Tages-Modus: Datum MIT Jahr (statt nur Wochentag),
+                        // damit die Jahres-Zugehoerigkeit jeder Sektion sichtbar ist.
+                        else -> if (item.time > 0) append(" · ").append(Fmt.showDate(item.time))
                     }
                 }
                 val title = when (currentMode) {
