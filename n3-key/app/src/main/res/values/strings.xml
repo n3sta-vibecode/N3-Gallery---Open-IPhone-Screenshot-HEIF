@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">N3 Key</string>
+    <string name="service_description">Belegt freigegebene Hardwaretasten mit deinen Aktionen. N3 Key verarbeitet nur eingerichtete Tastencodes; im Anlernmodus die gedrückte Taste. Keine Bildschirminhalte, keine Texte, keine Übertragung ins Internet. Du kannst den Dienst jederzeit hier deaktivieren.</string>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#D2F58A</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowBackground">#101512</item>
+        <item name="android:navigationBarColor">#101512</item>
+        <item name="android:statusBarColor">#101512</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

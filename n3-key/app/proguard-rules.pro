@@ -1,0 +1,3 @@
+-keep class com.n3vibecode.key.MainActivity { *; }
+-keep class com.n3vibecode.key.KeyService { *; }
+-keepattributes *Annotation*

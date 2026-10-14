@@ -1,0 +1,41 @@
+name: N3 Key APK
+on:
+  workflow_dispatch:
+  push:
+    paths: ['n3-key/**', '.github/workflows/n3-key.yml']
+  pull_request:
+    paths: ['n3-key/**', '.github/workflows/n3-key.yml']
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: n3-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Kotlin test compiler
+        run: |
+          curl -fsSL https://registry.npmjs.org/kotlin-compiler/-/kotlin-compiler-2.1.20.tgz -o /tmp/kotlin.tgz
+          echo 'de1476137985c2d3aa1bd50d8976bb7eb900ca564321686ca2458d0fce45c346  /tmp/kotlin.tgz' > /tmp/kotlin.sha256
+          sha256sum -c /tmp/kotlin.sha256
+          # The pinned compiler package is installed outside the source tree.
+          mkdir -p "$RUNNER_TEMP/kotlin"
+          tar xzf /tmp/kotlin.tgz -C "$RUNNER_TEMP/kotlin"
+          echo "KOTLIN_HOME=$RUNNER_TEMP/kotlin/package" >> "$GITHUB_ENV"
+      - name: Test click engine
+        run: tools/test.sh
+      - name: Build optimized signed test APK and lint
+        run: ./gradlew :app:assemblePreview :app:lintPreview --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: N3-Key-by-n3-Vibecode
+          path: n3-key/app/build/outputs/apk/preview/*.apk
+          if-no-files-found: error

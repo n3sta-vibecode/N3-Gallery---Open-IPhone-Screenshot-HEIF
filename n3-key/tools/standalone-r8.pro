@@ -1,0 +1,11 @@
+# Entry points instantiated by Android; other classes may be optimized/removed.
+-keep public class com.n3vibecode.key.MainActivity { public <init>(); }
+-keep public class com.n3vibecode.key.KeyService { public <init>(); }
+-keepattributes RuntimeVisibleAnnotations,AnnotationDefault,InnerClasses,EnclosingMethod
+-dontwarn org.jetbrains.annotations.**
+-dontwarn org.intellij.lang.annotations.**
+-dontwarn kotlin.jvm.internal.SourceDebugExtension
+-dontwarn java.lang.instrument.**
+-dontwarn java.lang.management.**
+-dontwarn java.lang.ClassValue
+-dontwarn java.util.function.**
