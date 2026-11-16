@@ -49,6 +49,8 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew :app:testReleaseUnitTest --no-daemon --stacktrace 2>&1 | tee /tmp/test.log
+          # Kurzfassung ins Protokoll (Landet als Annotation, weil Runner-Logs hier nicht lesbar sind)
+          grep -E "FAILED|AssertionError|^e: |Execution failed|No tests found|Task :app:test" /tmp/test.log | head -20 || true
           echo "--- Ergebnisse:"
           find app/build/test-results -name "*.xml" -exec grep -h "<testsuite" {} \; | \
             sed -E 's/.*tests="([0-9]+)".*failures="([0-9]+)".*errors="([0-9]+)".*/Tests: \1, Fehler: \2, Abbrüche: \3/' || true
@@ -57,7 +59,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          ZEILE=$(grep -E "^e: |AssertionError|FAILED" /tmp/test.log | head -8 | tr '\n' ' ') || true
+          ZEILE=$(grep -E "^e: |AssertionError|FAILED|> Task .*FAILED|Caused by|No tests found|Execution failed" /tmp/test.log | head -10 | tr '\n' ' ') || true
           echo "::error::Unit-Tests fehlgeschlagen: ${ZEILE:-siehe Protokoll}"
 
       # Schutzprüfung gegen einen Fehler, der 1.37 gekostet hat: tasks-retrieval deklariert eine
