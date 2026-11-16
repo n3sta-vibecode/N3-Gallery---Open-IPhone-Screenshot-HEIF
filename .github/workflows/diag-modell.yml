@@ -42,87 +42,53 @@ jobs:
             > /tmp/deps.txt 2>&1 || true
           grep -iE "mediapipe|litert" /tmp/deps.txt | sort -u > /tmp/deps-mediapipe.txt || true
 
-      - name: AAR untersuchen
+      - name: AARs direkt laden und untersuchen
         shell: bash
         run: |
           set -u
           OUT=/tmp/bericht.md
-          echo "## Modell-Umgebung" > "$OUT"
+          echo "## LiteRT-LM im Paket" > "$OUT"
+          D="https://dl.google.com/dl/android/maven2"
+          rm -rf /tmp/x && mkdir -p /tmp/x && cd /tmp/x
+
+          # Kombiniertes AAR von tasks-retrieval (enthält MediaPipe UniversalEmbedder)
+          curl -sSL -m 180 -o mp.aar \
+            "$D/com/google/mediapipe/tasks-retrieval/1.2.3/tasks-retrieval-1.2.3.aar" && \
+            mkdir -p mp && cd mp && unzip -q ../mp.aar && cd .. || echo "tasks-retrieval-laden fehlgeschlagen" >> "$OUT"
+
+          # LiteRT-LM selbst (separates Artefakt)
+          curl -sSL -m 180 -o lm.aar \
+            "$D/com/google/ai/edge/litertlm/litertlm-android/0.17.0-alpha1/litertlm-android-0.17.0-alpha1.aar" && \
+            mkdir -p lm && cd lm && unzip -q ../lm.aar && cd .. || echo "litertlm-laden fehlgeschlagen" >> "$OUT"
+
+          ls -la /tmp/x >> "$OUT" 2>&1
           echo "" >> "$OUT"
 
-          echo "### 1. Aufgelöste Abhängigkeiten" >> "$OUT"
+          echo "### LiteRT-LM-Klassen im MediaPipe-AAR" >> "$OUT"
           echo '```' >> "$OUT"
-          cat /tmp/deps-mediapipe.txt >> "$OUT"
-          echo '```' >> "$OUT"
-          echo "" >> "$OUT"
-
-          # Verfügbare Versionen laut Google Maven
-          echo "### 2. Veröffentlichte Versionen (tasks-retrieval)" >> "$OUT"
-          echo '```' >> "$OUT"
-          curl -sS -m 60 "https://dl.google.com/dl/android/maven2/com/google/mediapipe/tasks-retrieval/maven-metadata.xml" \
-            | tr '>' '>\n' | grep -oE "[0-9]+\.[0-9]+\.[0-9]+[^<]*" | tail -25 >> "$OUT" || echo "nicht erreichbar" >> "$OUT"
-          echo '```' >> "$OUT"
-          echo "" >> "$OUT"
-
-          # Das AAR aus dem Cache holen
-          AAR=$(find ~/.gradle/caches -name "tasks-retrieval-*.aar" 2>/dev/null | head -1)
-          echo "AAR: ${AAR:-nicht gefunden}" >> "$OUT"
-          if [ -n "${AAR:-}" ]; then
-            VERSION=$(basename "$AAR" | sed 's/tasks-retrieval-//; s/\.aar$//')
-            echo "Aufgelöste Version: $VERSION" >> "$OUT"
-            rm -rf /tmp/aar && mkdir -p /tmp/aar && cd /tmp/aar && unzip -q "$AAR"
-            echo "" >> "$OUT"
-            echo "### 3. Enthält das AAR selbst LiteRT-LM-Klassen?" >> "$OUT"
-            echo '```' >> "$OUT"
-            unzip -l classes.jar | grep -E "ai/edge/litertlm" | awk '{print $4}' | head -40 >> "$OUT" || echo "keine" >> "$OUT"
-            echo '```' >> "$OUT"
-            echo "" >> "$OUT"
-            echo "### 4. UniversalEmbedder-Klassen" >> "$OUT"
-            echo '```' >> "$OUT"
-            unzip -l classes.jar | grep -E "UniversalEmbedder" | awk '{print $4}' >> "$OUT" || echo "keine" >> "$OUT"
-            echo '```' >> "$OUT"
-            echo "" >> "$OUT"
-          fi
-
-          # Transitive LiteRT-LM-Abhängigkeit (separates Artefakt?)
-          echo "### 5. LiteRT-LM als eigenes Artefakt im Cache" >> "$OUT"
-          echo '```' >> "$OUT"
-          find ~/.gradle/caches -iname "*litertlm*" 2>/dev/null | head -20 >> "$OUT" || true
-          find ~/.gradle/caches -iname "*litert-lm*" 2>/dev/null | head -20 >> "$OUT" || true
+          (cd /tmp/x/mp 2>/dev/null && unzip -l classes.jar 2>/dev/null | grep -E "litertlm" | awk '{print $4}') >> "$OUT" 2>&1 || echo "-" >> "$OUT"
           echo '```' >> "$OUT"
           echo "" >> "$OUT"
 
-          # Signaturen der Klassen, die die App per Reflection braucht
-          if [ -f /tmp/aar/classes.jar ]; then
-            echo "### 6. Signaturen (javap)" >> "$OUT"
-            echo '```' >> "$OUT"
-            cd /tmp/aar
+          echo "### Klassen im LiteRT-LM-AAR (Auswahl)" >> "$OUT"
+          echo '```' >> "$OUT"
+          (cd /tmp/x/lm 2>/dev/null && unzip -l classes.jar 2>/dev/null | grep -E "ActivationDataType|EmbeddingEngine|Backend|UniversalEmbedder" | awk '{print $4}') >> "$OUT" 2>&1 || echo "-" >> "$OUT"
+          echo '```' >> "$OUT"
+          echo "" >> "$OUT"
+
+          echo "### Signaturen (javap)" >> "$OUT"
+          echo '```' >> "$OUT"
+          for J in /tmp/x/lm/classes.jar /tmp/x/mp/classes.jar; do
+            [ -f "$J" ] || continue
+            echo "== $J" >> "$OUT"
             for C in \
-              com.google.mediapipe.tasks.core.BaseOptions\$Builder \
-              com.google.mediapipe.tasks.retrieval.universalembedder.UniversalEmbedderOptions\$Builder \
-              com.google.mediapipe.tasks.retrieval.universalembedder.UniversalEmbedder \
               com.google.ai.edge.litertlm.EmbeddingEngineConfig \
-              com.google.ai.edge.litertlm.ActivationDataType ; do
+              com.google.ai.edge.litertlm.EmbeddingEngine \
+              com.google.ai.edge.litertlm.ActivationDataType \
+              com.google.mediapipe.tasks.retrieval.universalembedder.UniversalEmbedderOptions\$Builder ; do
               echo "--- $C" >> "$OUT"
-              javap -classpath classes.jar "$C" 2>&1 | head -25 >> "$OUT"
+              javap -classpath "$J" "$C" 2>&1 | head -30 >> "$OUT"
             done
-            echo '```' >> "$OUT"
-            echo "" >> "$OUT"
-          fi
-
-          # Modelldateien: erreichbar? Größe? HTML statt Datei?
-          echo "### 7. Modelldateien auf dem Server" >> "$OUT"
-          echo '```' >> "$OUT"
-          for U in \
-            "https://huggingface.co/litert-community/embeddinggemma-2-text-270m-litert-lm/resolve/main/embeddinggemma-2-text-270m.litertlm" \
-            "https://huggingface.co/litert-community/embeddinggemma-2-text-vision-440m-litert-lm/resolve/main/embeddinggemma-2-text-vision-440m.litertlm" \
-            "https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm/resolve/main/embeddinggemma-2-740m.litertlm" ; do
-            echo "URL: $U" >> "$OUT"
-            curl -sSL -m 120 -o /dev/null \
-              -w "  HTTP %{http_code} · %{size_download} Bytes · Typ %{content_type} · %{url_effective}\n" \
-              -r 0-0 "$U" 2>&1 | sed 's/%/%%/g' >> "$OUT" || echo "  nicht erreichbar" >> "$OUT"
-            # Gesamtgröße über HEAD
-            curl -sSIL -m 60 "$U" 2>/dev/null | grep -iE "^content-length|^content-type" | tail -2 >> "$OUT" || true
           done
           echo '```' >> "$OUT"
 
