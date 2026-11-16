@@ -625,11 +625,13 @@ class SearchActivity : AppCompatActivity() {
             if (!AiEngine.ready()) AiEngine.prepare(applicationContext)
             // Klassische Suche: gleicher Wortlaut in Name/Ordner/Notizen/Tags/Format
             val plain = runCatching { classicSearch(query) }.getOrDefault(emptyList())
+            // KI-Suche in derselben Reihenfolge wie die Ähnlichkeit (beste zuerst)
             val ai = runCatching { SearchIndex.search(query) }.getOrDefault(emptyList())
-            val merged = LinkedHashSet<MediaItem>(ai.size + plain.size)
-            merged.addAll(plain)
-            merged.addAll(ai)
-            val list = merged.toList()
+            // **Nicht mehr mischen, sondern rangieren** (1.39): Vorher kamen erst alle
+            // Wort-Treffer, dann alle KI-Treffer. Ein Bild, das die KI als besten Treffer
+            // sieht, landete dadurch hinter jedem zufälligen Dateinamen-Treffer – genau
+            // darum fühlte sich die Suche schwächer an als in AI Edge Studio.
+            val list = rankResults(plain, ai)
             main.post {
                 if (token != searchToken || isFinishing || isDestroyed) return@post
                 results = list
@@ -662,14 +664,24 @@ class SearchActivity : AppCompatActivity() {
         }
     }
 
-    private fun classicSearch(query: String): List<MediaItem> {
-        val terms = query.lowercase().split(' ').filter { it.isNotBlank() }
-        if (terms.isEmpty()) return emptyList()
-        return DataHub.all.filter { item ->
-            val text = SearchIndex.describeCached(this, item).lowercase()
-            terms.all { text.contains(it) }
+    /**
+     * Rangliste aus beiden Wegen: Wort-Treffer und KI-Treffer werden **verschmolzen und
+     * nach Güte sortiert**, nicht aneinandergehängt. Die Logik sitzt in
+     * [com.n3vibecode.gallery.ai.SearchRanking] und ist dort mit Tests abgesichert.
+     */
+    private fun rankResults(plain: List<MediaItem>, ai: List<MediaItem>): List<MediaItem> =
+        com.n3vibecode.gallery.ai.SearchRanking.rank(plain, ai) { it.uri }
+
+    /**
+     * Wortsuche mit **Teilwörtern und Umlaut-Toleranz**: „strand“ findet „Strandbad“,
+     * „grun“ findet „grün“, und mehrere Wörter dürfen in beliebiger Reihenfolge vorkommen.
+     */
+    private fun classicSearch(query: String): List<MediaItem> =
+        DataHub.all.filter { item ->
+            com.n3vibecode.gallery.ai.SearchRanking.matches(
+                query, SearchIndex.describeCached(this, item)
+            )
         }
-    }
 
     private companion object {
         const val REQ_PICK_MODEL = 4711

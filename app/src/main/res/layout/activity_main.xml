@@ -23,27 +23,10 @@
             app:titleTextAppearance="@style/TextAppearance.Material3.HeadlineMedium"
             app:menu="@menu/main" />
 
-        <TextView
-            android:id="@+id/promoBar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_marginTop="2dp"
-            android:background="@drawable/bg_promo"
-            android:clickable="true"
-            android:drawableEnd="@drawable/ic_info"
-            android:drawablePadding="6dp"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="7dp"
-            android:paddingBottom="7dp"
-            android:text="@string/promo_bar"
-            android:textColor="@color/n3_accent"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+        <!--
+            1.39: Die Werbe-/Hinweis-Leiste ist weg. Sie stand dauerhaft unter dem Titel und
+            nahm Platz weg; der gleiche Text steht jetzt im ⋮-Menü unter „Über die App“.
+        -->
 
         <com.google.android.material.search.SearchBar
             android:id="@+id/searchBar"

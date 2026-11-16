@@ -377,4 +377,15 @@
     <string name="tab_title">Bilder</string>
     <string name="nav_menu">Menü</string>
     <string name="share_in_failed">Übernahme fehlgeschlagen: %1$s</string>
+    <string name="fact_resolution_px">Auflösung (Pixel)</string>
+    <string name="fact_resolution_mp">Auflösung (Megapixel)</string>
+    <string name="fact_format">Dateiformat</string>
+    <string name="fact_datetime">Datum &amp; Uhrzeit</string>
+    <string name="fact_place">Aufnahmeort</string>
+    <string name="fact_sensor">Aufnahme-Sensor</string>
+    <string name="key_facts_copy">Kopieren</string>
+    <string name="key_facts_copied">In die Zwischenablage kopiert</string>
+    <string name="location_hint_title">Foto-Standorte anzeigen</string>
+    <string name="location_hint_text">Android verbirgt GPS-Daten vor anderen Apps. Erlaube „Fotos und Videos: Ort“, damit die App die echten Koordinaten lesen darf.</string>
+    <string name="location_hint_action">Erlauben</string>
 </resources>

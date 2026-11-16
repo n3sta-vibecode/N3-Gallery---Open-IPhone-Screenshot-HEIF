@@ -378,4 +378,15 @@
     <string name="tab_title">Photos</string>
     <string name="nav_menu">Menu</string>
     <string name="share_in_failed">Taken over failed: %1$s</string>
+    <string name="fact_resolution_px">Resolution (pixels)</string>
+    <string name="fact_resolution_mp">Resolution (megapixels)</string>
+    <string name="fact_format">File format</string>
+    <string name="fact_datetime">Date &amp; time</string>
+    <string name="fact_place">Capture location</string>
+    <string name="fact_sensor">Capture sensor</string>
+    <string name="key_facts_copy">Copy</string>
+    <string name="key_facts_copied">Copied to clipboard</string>
+    <string name="location_hint_title">Show photo locations</string>
+    <string name="location_hint_text">Android hides GPS data from other apps by default. Allow “Photos and videos: location” so the app can read the real coordinates.</string>
+    <string name="location_hint_action">Allow</string>
 </resources>

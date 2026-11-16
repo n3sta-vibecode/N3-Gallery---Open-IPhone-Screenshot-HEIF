@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.38-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.38/N3-Gallery-1.38-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.38-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.38/N3-Gallery-1.38-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.38.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.38/N3Gallery-Projekt-1.38.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.39-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.39/N3-Gallery-1.39-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.39-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.39/N3-Gallery-1.39-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.39.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.39/N3Gallery-Projekt-1.39.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -35,7 +35,21 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.38 – Foto-App-Optik, Fotos aus anderen Apps annehmen, NPU-Versuch
+## 🆕 Version 1.39 – Koordinaten wirklich lesen, Suche rangieren, ruhiges Wischen
+
+* **GPS-Koordinaten** kommen jetzt an: unredigierte Datei (`ACCESS_MEDIA_LOCATION` +
+  `setRequireOriginal`), XMP (`exif:GPSLatitude`) und ISO 6709 im HEIF-Container. Fehlt die
+  Berechtigung, sagt die App das – statt „kein Ort“.
+* **Wichtigste Angaben** = Auflösung in Pixel, Auflösung in MP, Dateiformat, Aufnahmeort,
+  Datum & Uhrzeit, Aufnahme-Sensor (plus Notiz). Kopierbar, auch aus dem ⋮-Menü erreichbar.
+* **Suche**: KI-Treffer werden **rangiert** statt an Wort-Treffer angehängt; Umlaute,
+  Teilwörter und mehrere Wörter in beliebiger Reihenfolge treffen.
+* **Wischen**: Nachbarfotos werden in Bildschirmgröße vorgeladen, kein sichtbares
+  Nachschärfen mehr beim Bilderwechsel.
+* **Aufgeräumt**: Werbe-Leiste weg, keine Symbole in der Kopfzeile (alles über ⋮),
+  obere Systemleisten in Galerie und Bildansicht ausgeblendet.
+
+## 🔧 Version 1.38 – Foto-App-Optik, Fotos aus anderen Apps annehmen, NPU-Versuch
 
 * Untere Leiste **Bilder · Alben · Formate · Sammlungen · Menü**, großer Titel, randloses Raster.
 * **Teilen** aus anderen Apps: `SEND`/`SEND_MULTIPLE` → Ansicht „Aus anderer App geöffnet“ mit

@@ -343,6 +343,25 @@ object SearchIndex {
             }
             sb.append(Fmt.dateTime(item.time)).append(' ')
         }
+        // Auflösung/Format in Worten – damit „grosses bild“, „panorama“, „12 mp“ greifen
+        if (item.width > 0 && item.height > 0) {
+            sb.append(item.width).append('x').append(item.height).append(' ')
+            val mp = (item.width.toLong() * item.height) / 1_000_000.0
+            sb.append(String.format(java.util.Locale.US, "%.0f megapixel mp ", mp))
+            when {
+                mp >= 20 -> sb.append("hochaufloesend gross hochauflösend ")
+                mp < 2 -> sb.append("klein niedrig aufgeloest ")
+            }
+        }
+        // Klartext-Datum für „heute“, „gestern“, „diesen monat“, „2024“
+        if (item.time > 0) {
+            val cal = java.util.Calendar.getInstance().apply { timeInMillis = item.time }
+            sb.append(String.format(java.util.Locale.US, "%02d.%02d.%04d ",
+                cal.get(java.util.Calendar.DAY_OF_MONTH),
+                cal.get(java.util.Calendar.MONTH) + 1,
+                cal.get(java.util.Calendar.YEAR)))
+            sb.append(relativeDayWords(item.time)).append(' ')
+        }
         // Notizen und Tags (die stärksten Hinweise – der Nutzer hat sie selbst vergeben)
         val note = MetaStore.note(item.uri)
         if (note.isNotBlank()) sb.append(note).append(' ').append(note).append(' ')
@@ -359,6 +378,23 @@ object SearchIndex {
             }
         }
         return sb.toString()
+    }
+
+    /** „heute“, „gestern“, „vorgestern“, „letzte woche“, „alt“ – reine Textlogik, testbar. */
+    fun relativeDayWords(takenAt: Long, now: Long = System.currentTimeMillis()): String {
+        if (takenAt <= 0) return ""
+        val dayMs = 24L * 60 * 60 * 1000
+        val diff = (now - takenAt) / dayMs
+        return when {
+            diff < 0 -> "zukunft "
+            diff < 1 -> "heute heute today "
+            diff < 2 -> "gestern yesterday "
+            diff < 3 -> "vorgestern "
+            diff < 7 -> "diese woche letzte tage neu "
+            diff < 31 -> "diesen monat "
+            diff < 366 -> "dieses jahr "
+            else -> "aelter alt "
+        }
     }
 
     // ------------------------------------------------------------------ Suche

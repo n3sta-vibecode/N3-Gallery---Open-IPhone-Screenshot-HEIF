@@ -52,6 +52,24 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // 1.39: obere Systemleisten (Uhr, Akku) aus – die Galerie beginnt oben mit dem Titel.
+        runCatching { SystemBars.hideTop(this) }
+        // Der Inhalt braucht trotzdem Abstand zur Statusleiste, sonst klebt der Titel
+        // unter der Kamera-Aussparung.
+        runCatching {
+            val appBar = findViewById<android.view.View>(R.id.appBar)
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(appBar) { v, insets ->
+                val top = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top
+                val bottom = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom
+                v.setPadding(v.paddingLeft, top + dp(4), v.paddingRight, v.paddingBottom)
+                // Die untere Leiste bekommt den Systemabstand unten, sonst liegt sie darunter
+                findViewById<android.view.View>(R.id.bottomNav)?.let { nav ->
+                    nav.setPadding(nav.paddingLeft, nav.paddingTop, nav.paddingRight, bottom)
+                }
+                insets
+            }
+        }
+
         toolbar = findViewById(R.id.toolbar)
         // 1.38: Kopfzeile wie in einer normalen Foto-App – großer Titel „Bilder“, darunter
         // die eine Suchleiste, rechts Karte und ⋮. Kein Quetschen mehr auf 14 sp. 
@@ -66,6 +84,24 @@ class MainActivity : AppCompatActivity() {
                     // Gesamte Bibliothek auf der Karte zeigen
                     ViewState.viewList = DataHub.all
                     startActivity(android.content.Intent(this, MapActivity::class.java))
+                    true
+                }
+                R.id.action_key_facts -> {
+                    // Die sechs wichtigsten Angaben des ersten Fotos direkt aus dem Menü
+                    // (im Foto selbst gibt es zusätzlich den Knopf in der Leiste unten).
+                    val first = DataHub.all.firstOrNull()
+                    if (first == null) {
+                        android.widget.Toast.makeText(
+                            this, R.string.empty, android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        ViewState.viewList = DataHub.all
+                        startActivity(
+                            android.content.Intent(this, DetailActivity::class.java)
+                                .putExtra(DetailActivity.EXTRA_POSITION, 0)
+                                .putExtra(DetailActivity.EXTRA_KEY_FACTS, true)
+                        )
+                    }
                     true
                 }
                 R.id.action_refresh -> { reload(); true }
@@ -95,8 +131,6 @@ class MainActivity : AppCompatActivity() {
         // Ein einziges Ziel: die Bildersuche. Kein zweiter Suchweg, keine zweite Lupe.
         searchBar.setOnLongClickListener { openSearchAi(); true }
 
-        // Dauerhafte Werbe-Leiste: iPhone-Screenshots / HEIC – tippen öffnet die Info
-        findViewById<android.view.View>(R.id.promoBar).setOnClickListener { showAboutDialog() }
 
         val titles = listOf(
             getString(R.string.tab_timeline),
@@ -162,22 +196,65 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    /**
+     * Fragt die Ort-Berechtigung nach, wenn sie fehlt – aber **nur einmal** und nur, wenn
+     * noch nicht alle Fotos geladen sind. So bleibt die App bedienbar und der Nutzer weiß,
+     * warum bei manchen Fotos kein Ort steht.
+     */
+    private fun askForLocationIfNeeded() {
+        if (Build.VERSION.SDK_INT < 29) return
+        val perm = Manifest.permission.ACCESS_MEDIA_LOCATION
+        if (ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED) return
+        val prefs = getSharedPreferences("n3_perms", MODE_PRIVATE)
+        if (prefs.getBoolean("asked_location", false)) return
+        prefs.edit().putBoolean("asked_location", true).apply()
+        runCatching { locationLauncher.launch(arrayOf(perm)) }
+    }
+
+    private val locationLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            DataHub.requestRescan()
+            reload()
+        }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
     private fun ensurePermissionsThenLoad() {
         val needed = requiredPermissions().filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        if (needed.isEmpty()) reload() else permissionLauncher.launch(needed.toTypedArray())
+        if (needed.isEmpty()) {
+            reload()
+            askForLocationIfNeeded()
+        } else {
+            permissionLauncher.launch(needed.toTypedArray())
+        }
     }
 
+    /**
+     * Seit Android 10 liefert der Medienindex Fotos **ohne** GPS-Position. Die echten
+     * Koordinaten gibt es nur mit `ACCESS_MEDIA_LOCATION` (`setRequireOriginal`).
+     * Ohne diese Berechtigung stand bei vielen Fotos „kein Ort gespeichert“ –
+     * obwohl einer in der Datei ist.
+     */
     private fun requiredPermissions(): List<String> = when {
         Build.VERSION.SDK_INT >= 34 -> listOf(
             Manifest.permission.READ_MEDIA_IMAGES,
             Manifest.permission.READ_MEDIA_VIDEO,
-            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+            Manifest.permission.ACCESS_MEDIA_LOCATION
         )
         Build.VERSION.SDK_INT >= 33 -> listOf(
             Manifest.permission.READ_MEDIA_IMAGES,
-            Manifest.permission.READ_MEDIA_VIDEO
+            Manifest.permission.READ_MEDIA_VIDEO,
+            Manifest.permission.ACCESS_MEDIA_LOCATION
+        )
+        Build.VERSION.SDK_INT >= 29 -> listOf(
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.ACCESS_MEDIA_LOCATION
         )
         else -> listOf(
             Manifest.permission.READ_EXTERNAL_STORAGE,

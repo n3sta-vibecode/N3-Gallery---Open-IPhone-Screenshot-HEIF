@@ -142,6 +142,17 @@ object ImageLoader {
         cacheBytes(key, bmp)
     }
 
+    /**
+     * Legt ein Bild **nur** in den Bildspeicher, ohne es zu komprimieren.
+     *
+     * Für Vollbilder: Beim Vorladen der Nachbarfotos würde `cacheBytes` die Bitmap auf dem
+     * Hintergrund-Thread als JPEG kodieren – reine Rechenzeit, die beim Wischen fehlt, und
+     * die Vollbildstufe wird ohnehin nie aus den Bytes zurückgeholt (nur ≤ 512 px).
+     */
+    fun putBitmap(key: String, bmp: Bitmap) {
+        cache.put(key, bmp)
+    }
+
     /** Leert den Speicher-Cache (Vorschauen auf der Festplatte bleiben gültig). */
     fun clear() {
         cache.evictAll()
@@ -637,7 +648,8 @@ object ImageLoader {
             } finally {
                 interactiveBusy.decrementAndGet()
             }
-            result.bitmap?.let { put(key, it) }
+            // Vollbild: nur in den Bitmap-Speicher (kein JPEG-Kodieren auf dem Hintergrund-Thread)
+            result.bitmap?.let { putBitmap(key, it) }
             runningFull.remove(key)
             val snapshot = ArrayList(waiters)
             main.post { for (w in snapshot) runCatching { w(result.bitmap, result.path) } }

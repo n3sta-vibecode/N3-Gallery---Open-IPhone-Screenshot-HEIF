@@ -106,6 +106,13 @@ class DetailActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_detail)
 
+        // 1.39: Bildansicht wirklich bildschirmfüllend – auch die obere Systemleiste aus.
+        // Sie war der Grund, warum das Foto oben und unten „eingequetscht“ wirkte und beim
+        // Wischen die Höhe sprang, sobald die Leisten ein-/ausblendeten.
+        runCatching { SystemBars.hideAll(this) }
+        // Aber: solange Metadaten offen sind, gehören die Leisten wieder dazu (man scrollt
+        // Text, keine Bilder) – siehe applySheetState().
+
         pager = findViewById(R.id.pager)
         topBar = findViewById(R.id.topBar)
         sheet = findViewById(R.id.sheet)
@@ -171,7 +178,9 @@ class DetailActivity : AppCompatActivity() {
         })
         applySheetState(BottomSheetBehavior.STATE_HIDDEN)
 
-        // „Wichtigste Angaben“ – ohne Scrollen, ohne Blatt: das Wichtigste in einem Dialog
+        // „Wichtigste Angaben“ – ohne Scrollen, ohne Blatt: das Wichtigste in einem Dialog.
+        // Der Knopf sitzt in der immer sichtbaren Leiste unten, also auch dann erreichbar,
+        // wenn das Metadaten-Blatt geschlossen ist.
         findViewById<View>(R.id.btnKeyFacts).setOnClickListener { showKeyFacts() }
 
         // Kopfzeile antippen = auf-/zuklappen
@@ -243,13 +252,26 @@ class DetailActivity : AppCompatActivity() {
                 MediaPageFragment.create(position, position == pager.currentItem)
                     .also { pages[position] = it }
         }
-        // Nachbarfotos schon im Voraus laden – Wischen zeigt sofort das nächste Bild
+        // Nachbarfotos schon im Voraus laden – Wischen zeigt sofort das nächste Bild.
+        // 1.39: Vorher blieb das Vollbild-Dekodieren des Nachbarn aus, bis man ihn antippte.
+        // Dann stand beim Wischen erst die 1024-px-Vorschau und wurde sichtbar ersetzt –
+        // genau das war das „Ruckartige“ beim Bilderwechsel.
         pager.offscreenPageLimit = 1
         pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 pager.isUserInputEnabled = true
                 onItemShown(position)
                 updatePrimary(position)
+                // Nachbarn gleich mit der Zielgröße dekodieren, solange man noch schaut
+                warmNeighbours(position)
+            }
+
+            override fun onPageScrollStateChanged(state: Int) {
+                // Während des Wischens keine neuen Dekodiervorgänge anstoßen – das ist der
+                // Unterschied zwischen „flüssig“ und „hakt beim Ziehen“.
+                if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                    warmNeighbours(pager.currentItem)
+                }
             }
         })
 
@@ -258,6 +280,11 @@ class DetailActivity : AppCompatActivity() {
         onItemShown(start)
         // Nach dem Aufbau (die Seite entsteht erst mit dem Layout) das Vollbild starten
         pager.post { updatePrimary(start) }
+
+        // Aus dem ⋮-Menü heraus „Wichtigste Angaben“ sofort zeigen (Metadaten laden, dann Dialog)
+        if (intent.getBooleanExtra(EXTRA_KEY_FACTS, false)) {
+            pager.postDelayed({ if (!isFinishing) showKeyFacts() }, 220)
+        }
 
         findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
         // ℹ️  = Vollbild-Metadaten-Seite (immer vollständig scrollbar, kein Bottom-Sheet)
@@ -351,41 +378,41 @@ class DetailActivity : AppCompatActivity() {
      */
     private fun showKeyFacts() {
         val item = current ?: return
-        val rows = ArrayList<Pair<String, String>>(8)
-        rows.add(getString(R.string.meta_when) to
-            if (item.time > 0) Fmt.dateTime(item.time) else getString(R.string.date_unknown))
-        GeoStore.pointFor(item)?.let { p ->
-            val place = runCatching {
-                com.n3vibecode.gallery.map.GeoIndex.nearest(p.first, p.second)?.let { loc ->
-                    "${loc.place.name}, ${loc.place.country}"
-                }
-            }.getOrNull()
-            rows.add(
-                getString(R.string.map_title) to
-                    (place ?: "%.5f, %.5f".format(java.util.Locale.US, p.first, p.second))
-            )
+        // Die sechs Kern-Angaben kommen fertig aus der Metadaten-Auswertung
+        // (Auflösung in Pixel und MP, Format, Ort, Datum/Uhrzeit, Aufnahme-Sensor).
+        val rows = currentMeta?.keyFacts.orEmpty().toMutableList()
+        if (rows.isEmpty()) {
+            // Noch nicht geladen: wenigstens das, was ohne EXIF sicher bekannt ist
+            if (item.width > 0 && item.height > 0) {
+                rows.add(com.n3vibecode.gallery.data.MetaRow(
+                    getString(R.string.fact_resolution_px), "${item.width} × ${item.height}"
+                ))
+                rows.add(com.n3vibecode.gallery.data.MetaRow(
+                    getString(R.string.fact_resolution_mp),
+                    com.n3vibecode.gallery.data.ExifRepository.megapixelPrecise(item.width, item.height)
+                ))
+            }
+            rows.add(com.n3vibecode.gallery.data.MetaRow(getString(R.string.fact_format), item.format))
+            rows.add(com.n3vibecode.gallery.data.MetaRow(
+                getString(R.string.fact_datetime),
+                if (item.time > 0) Fmt.dateTime(item.time) else getString(R.string.date_unknown)
+            ))
         }
-        rows.add(getString(R.string.meta_format) to item.format)
-        if (item.width > 0 && item.height > 0) {
-            rows.add(getString(R.string.meta_resolution) to "${item.width} × ${item.height}")
-        }
-        rows.add(getString(R.string.meta_file_size) to Fmt.bytes(item.size))
         val note = MetaStore.note(item.uri)
-        if (note.isNotBlank()) rows.add(getString(R.string.meta_note) to note)
-        val tags = MetaStore.tags(item.uri)
-        if (tags.isNotEmpty()) {
-            rows.add(getString(R.string.meta_tags) to tags.joinToString(", "))
+        if (note.isNotBlank()) {
+            rows.add(com.n3vibecode.gallery.data.MetaRow(getString(R.string.meta_note), note))
         }
-        if (MetaStore.isFavorite(item.uri)) {
-            rows.add(getString(R.string.favorite) to "★")
-        }
-
         val text = rows.joinToString("\n\n") { (k, v) -> "$k\n$v" }
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.key_facts)
             .setMessage(text)
             .setPositiveButton(R.string.ok) { _, _ -> }
-            .setNeutralButton(R.string.sheet_pull_title) { _, _ ->
+            .setNeutralButton(R.string.key_facts_copy) { _, _ ->
+                val clip = getSystemService(ClipboardManager::class.java)
+                clip?.setPrimaryClip(ClipData.newPlainText(getString(R.string.key_facts), text))
+                Toast.makeText(this, R.string.key_facts_copied, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(R.string.sheet_pull_title) { _, _ ->
                 behavior.state = BottomSheetBehavior.STATE_EXPANDED
             }
             .show()
@@ -413,6 +440,8 @@ class DetailActivity : AppCompatActivity() {
                 topBar.visibility = View.GONE
                 // Offen: die Leiste unten verschwindet (das Blatt füllt den Bildschirm)
                 findViewById<View>(R.id.sheetPull)?.visibility = View.GONE
+                // Beim Lesen von Metadaten sollen Uhr und Akku sichtbar sein
+                runCatching { SystemBars.showAll(this) }
             }
             else -> {
                 // Zu (HIDDEN oder Übergang): Liste gesperrt, Blatt lässt sich hochziehen.
@@ -421,6 +450,8 @@ class DetailActivity : AppCompatActivity() {
                 sheetHint.visibility = View.GONE
                 topBar.visibility = View.VISIBLE
                 findViewById<View>(R.id.sheetPull)?.visibility = View.VISIBLE
+                // Zurück zum bildschirmfüllenden Foto
+                runCatching { SystemBars.hideAll(this) }
             }
         }
     }
@@ -550,6 +581,30 @@ class DetailActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Lädt die Nachbarfotos **in Bildschirmgröße vor**, sobald der Pager steht.
+     * Ein HEIC in dieser Größe zu dekodieren dauert; passiert das erst beim Wischen, sieht
+     * man das Nachladen. Im Leerlauf fällt es nicht auf.
+     */
+    private fun warmNeighbours(position: Int) {
+        val list = ViewState.viewList
+        if (list.isEmpty()) return
+        val targets = listOf(position - 1, position + 1)
+            .filter { it in list.indices }
+            .map { list[it] }
+        if (targets.isEmpty()) return
+        Thread({
+            val px = com.n3vibecode.gallery.image.ImageLoader.detailPx(this)
+            for (item in targets) {
+                // Nur wenn es nicht ohnehin schon im Speicher liegt
+                if (com.n3vibecode.gallery.image.ImageLoader.bestCached(item) != null) continue
+                runCatching {
+                    com.n3vibecode.gallery.image.ImageLoader.loadFullDetailed(this, item, px) { _, _ -> }
+                }
+            }
+        }, "n3-warm-neighbours").apply { isDaemon = true }.start()
     }
 
     private fun recreatePager() {
@@ -685,5 +740,8 @@ class DetailActivity : AppCompatActivity() {
 
         /** Optionaler Titel (z. B. Ortsname, wenn die Liste von der Karte kommt). */
         const val EXTRA_TITLE = "title"
+
+        /** Direkt die Karte „Wichtigste Angaben“ öffnen (Aufruf aus dem ⋮-Menü). */
+        const val EXTRA_KEY_FACTS = "key_facts"
     }
 }

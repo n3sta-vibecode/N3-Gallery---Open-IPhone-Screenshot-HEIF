@@ -1,5 +1,70 @@
 # N3 Gallery – was neu ist
 
+## 1.39 – Koordinaten, Suche, Wischen, Aufräumen
+
+Sechs Punkte, die du genannt hast – hier der Stand, jeweils mit der Ursache:
+
+### 🧭 Koordinaten-Metadaten wurden nicht gefunden (Ursache gefunden)
+
+Android **verbirgt GPS-Daten** vor anderen Apps: Der Medienindex liefert Fotos „redigiert“,
+also ohne Position. Bisher wurde genau dieser redigierte Stream gelesen – deshalb stand bei
+vielen Fotos „kein Ort gespeichert“, obwohl einer in der Datei ist.
+
+Jetzt gilt eine Kette von drei Wegen, die nacheinander probiert werden:
+
+| Weg | Wie | Wann nötig |
+| --- | --- | --- |
+| 1. Unredigierte Datei | `MediaStore.setRequireOriginal` mit `ACCESS_MEDIA_LOCATION` | Android 10+, Standardfall |
+| 2. XMP | `exif:GPSLatitude` / `GPSLongitude` inkl. N/S/W/O | Apple-HEIF, bearbeitete Fotos |
+| 3. ISO 6709 | `+47.0506+008.3066/` im HEIF-Container | Apple schreibt den Ort so |
+
+Dazu: Breiten-/Längengrad, **kopierbare Koordinaten** (`47.050647, 8.306553`) und – wenn
+wirklich nichts drin ist – der ehrliche Grund („Berechtigung fehlt“ vs. „in der Datei ist
+keine Position“). Die Berechtigung fragt die App einmalig selbst ab.
+
+### 📌 Wichtigste Angaben – genau deine sechs Werte
+
+Neues erstes Kapitel **„Wichtigste Angaben“** (und derselbe Dialog über den Knopf unten und
+über ⋮ → Wichtigste Angaben):
+
+1. **Auflösung (Pixel)** – z. B. `4032 × 3024`
+2. **Auflösung (Megapixel)** – z. B. `12,19 MP`
+3. **Dateiformat** – z. B. `HEIC · HEIF (Apple, 10-Bit)`
+4. **Aufnahmeort** – Ortsname + Koordinaten
+5. **Datum & Uhrzeit** – EXIF-Zeit inkl. Zeitzone
+6. **Aufnahme-Sensor** – Kamera, Objektiv, Sensortyp, Kleinbild-Äquivalent, Blende, ISO
+
+Der Dialog hat „Kopieren“ – die Angaben landen als Text in der Zwischenablage.
+
+### 🔍 Suche auf Ranglisten-Niveau
+
+Der eigentliche Fehler: Wort-Treffer und KI-Treffer wurden **aneinandergehängt**. Ein Bild,
+das die KI als *besten* Treffer sieht, landete dadurch hinter jedem zufälligen
+Dateinamen-Treffer. Jetzt wird rangiert: von beiden Wegen bestätigt → KI-Reihenfolge →
+reine Wort-Treffer. Dazu Teilwort- und Umlaut-Toleranz („grun“ findet „grün“, „strand“
+findet „Strandbad“) und mehr Text im Beschreibungssatz (Auflösung, MP, Klartext-Datum,
+„heute/gestern/diesen Monat“).
+
+### ↔️ Ruckeln beim Bilderwechsel
+
+Beim Wischen stand erst die 1024-px-Vorschau und wurde dann sichtbar durch das scharfe
+Bild ersetzt. Jetzt werden die **Nachbarfotos in Bildschirmgröße vorgeladen**, sobald der
+Pager steht – und während des Ziehens wird **nichts** Neues dekodiert.
+
+### 🧹 Werbe-Banner weg, alles nur über die drei Punkte
+
+* Die Werbe-/Hinweis-Leiste unter dem Titel ist entfernt (der Text steht im ⋮-Menü unter
+  „Über die App“).
+* Karte, Aktualisieren und Rastergröße sind keine eigenen Kopfzeilen-Symbole mehr –
+  **nur noch ⋮**.
+* Neu im ⋮-Menü: **Wichtigste Angaben**.
+
+### 📵 Obere Systemleisten aus
+
+Galerie: Statusleiste (Uhr, Akku) ausgeblendet, Bilder beginnen oben mit dem Titel.
+Bildansicht: beide Leisten aus (Wischen vom Rand holt sie zurück); beim offenen
+Metadaten-Blatt erscheinen sie wieder.
+
 ## 1.38 – Sieht aus wie eine Foto-App, nimmt Fotos an, probiert die NPU
 
 Diese Runde ist **nur Oberfläche und Verhalten** – **keine Cloud** (so gewünscht). Was drin ist:
