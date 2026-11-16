@@ -129,6 +129,17 @@ jobs:
             echo "Keine Dateien zum Hochladen gefunden." >&2
           fi
 
+      # Compiler-Fehler als GitHub-Annotation ausgeben – die sind auch über die API
+      # lesbar, wenn die Runner-Logs (noch) nicht abrufbar sind.
+      - name: Fehler als Annotation melden
+        if: failure()
+        shell: bash
+        run: |
+          grep -E "^(e: |\* What went wrong|Execution failed)|^Caused by:|Unresolved reference|error:" /tmp/build.log \
+            | head -25 | while IFS= read -r line; do
+                [ -n "$line" ] && echo "::error title=Build::$line"
+              done || true
+
       # Damit Build-Fehler auch ohne Zugriff auf die Runner-Logs gelesen werden können:
       # die wichtigsten Zeilen landen als Kommentar am Pull Request.
       - name: Build-Protokoll in den Pull Request schreiben
