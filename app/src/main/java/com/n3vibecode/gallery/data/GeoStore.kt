@@ -58,7 +58,7 @@ object GeoStore {
         val h = helper ?: synchronized(this) {
             helper ?: Helper(GalleryApp.instance).also { helper = it }
         }
-        h.writableDb
+        h.writableDatabase
     } catch (_: Throwable) {
         null
     }
@@ -162,9 +162,11 @@ object GeoStore {
         memory[uri] = lat to lon
         val d = db() ?: return
         try {
+            // arrayOf<Any?> gesetzt: sonst leitet Kotlin den Typ über die Schnittmenge
+            // (Comparable & Serializable) ab – der Compiler warnt davor.
             d.execSQL(
                 "INSERT OR REPLACE INTO $TABLE (uri, lat, lon, taken, ver) VALUES (?,?,?,?,1)",
-                arrayOf(uri, lat, lon, taken)
+                arrayOf<Any?>(uri, lat, lon, taken)
             )
         } catch (_: Throwable) {
         }
