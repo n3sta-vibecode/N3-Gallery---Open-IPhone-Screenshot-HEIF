@@ -22,8 +22,8 @@ android {
         applicationId = "com.n3vibecode.gallery"
         minSdk = 26
         targetSdk = 35
-        versionCode = 33
-        versionName = "1.32"
+        versionCode = 34
+        versionName = "1.33"
         resourceConfigurations += listOf("de", "en")
         vectorDrawables.useSupportLibrary = true
 

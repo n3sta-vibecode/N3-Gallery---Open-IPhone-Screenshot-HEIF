@@ -53,7 +53,9 @@
             android:layout_marginEnd="12dp"
             android:layout_marginBottom="4dp"
             android:hint="@string/search_hint"
-            app:iconifiedByDefault="true" />
+            android:clickable="true"
+            android:focusable="false"
+            app:iconifiedByDefault="false" />
 
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabLayout"

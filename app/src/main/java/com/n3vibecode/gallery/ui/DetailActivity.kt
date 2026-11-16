@@ -28,6 +28,7 @@ import com.n3vibecode.gallery.data.DataHub
 import com.n3vibecode.gallery.data.ExifRepository
 import com.n3vibecode.gallery.data.ExifWriter
 import com.n3vibecode.gallery.data.Labels
+import com.n3vibecode.gallery.data.GeoStore
 import com.n3vibecode.gallery.data.MediaItem
 import com.n3vibecode.gallery.data.MediaMeta
 import com.n3vibecode.gallery.data.MetaStore
@@ -250,6 +251,8 @@ class DetailActivity : AppCompatActivity() {
             toggleSheet()
             true
         }
+        // Karte direkt: aktuelles Foto groß auf der Karte (ohne Umweg über „Details“)
+        findViewById<MaterialButton>(R.id.btnMap).setOnClickListener { openMapForCurrent() }
         findViewById<MaterialButton>(R.id.btnCopy).setOnClickListener { copyMetadata() }
         findViewById<MaterialButton>(R.id.btnDelete).setOnClickListener { confirmDelete() }
         findViewById<ImageButton>(R.id.btnTrash).setOnClickListener { confirmDelete() }
@@ -280,6 +283,18 @@ class DetailActivity : AppCompatActivity() {
         )
         MetaRenderer.render(this, metaContainer)
         loadMeta(item)
+    }
+
+    /**
+     * Karte für das aktuelle Foto öffnen – mit Position direkt an der Stelle, sonst mit
+     * allen Fotos (die Karte liest die Position dort im Hintergrund nach).
+     */
+    private fun openMapForCurrent() {
+        val item = current ?: return
+        val point = GeoStore.pointFor(item)
+        val intent = if (point != null) MapActivity.intentFor(this, point.first, point.second)
+        else android.content.Intent(this, MapActivity::class.java)
+        runCatching { startActivity(intent) }
     }
 
     private fun loadMeta(item: MediaItem) {

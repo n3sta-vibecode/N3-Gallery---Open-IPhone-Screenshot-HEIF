@@ -25,7 +25,25 @@ einem Testlauf**. Erst wenn ein Vektor zurückkommt, gilt die Stufe als aktiv:
 In der Suchseite steht unter dem Eingabefeld, welche Stufe gerade rechnet
 (`⚡ Gemma Embedding (NPU)`, `◦ Wortmodell (eingebaut)` …).
 
-## 2. Modell einlegen (einmalig, vor dem Bauen)
+## 2. Modell holen – direkt in der App
+
+In der **Bildersuche** steht unter dem Suchfeld eine Leiste, solange kein Modell vorhanden ist:
+
+* **„Modell laden“** → der **Browser** (oder Download-Manager) öffnet die offizielle
+  Google-Adresse und lädt `embedding_gemma.task` (~ 200 MB).
+* **„Datei wählen“** → die heruntergeladene Datei einmal antippen. Die App kopiert sie in
+  ihren eigenen Speicher (`files/models/`), prüft sie und startet die Suchmaschine neu –
+  ab dann rechnet Gemma, bevorzugt auf der **NPU**.
+
+> **Warum nicht direkt in der App herunterladen?** Die App hat bewusst **keine**
+> `INTERNET`-Berechtigung – das ist eine Zusage dieser App und in der APK prüfbar
+> (`aapt dump badging … | grep uses-permission`). Den Download macht deshalb der Browser;
+> die App liest nur die fertige Datei. Nach dem einmaligen Holen ist alles offline.
+
+Das Modell lässt sich auch schon **beim Bauen** beilegen (`app/src/main/assets/models/`) –
+dann ist die Leiste sofort verschwunden. Für eigene Builds: siehe unten.
+
+## 2b. Modell beim Bauen beilegen (optional)
 
 Die fertige `.task`-Datei von Google AI Edge herunterladen und in den Ordner
 `app/src/main/assets/models/` legen. Die App erkennt automatisch die erste passende Datei:
@@ -48,10 +66,8 @@ curl -L -o app/src/main/assets/models/universal_sentence_encoder.tflite \
   https://storage.googleapis.com/mediapipe-models/text_embedder/universal_sentence_encoder/float32/latest/universal_sentence_encoder.tflite
 ```
 
-> **Warum nicht automatisch herunterladen?** Die App darf kein Internet nutzen
-> (keine `INTERNET`-Berechtigung im Manifest – das ist eine bewusste Zusage dieser App).
-> Also muss das Modell beim Bauen im Paket liegen. Ohne Modell baut die App normal weiter
-> und nutzt das eingebaute Wortmodell.
+> Ohne Modell baut und läuft die App normal weiter – dann rechnet das eingebaute
+> Wortmodell (siehe Abschnitt 4).
 
 ## 3. Was in den Foto-Vektor einfließt
 

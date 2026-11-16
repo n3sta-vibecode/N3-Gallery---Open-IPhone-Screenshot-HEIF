@@ -1,5 +1,33 @@
 # N3 Gallery – was neu ist
 
+## 1.33 – Modell-Download, Karte in den Details, eine Suchleiste
+
+### 🧠 Gemma-Embedding 2 direkt holen – ohne Projekt-Bau
+
+Bisher musste die Modelldatei beim Bauen im App-Paket liegen. Jetzt steht in der Bildersuche
+eine Leiste, solange kein Modell da ist:
+
+* **„Modell laden“** öffnet die offizielle Google-Adresse im **Browser** – der Browser lädt
+  `embedding_gemma.task` (~ 200 MB).
+* **„Datei wählen“** übernimmt die Datei in den App-Speicher (`files/models/`), prüft sie und
+  startet die Suchmaschine neu. Danach: **NPU → GPU → CPU**, wie gehabt.
+
+Die App selbst bleibt **ohne Internet-Berechtigung**: den Download macht der Browser, die App
+liest nur die fertige Datei. Das ist in der APK weiterhin prüfbar.
+
+### 🗺️ Karte direkt in den Metadaten
+
+Die Karte steht jetzt **ganz oben in den Metadaten** – mit dem eigenen Foto als rotem Punkt
+und antippbar zur großen Ansicht. Dazu ein Karten-Knopf in der Detailansicht. Der Umweg über
+die Zeile „Auf Karte zeigen“ (die man erst erscrollen musste) entfällt; die Zeile bleibt als
+Text erhalten.
+
+### 🔍 Nur noch eine Suchleiste
+
+Die zweite Lupe im Menü und der klassische Such-Dialog sind entfernt. Es gibt genau eine
+Suchleiste; sie öffnet die Bildersuche, in der die klassische Suche (Dateiname, Ordner, Tags)
+weiterhin mitläuft.
+
 ## 1.32 – Karte, Vorschau im richtigen Seitenverhältnis, Bildersuche mit Gemma
 
 ### 🗺️ Karte: wo sind meine Fotos entstanden?

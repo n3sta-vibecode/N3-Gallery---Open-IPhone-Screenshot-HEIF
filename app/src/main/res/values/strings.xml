@@ -309,4 +309,18 @@
     <string name="ai_engine_cpu">CPU – works on every device</string>
     <string name="ai_engine_local">built-in word model – no download needed</string>
     <string name="fav_remove_short">Remove</string>
+
+    <!-- Bildersuche: Modell holen/auswählen -->
+    <string name="ai_model_missing_title">Search engine: built-in word model</string>
+    <string name="ai_model_missing_hint">For real Gemma embedding (like Google Edge Gallery) the model file is needed – about 200 MB. Download it once: the browser fetches it, then pick the file here. The app itself never goes online.</string>
+    <string name="ai_model_download">Download model</string>
+    <string name="ai_model_pick">Pick file</string>
+    <string name="ai_model_ready">Model ready: %1$s</string>
+    <string name="ai_model_imported">Model loaded: %1$s</string>
+    <string name="ai_model_import_failed">File could not be read. Please pick the .task file again.</string>
+    <string name="ai_model_download_hint">The browser opens the official Google address. Download, then tap “Pick file”.</string>
+    <string name="ai_model_size">%1$s MB</string>
+    <string name="ai_model_remove">Remove model</string>
+    <string name="search_open_ai">Search in your own words</string>
+    <string name="map_tap_to_open">Tap the map for the full view</string>
 </resources>

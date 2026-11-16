@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.32-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.32/N3-Gallery-1.32-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.32-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.32/N3-Gallery-1.32-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.32.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.32/N3Gallery-Projekt-1.32.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.33-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.33/N3-Gallery-1.33-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.33-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.33/N3-Gallery-1.33-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.33.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.33/N3Gallery-Projekt-1.33.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -35,7 +35,20 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.32 – Karte, Vorschau im Seitenverhältnis, Gemma-Suche
+## 🆕 Version 1.33 – Gemma-Modell direkt in der App, Karte in den Details, eine Suchleiste
+
+* **Gemma-Embedding 2 holen, ohne das Projekt zu bauen:** In der Bildersuche steht unter dem
+  Suchfeld „Modell laden“ (öffnet die offizielle Google-Adresse im Browser) und „Datei
+  wählen“ – danach rechnet Gemma auf der **NPU**. Die App selbst bleibt ohne
+  Internet-Berechtigung; den Download macht der Browser.
+* **Karte direkt in den Metadaten:** Ganz oben in den Metadaten steht die Karte mit dem Ort
+  des Fotos (antippen = groß). Zusätzlich ein Karten-Knopf in der Detailansicht – kein
+  Umweg mehr über eine Zeile „Auf Karte zeigen“.
+* **Eine Suchleiste:** Die zweite Lupe im Menü und der klassische Suchdialog sind weg.
+  Tippen auf die eine Suchleiste öffnet die Bildersuche; Dateiname/Ordner/Tags werden dort
+  weiterhin mitgefunden.
+
+## Version 1.32 – Karte, Vorschau im Seitenverhältnis, Gemma-Suche
 
 * **Karte (offline):** Wo sind meine Fotos entstanden? Mit Ortsnamen („Luzern, Schweiz“),
   Zusammenfassung dicht beieinanderliegender Fotos, Zwei-Finger-Zoom und „auf Karte zeigen“

@@ -21,7 +21,11 @@ data class MediaMeta(
     val exifTagDump: List<MetaRow>,
     val note: String,
     val tags: List<String>,
-    val writeSupported: Boolean
+    val writeSupported: Boolean,
+    /** Position des Fotos (lat, lon) – oder `null`, wenn keine GPS-Daten in der Datei sind. */
+    val mapPoint: Pair<Double, Double>? = null,
+    /** Kurzbezeichnung des Ortes für die Karte („Luzern, Schweiz“). */
+    val mapLabel: String? = null
 ) {
     /** Alle Metadaten als Text. [tr] erlaubt die Übersetzung der Beschriftungen. */
     fun asPlainText(tr: ((String) -> String)? = null): String {
@@ -295,10 +299,14 @@ object ExifRepository {
         }
 
         // === 6) GPS ============================================================
+        // Position und Ortsname auch für die Karte in den Metadaten merken.
+        var mapPoint: Pair<Double, Double>? = null
+        var mapLabel: String? = null
         if (e != null) {
             val rows = mutableListOf<MetaRow>()
             val latLong: DoubleArray? = runCatching { e.latLong }.getOrNull()
             if (latLong != null && (latLong[0] != 0.0 || latLong[1] != 0.0)) {
+                mapPoint = latLong[0] to latLong[1]
                 // Ortsname offline bestimmen (GeoNames-Liste im App-Paket) – wie in Google Fotos
                 val loc = runCatching {
                     com.n3vibecode.gallery.map.GeoIndex.load(ctx)
@@ -309,6 +317,7 @@ object ExifRepository {
                     // Der Abstandswert wird ohne Einheit eingesetzt, damit die Übersetzung
                     // (Labels) „km entfernt“ → „km away“ sauber greifen kann.
                     val label = loc.label()
+                    mapLabel = label
                     rows += if (loc.distanceKm < 1.0) {
                         MetaRow("Ort", label)
                     } else {
@@ -376,7 +385,9 @@ object ExifRepository {
             exifTagDump = dump,
             note = MetaStore.note(item.uri).ifBlank { e?.getAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION).orEmpty() },
             tags = MetaStore.tags(item.uri),
-            writeSupported = writeSupported
+            writeSupported = writeSupported,
+            mapPoint = mapPoint,
+            mapLabel = mapLabel
         )
     }
 

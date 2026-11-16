@@ -9,6 +9,7 @@ import android.text.TextWatcher
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -17,9 +18,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.n3vibecode.gallery.R
 import com.n3vibecode.gallery.ai.AiEngine
+import com.n3vibecode.gallery.ai.ModelStore
 import com.n3vibecode.gallery.ai.SearchIndex
 import com.n3vibecode.gallery.data.DataHub
 import com.n3vibecode.gallery.data.GridPrefs
@@ -46,6 +49,10 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var tvEmptyTitle: TextView
     private lateinit var tvEmptySub: TextView
     private lateinit var progress: View
+
+    private lateinit var modelBox: View
+    private lateinit var tvModelTitle: TextView
+    private lateinit var tvModelHint: TextView
 
     private lateinit var adapter: GridAdapter
     private val main = Handler(Looper.getMainLooper())
@@ -78,8 +85,16 @@ class SearchActivity : AppCompatActivity() {
         tvEmptySub = findViewById(R.id.tvEmptySub)
         progress = findViewById(R.id.progress)
 
+        modelBox = findViewById(R.id.modelBox)
+        tvModelTitle = findViewById(R.id.tvModelTitle)
+        tvModelHint = findViewById(R.id.tvModelHint)
+
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         toolbar.setNavigationOnClickListener { finish() }
+
+        // Modell holen: der Browser lädt die offizielle Datei, die App liest sie danach ein.
+        findViewById<View>(R.id.btnModelDownload).setOnClickListener { openModelDownload() }
+        findViewById<View>(R.id.btnModelPick).setOnClickListener { pickModelFile() }
 
         val root = findViewById<View>(R.id.searchRoot)
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
@@ -150,6 +165,94 @@ class SearchActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    /** Modell-Leiste zeigen, solange kein Gemma-Modell vorhanden ist. */
+    private fun refreshModelBox(status: AiEngine.Status) {
+        if (status.modelInstalled) {
+            modelBox.visibility = View.GONE
+            return
+        }
+        modelBox.visibility = View.VISIBLE
+        tvModelTitle.text = getString(R.string.ai_model_missing_title)
+        tvModelHint.text = getString(R.string.ai_model_missing_hint)
+    }
+
+    /**
+     * Modell besorgen. Die App hat keine Internet-Berechtigung – deshalb übergibt sie die
+     * offizielle Adresse an den Browser/Download-Manager des Geräts. Danach „Datei wählen“.
+     */
+    private fun openModelDownload() {
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(ModelStore.DOWNLOAD_URL))
+        val opened = runCatching { startActivity(intent) }.isSuccess
+        if (!opened) {
+            // Kein Browser: Adresse zum Kopieren anzeigen
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.ai_model_download)
+                .setMessage(ModelStore.DOWNLOAD_URL)
+                .setPositiveButton(R.string.ok) { _, _ ->
+                    val clip = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clip.setPrimaryClip(
+                        android.content.ClipData.newPlainText("model", ModelStore.DOWNLOAD_URL)
+                    )
+                    Toast.makeText(this, R.string.ai_model_download_hint, Toast.LENGTH_LONG).show()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+            return
+        }
+        Toast.makeText(this, R.string.ai_model_download_hint, Toast.LENGTH_LONG).show()
+    }
+
+    /** Datei-Auswahl (SAF) – die gewählte .task-Datei wird in den App-Speicher kopiert. */
+    private fun pickModelFile() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        runCatching { startActivityForResult(intent, REQ_PICK_MODEL) }
+            .onFailure { Toast.makeText(this, R.string.ai_model_import_failed, Toast.LENGTH_LONG).show() }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_PICK_MODEL || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        progress.visibility = View.VISIBLE
+        tvEngine.text = getString(R.string.ai_loading)
+        Thread({
+            val file = ModelStore.importFrom(applicationContext, uri)
+            runOnUiThread {
+                progress.visibility = View.GONE
+                if (file == null) {
+                    Toast.makeText(this, R.string.ai_model_import_failed, Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                Toast.makeText(
+                    this,
+                    getString(R.string.ai_model_imported, file.name),
+                    Toast.LENGTH_SHORT
+                ).show()
+                reloadEngine()
+            }
+        }, "n3-model-import").apply { isDaemon = true }.start()
+    }
+
+    /** Suchmaschine mit dem neuen Modell neu starten und Index neu aufbauen. */
+    private fun reloadEngine() {
+        Thread({
+            AiEngine.prepare(applicationContext, force = true) { status ->
+                // Andere Vektoren (anderes Modell) → Index neu berechnen
+                SearchIndex.invalidate(applicationContext)
+                SearchIndex.build(applicationContext, DataHub.all) {
+                    runOnUiThread {
+                        showEngineStatus(status)
+                        refreshModelBox(status)
+                        search()
+                    }
+                }
+            }
+        }, "n3-engine-reload").apply { isDaemon = true }.start()
+    }
+
     private fun showEngineStatus(status: AiEngine.Status) {
         val prefix = when (status.accelerator) {
             AiEngine.Accelerator.NPU -> "⚡"
@@ -163,6 +266,7 @@ class SearchActivity : AppCompatActivity() {
             status.modelName,
             status.accelerator.label
         ) + if (status.detail.isNotBlank()) " · ${status.detail}" else ""
+        refreshModelBox(status)
     }
 
     private fun buildSuggestions() {
@@ -233,6 +337,10 @@ class SearchActivity : AppCompatActivity() {
                 }
             }
         }, "n3-search").apply { isDaemon = true }.start()
+    }
+
+    private companion object {
+        const val REQ_PICK_MODEL = 4711
     }
 
     private fun classicSearch(query: String): List<MediaItem> {

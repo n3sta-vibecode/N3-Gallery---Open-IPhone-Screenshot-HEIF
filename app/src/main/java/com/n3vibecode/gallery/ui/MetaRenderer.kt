@@ -3,12 +3,14 @@ package com.n3vibecode.gallery.ui
 import android.content.Context
 import android.util.TypedValue
 import android.view.LayoutInflater
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.n3vibecode.gallery.R
 import com.n3vibecode.gallery.data.Labels
 import com.n3vibecode.gallery.data.MediaMeta
 import com.n3vibecode.gallery.data.MetaSection
+import com.n3vibecode.gallery.map.MapView
 
 /**
  * Baut die Metadaten-Ansicht (Abschnitte + Zeilen) für Detailansicht und Info-Tab.
@@ -29,6 +31,9 @@ object MetaRenderer {
         container.removeAllViews()
         val inflater = LayoutInflater.from(context)
 
+        // Ganz oben die Karte: der Ort des Fotos ist so sofort sichtbar (antippen = groß).
+        addMapCard(context, container, meta)
+
         meta.sections.forEach { section ->
             addSection(context, container, inflater, section)
         }
@@ -48,6 +53,59 @@ object MetaRenderer {
             setPadding(0, dp(context, 20), 0, dp(context, 8))
         }
         container.addView(footer)
+    }
+
+    /**
+     * Karte direkt in den Metadaten – oben, vor allen Zeilen.
+     *
+     * Vorher musste man erst eine Zeile „Auf Karte zeigen“ suchen (und dafür nach unten
+     * scrollen). Jetzt steht die Karte mit allen Fotos, der eigene Punkt ist rot markiert;
+     * antippen öffnet sie groß. Ohne Position im Foto entfällt der Block.
+     */
+    private fun addMapCard(context: Context, container: LinearLayout, meta: MediaMeta) {
+        val point = meta.mapPoint ?: return
+        val height = dp(context, 190)
+        val frame = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, height
+            ).apply { bottomMargin = dp(context, 10) }
+        }
+        val view = MapView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setMarkers(
+                listOf(
+                    MapView.Marker(
+                        id = "self",
+                        lat = point.first,
+                        lon = point.second,
+                        count = 1,
+                        label = meta.mapLabel.orEmpty()
+                    )
+                )
+            )
+            isClickable = true
+            setOnClickListener {
+                runCatching { context.startActivity(MapActivity.intentFor(context, point.first, point.second)) }
+            }
+            post { fitToMarkers(minDegrees = 6f) }
+        }
+        frame.addView(view)
+        // Runder Rahmen + Hinweis „antippen für groß“
+        frame.setBackgroundResource(R.drawable.bg_map_card)
+        container.addView(frame)
+
+        val hint = TextView(context).apply {
+            text = context.getString(R.string.map_tap_to_open)
+            setTextColor(context.getColor(R.color.n3_on_surface_variant))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setPadding(dp(context, 4), 0, 0, dp(context, 10))
+            setOnClickListener {
+                runCatching { context.startActivity(MapActivity.intentFor(context, point.first, point.second)) }
+            }
+        }
+        container.addView(hint)
     }
 
     private fun addSection(context: Context, container: LinearLayout, inflater: LayoutInflater, section: MetaSection) {

@@ -42,6 +42,24 @@ internal class GemmaEmbedder(
         }
     }
 
+    /** Woher das Modell kommt: App-Speicher (Download) oder App-Paket (assets). */
+    internal sealed class ModelSource {
+        abstract val label: String
+        abstract val name: String
+
+        /** Datei im App-Speicher – z. B. `files/models/embedding_gemma.task`. */
+        data class File(val file: java.io.File) : ModelSource() {
+            override val label: String get() = file.absolutePath
+            override val name: String get() = file.name
+        }
+
+        /** Datei im App-Paket – z. B. `models/embedding_gemma.task`. */
+        data class Asset(val path: String) : ModelSource() {
+            override val label: String get() = path
+            override val name: String get() = path.substringAfterLast('/')
+        }
+    }
+
     companion object {
 
         private const val TAG = "N3Ai"
@@ -52,10 +70,14 @@ internal class GemmaEmbedder(
          * Wortmodell ([LocalTextModel]).
          */
         fun create(ctx: Context): GemmaEmbedder? {
-            val asset = findModelAsset(ctx) ?: run {
-                Log.i(TAG, "Kein Gemma-Modell im App-Paket – Suche nutzt das eingebaute Wortmodell.")
-                return null
-            }
+            // 1) Modell im App-Speicher (vom Nutzer geholt, siehe ModelStore)
+            // 2) Modell im App-Paket (assets/models, falls beim Bauen beigelegt)
+            val source: ModelSource = ModelStore.best(ctx)?.let { ModelSource.File(it) }
+                ?: findModelAsset(ctx)?.let { ModelSource.Asset(it) }
+                ?: run {
+                    Log.i(TAG, "Kein Gemma-Modell vorhanden – Suche nutzt das eingebaute Wortmodell.")
+                    return null
+                }
             val engineClass = runCatching {
                 Class.forName("com.google.mediapipe.tasks.text.textembedder.TextEmbedder")
             }.getOrNull() ?: run {
@@ -71,20 +93,20 @@ internal class GemmaEmbedder(
                 AiEngine.Accelerator.CPU to "CPU"
             )
             for ((acc, delegateName) in order) {
-                val built = runCatching { build(ctx, engineClass, asset, delegateName, acc) }
+                val built = runCatching { build(ctx, engineClass, source, delegateName, acc) }
                     .onFailure { Log.i(TAG, "${acc.label} nicht möglich: ${it.message}") }
                     .getOrNull()
                 if (built != null) {
                     // Kurzer Testlauf (kleiner Satz) – erst dann gilt der Beschleuniger als nutzbar
                     val ok = runCatching { built.embedFn("Test") }.getOrNull()?.isNotEmpty() == true
                     if (ok) {
-                        Log.i(TAG, "Gemma-Embedding läuft auf ${acc.label} ($asset)")
+                        Log.i(TAG, "Gemma-Embedding läuft auf ${acc.label} (${source.label})")
                         return built
                     }
                     runCatching { built.close() }
                 }
             }
-            Log.w(TAG, "Modell $asset ließ sich mit keinem Beschleuniger starten.")
+            Log.w(TAG, "Modell ${source.label} ließ sich mit keinem Beschleuniger starten.")
             return null
         }
 
@@ -107,7 +129,7 @@ internal class GemmaEmbedder(
         private fun build(
             context: Context,
             engineClass: Class<*>,
-            assetPath: String,
+            source: ModelSource,
             delegateName: String,
             accelerator: AiEngine.Accelerator
         ): GemmaEmbedder? {
@@ -120,8 +142,28 @@ internal class GemmaEmbedder(
 
             // BaseOptions.builder() → BaseOptions.Builder
             val baseBuilder = baseOptionsClass.getMethod("builder").invoke(null) ?: return null
-            baseBuilder.javaClass.getMethod("setModelAssetPath", String::class.java)
-                .invoke(baseBuilder, assetPath)
+            when (source) {
+                is ModelSource.Asset ->
+                    baseBuilder.javaClass.getMethod("setModelAssetPath", String::class.java)
+                        .invoke(baseBuilder, source.path)
+                is ModelSource.File ->
+                    // Datei im App-Speicher: MediaPipe nimmt den Pfad; fehlt die Methode in
+                    // älteren Versionen, wird bei fehlender Schreibrechte-Kopie die
+                    // Modell-Datei über den Deskriptor übergeben.
+                    runCatching {
+                        baseBuilder.javaClass.getMethod("setModelAssetPath", String::class.java)
+                            .invoke(baseBuilder, source.file.absolutePath)
+                    }.getOrElse {
+                        context.contentResolver.openFileDescriptor(
+                            android.net.Uri.fromFile(source.file), "r"
+                        )?.use { pfd ->
+                            baseBuilder.javaClass.getMethod(
+                                "setModelAssetFileDescriptor",
+                                android.os.ParcelFileDescriptor::class.java
+                            ).invoke(baseBuilder, pfd)
+                        } ?: return null
+                    }
+            }
             baseBuilder.javaClass.getMethod("setDelegate", delegateClass).invoke(baseBuilder, delegate)
             val baseOptions = baseBuilder.javaClass.getMethod("build").invoke(baseBuilder) ?: return null
 
@@ -156,7 +198,7 @@ internal class GemmaEmbedder(
                 }.getOrNull()
             }
 
-            val modelName = assetPath.substringAfterLast('/')
+            val modelName = source.name
             val friendly = when {
                 modelName.contains("gemma", ignoreCase = true) -> "Gemma Embedding"
                 modelName.contains("universal", ignoreCase = true) -> "Universal Sentence Encoder"

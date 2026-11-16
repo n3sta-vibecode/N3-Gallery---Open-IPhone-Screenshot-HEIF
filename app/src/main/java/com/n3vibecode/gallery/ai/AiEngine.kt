@@ -28,12 +28,19 @@ object AiEngine {
         LOCAL("Wortmodell")
     }
 
-    /** Zustand der Suche – für die Anzeige in der Suchleiste. */
+    /**
+     * Zustand der Suche – für die Anzeige in der Suchleiste.
+     *
+     * [modelInstalled] sagt, ob ein **Gemma-Modell** vorhanden ist; ist es `false`, rechnet
+     * die Suche mit dem eingebauten Wortmodell. Die Suchseite bietet in diesem Fall an, das
+     * Modell zu holen.
+     */
     data class Status(
         val ready: Boolean,
         val accelerator: Accelerator,
         val modelName: String,
-        val detail: String = ""
+        val detail: String = "",
+        val modelInstalled: Boolean = false
     )
 
     /** Gemeinsame Schnittstelle aller Such-Engines (Gemma und das eingebaute Wortmodell). */
@@ -45,7 +52,7 @@ object AiEngine {
     }
 
     @Volatile private var backend: EmbedderBackend? = null
-    @Volatile private var status: Status = Status(false, Accelerator.LOCAL, "", "")
+    @Volatile private var status: Status = Status(false, Accelerator.LOCAL, "", "", false)
 
     fun currentStatus(): Status = status
 
@@ -55,35 +62,44 @@ object AiEngine {
      *
      * [onReady] kommt auf einem Hintergrund-Thread.
      */
-    fun prepare(ctx: Context, onReady: ((Status) -> Unit)? = null) {
-        backend?.let {
-            onReady?.invoke(status)
-            return
-        }
-        synchronized(this) {
-            if (backend != null) {
+    fun prepare(ctx: Context, force: Boolean = false, onReady: ((Status) -> Unit)? = null) {
+        if (!force) {
+            backend?.let {
                 onReady?.invoke(status)
                 return
+            }
+        }
+        synchronized(this) {
+            if (backend != null && !force) {
+                onReady?.invoke(status)
+                return
+            }
+            if (force) {
+                // Neu geladenes Modell soll sofort greifen
+                runCatching { backend?.close() }
+                backend = null
             }
             val app = ctx.applicationContext
             var chosen: EmbedderBackend? = null
             var st: Status? = null
 
-            // 1) Gemma-Embedding (NPU → GPU → CPU)
+            // 1) Gemma-Embedding (NPU → GPU → CPU).
+            //    Modell zuerst aus dem App-Speicher (heruntergeladen), dann aus dem
+            //    App-Paket (assets/models, falls beim Bauen eins beigelegt wurde).
             runCatching { GemmaEmbedder.create(app) }.getOrNull()?.let { gemma ->
                 chosen = gemma
-                st = Status(true, gemma.accelerator, gemma.modelName, gemma.detail)
+                st = Status(true, gemma.accelerator, gemma.modelName, gemma.detail, true)
             }
 
             // 2) Ersatz: eingebautes Wortmodell (immer verfügbar)
             if (chosen == null) {
                 val local = LocalTextModel(app)
                 chosen = local
-                st = Status(true, Accelerator.LOCAL, local.modelName, local.detail)
+                st = Status(true, Accelerator.LOCAL, local.modelName, local.detail, false)
             }
 
             backend = chosen
-            status = st ?: Status(false, Accelerator.LOCAL, "", "")
+            status = st ?: Status(false, Accelerator.LOCAL, "", "", false)
             Log.i("N3Ai", "Suche bereit: ${status.modelName} auf ${status.accelerator.label}")
             onReady?.invoke(status)
         }

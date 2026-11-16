@@ -396,6 +396,19 @@
      ------------------------------------------------------------------ */
   const LOG = [
     {
+      v: '1.33', de: 'Modell-Download, Karte in den Details', en: 'Model download, map in the details',
+      de_items: [
+        'Gemma-Modell direkt in der App holen: „Modell laden“ öffnet die offizielle Adresse im Browser, „Datei wählen“ übernimmt sie – danach rechnet die Suche auf der NPU. Die App bleibt ohne Internet-Berechtigung.',
+        'Karte ganz oben in den Metadaten (eigenes Foto als roter Punkt) plus Karten-Knopf in der Detailansicht.',
+        'Nur noch eine Suchleiste: Menü-Lupe und klassischer Such-Dialog sind entfernt.'
+      ],
+      en_items: [
+        'Fetch the Gemma model right in the app: “Download model” opens the official address in the browser, “Pick file” imports it – afterwards search runs on the NPU. The app still has no internet permission.',
+        'Map at the top of the metadata (your photo as a red dot) plus a map button in the detail view.',
+        'Just one search bar now: the menu magnifier and the classic search dialog are gone.'
+      ]
+    },
+    {
       v: '1.32', de: 'Karte, Vorschau, Gemma-Suche', en: 'Map, preview, Gemma search',
       de_items: [
         'Karte: alle Fotos mit GPS auf einer Karte, mit Ortsnamen („Luzern, Schweiz“) – Landflächen und 46 000 Orte liegen im App-Paket, kein Kartendienst, kein Netz.',
@@ -578,7 +591,7 @@
     'hero.h1a': 'Apple screenshots.',
     'hero.h1b': 'Finally on Android.',
     'hero.lead': 'N3 Gallery opens Apple’s tiled HEIC containers – including 10-bit, HDR and gain maps. Plus 35 RAW formats, AVIF, SVG and HEVC video. Entirely offline.',
-    'hero.note': 'Version 1.32 · 44 MB · open source',
+    'hero.note': 'Version 1.33 · 44 MB · open source',
     'hero.f1': 'No internet access',
     'hero.f2': 'No accounts',
     'hero.f3': 'No ads',
@@ -665,7 +678,7 @@
     'privacy.c2': 'No account, no sign-in, no cloud, no server.',
     'privacy.c3': 'No ads, no telemetry, no analytics SDK.',
     'privacy.c4': 'Notes, tags and favourites are additionally backed up outside the app – a reinstall costs nothing.',
-    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.32-release.apk | grep uses-permission</code>',
+    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.33-release.apk | grep uses-permission</code>',
     'install.kicker': 'Installation',
     'install.h2': 'Three steps onto the device.',
     'install.p': 'The app is not distributed through a store: the finished APK comes straight from the build and the signing key stays the same. That is why new versions can simply be laid over the installed one.',

@@ -8,8 +8,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
-import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -72,11 +70,6 @@ class MainActivity : AppCompatActivity() {
 
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                R.id.action_search -> { openSearch(); true }
-                R.id.action_search_ai -> {
-                    startActivity(android.content.Intent(this, SearchActivity::class.java))
-                    true
-                }
                 R.id.action_map -> {
                     // Gesamte Bibliothek auf der Karte zeigen
                     ViewState.viewList = DataHub.all
@@ -104,10 +97,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Tippen auf die Suchleiste = Bildersuche in eigenen Worten (Gemma-Embedding).
-        // Die klassische Suche nach Namen/Tags bleibt über das Menü erreichbar.
+        // Eine einzige Suchleiste: tippen öffnet die Bildersuche, in der zugleich die
+        // klassische Suche (Dateiname, Ordner, Tags) mitläuft – keine zweite Lupe daneben.
         searchBar.setOnClickListener { openSearchAi() }
-        searchBar.setOnLongClickListener { openSearch(); true }
+        // Ein einziges Ziel: die Bildersuche. Kein zweiter Suchweg, keine zweite Lupe.
+        searchBar.setOnLongClickListener { openSearchAi(); true }
 
         // Dauerhafte Werbe-Leiste: iPhone-Screenshots / HEIC – tippen öffnet die Info
         findViewById<android.view.View>(R.id.promoBar).setOnClickListener { showAboutDialog() }
@@ -236,34 +230,6 @@ class MainActivity : AppCompatActivity() {
     /** Bildersuche in eigenen Worten (Embeddings auf NPU/GPU/CPU). */
     private fun openSearchAi() {
         startActivity(android.content.Intent(this, SearchActivity::class.java))
-    }
-
-    private fun openSearch() {
-        val edit = EditText(this).apply {
-            hint = getString(R.string.search_hint)
-            setText(DataHub.query)
-            setSingleLine()
-        }
-        val container = FrameLayout(this).apply {
-            val pad = (20 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad / 2, pad, 0)
-            addView(edit)
-        }
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.search)
-            .setView(container)
-            .setPositiveButton(R.string.ok) { _, _ ->
-                DataHub.query = edit.text.toString()
-                searchBar.setText(DataHub.query)
-                DataHub.refreshListeners()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .setNeutralButton(R.string.reset) { _, _ ->
-                DataHub.query = ""
-                searchBar.setText("")
-                DataHub.refreshListeners()
-            }
-            .show()
     }
 
     /** Rastergröße: mehr Fotos pro Zeile (auch mit zwei Fingern im Raster zoombar). */
