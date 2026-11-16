@@ -96,6 +96,49 @@ jobs:
       # Prüfen, dass wirklich installierbare APKs entstanden sind – und dass alle mit
       # demselben festen Schlüssel signiert wurden. Nur dann lässt sich die App später
       # über die bereits installierte Version aktualisieren.
+      # Nachweis, dass die *richtige* LiteRT-LM-Fassung im ausgelieferten Paket steckt:
+      # Die alten Versionen kannten die Klasse ActivationDataType nicht – genau daran ist
+      # der Modellstart bis 1.36 gescheitert. Fehlt sie im Dex, bricht der Bau hier ab.
+      - name: LiteRT-LM-Klassen im APK nachweisen
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          APK=$(ls app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then
+            echo "::error::Kein Release-APK gefunden"
+            exit 1
+          fi
+          rm -rf /tmp/dex && mkdir -p /tmp/dex
+          cd /tmp/dex && unzip -oq "$OLDPWD/$APK" 'classes*.dex' || true
+          echo "Dex-Dateien: $(ls classes*.dex 2>/dev/null | wc -l)"
+          FEHLT=0
+          for K in com/google/ai/edge/litertlm/ActivationDataType \
+                   com/google/ai/edge/litertlm/EmbeddingEngineConfig \
+                   com/google/ai/edge/litertlm/EmbeddingEngine \
+                   com/google/mediapipe/tasks/retrieval/universalembedder/UniversalEmbedder ; do
+            N=$(strings classes*.dex 2>/dev/null | grep -c "$K")
+            echo "  $K: $N"
+            if [ "$N" -eq 0 ]; then
+              echo "::error::$K fehlt im APK"
+              FEHLT=1
+            fi
+          done
+          # Methoden, die der UniversalEmbedder aufruft, müssen vorhanden sein
+          DEXDUMP="$SDK/build-tools/36.0.0/dexdump"
+          if [ -x "$DEXDUMP" ]; then
+            "$DEXDUMP" -d classes*.dex 2>/dev/null > /tmp/dex/dump.txt || true
+            for M in "initialize" "computeEmbedding" ; do
+              N=$(grep -c "name          : '$M'" /tmp/dex/dump.txt || true)
+              echo "  Methode $M: $N"
+              if [ "${N:-0}" -eq 0 ]; then
+                echo "::error::Methode $M fehlt im Dex (LiteRT-LM passt nicht zu MediaPipe)"
+                FEHLT=1
+              fi
+            done
+          fi
+          exit $FEHLT
+
       - name: APK prüfen
         if: always()
         run: |
