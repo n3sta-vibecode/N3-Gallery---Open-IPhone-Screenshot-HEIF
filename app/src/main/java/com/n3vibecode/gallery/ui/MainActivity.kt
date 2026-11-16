@@ -208,7 +208,7 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("n3_perms", MODE_PRIVATE)
         if (prefs.getBoolean("asked_location", false)) return
         prefs.edit().putBoolean("asked_location", true).apply()
-        runCatching { locationLauncher.launch(arrayOf(perm)) }
+        runCatching { locationLauncher.launch(perm) }
     }
 
     private val locationLauncher = registerForActivityResult(
