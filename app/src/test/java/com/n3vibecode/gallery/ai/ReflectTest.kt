@@ -30,7 +30,7 @@ class ReflectTest {
 
     enum class Delegate { CPU, GPU, NPU }
 
-    abstract class AutoValueBaseOptionsBuilder : BaseOptions.Builder() {
+    open class AutoValueBaseOptionsBuilder : BaseOptions.Builder() {
         override fun setModelAssetPath(value: String): BaseOptions.Builder = this
         override fun setDelegate(value: Delegate): BaseOptions.Builder = this
 
