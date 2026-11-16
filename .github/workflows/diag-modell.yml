@@ -46,65 +46,62 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
-          set -u
-          exec 2>&1
+          # Kein "set -e": Jeder Teilschritt darf scheitern, alles landet im Bericht.
           OUT=/tmp/bericht.md
-          echo "## LiteRT-LM im Paket" > "$OUT"
+          {
+            echo "## LiteRT-LM im Paket"
+            echo ""
+          } > "$OUT"
+
           D="https://dl.google.com/dl/android/maven2"
-          rm -rf /tmp/x && mkdir -p /tmp/x && cd /tmp/x
+          rm -rf /tmp/x
+          mkdir -p /tmp/x/mp /tmp/x/lm
 
-          # Kombiniertes AAR von tasks-retrieval (enthält MediaPipe UniversalEmbedder)
-          if curl -sSL -m 180 -o mp.aar \
-              "$D/com/google/mediapipe/tasks-retrieval/1.2.3/tasks-retrieval-1.2.3.aar"; then
-            mkdir -p mp && (cd mp && unzip -oq ../mp.aar) || echo "mp entpacken fehlgeschlagen" >> "$OUT"
-            echo "tasks-retrieval geladen: $(stat -c%s mp.aar) Bytes" >> "$OUT"
-          else
-            echo "tasks-retrieval-laden fehlgeschlagen" >> "$OUT"
-          fi
+          AAR_MP="$D/com/google/mediapipe/tasks-retrieval/1.2.3/tasks-retrieval-1.2.3.aar"
+          AAR_LM="$D/com/google/ai/edge/litertlm/litertlm-android/0.17.0-alpha1/litertlm-android-0.17.0-alpha1.aar"
 
-          # LiteRT-LM selbst (separates Artefakt)
-          if curl -sSL -m 180 -o lm.aar \
-            "$D/com/google/ai/edge/litertlm/litertlm-android/0.17.0-alpha1/litertlm-android-0.17.0-alpha1.aar"; then
-            mkdir -p lm && (cd lm && unzip -oq ../lm.aar) || echo "lm entpacken fehlgeschlagen" >> "$OUT"
-            echo "litertlm geladen: $(stat -c%s lm.aar) Bytes" >> "$OUT"
-          else
-            echo "litertlm-laden fehlgeschlagen" >> "$OUT"
-          fi
+          {
+            echo "### Download"
+            curl -sSL -m 240 -o /tmp/x/mp.aar -w "tasks-retrieval: HTTP %{http_code}, %{size_download} Bytes\n" "$AAR_MP" || echo "tasks-retrieval: curl-Fehler"
+            curl -sSL -m 240 -o /tmp/x/lm.aar -w "litertlm: HTTP %{http_code}, %{size_download} Bytes\n" "$AAR_LM" || echo "litertlm: curl-Fehler"
+            ls -l /tmp/x
+            echo ""
+          } >> "$OUT" 2>&1
 
-          ls -la /tmp/x >> "$OUT" 2>&1
-          echo "" >> "$OUT"
+          ( cd /tmp/x/mp && unzip -oq ../mp.aar && echo "mp entpackt" && ls -l ) >> "$OUT" 2>&1
+          ( cd /tmp/x/lm && unzip -oq ../lm.aar && echo "lm entpackt" && ls -l ) >> "$OUT" 2>&1
 
-          echo "### LiteRT-LM-Klassen im MediaPipe-AAR" >> "$OUT"
-          echo '```' >> "$OUT"
-          (cd /tmp/x/mp 2>/dev/null && unzip -l classes.jar 2>/dev/null | grep -E "litertlm" | awk '{print $4}') >> "$OUT" 2>&1 || echo "-" >> "$OUT"
-          echo '```' >> "$OUT"
-          echo "" >> "$OUT"
-
-          echo "### Klassen im LiteRT-LM-AAR (Auswahl)" >> "$OUT"
-          echo '```' >> "$OUT"
-          (cd /tmp/x/lm 2>/dev/null && unzip -l classes.jar 2>/dev/null | grep -E "ActivationDataType|EmbeddingEngine|Backend|UniversalEmbedder" | awk '{print $4}') >> "$OUT" 2>&1 || echo "-" >> "$OUT"
-          echo '```' >> "$OUT"
-          echo "" >> "$OUT"
-
-          echo "### Signaturen (javap)" >> "$OUT"
-          echo '```' >> "$OUT"
-          for J in /tmp/x/lm/classes.jar /tmp/x/mp/classes.jar; do
-            [ -f "$J" ] || continue
-            echo "== $J" >> "$OUT"
-            for C in \
-              com.google.ai.edge.litertlm.EmbeddingEngineConfig \
-              com.google.ai.edge.litertlm.EmbeddingEngine \
-              com.google.ai.edge.litertlm.ActivationDataType \
-              com.google.mediapipe.tasks.retrieval.universalembedder.UniversalEmbedderOptions\$Builder ; do
-              echo "--- $C" >> "$OUT"
-              javap -classpath "$J" "$C" 2>&1 | head -30 >> "$OUT"
+          {
+            echo ""
+            echo "### LiteRT-LM-Klassen im MediaPipe-AAR"
+            echo '```'
+            unzip -l /tmp/x/mp/classes.jar 2>&1 | grep -E "litertlm|UniversalEmbedder" | awk '{print $4}' | head -40
+            echo '```'
+            echo ""
+            echo "### Klassen im LiteRT-LM-AAR"
+            echo '```'
+            unzip -l /tmp/x/lm/classes.jar 2>&1 | grep -E "ActivationDataType|EmbeddingEngine|Backend|EmbeddingOptions" | awk '{print $4}' | head -40
+            echo '```'
+            echo ""
+            echo "### Signaturen (javap)"
+            echo '```'
+            for J in /tmp/x/lm/classes.jar /tmp/x/mp/classes.jar; do
+              echo "== $J"
+              for C in \
+                com.google.ai.edge.litertlm.EmbeddingEngineConfig \
+                com.google.ai.edge.litertlm.ActivationDataType \
+                com.google.mediapipe.tasks.retrieval.universalembedder.UniversalEmbedderOptions\$Builder ; do
+                echo "--- $C"
+                javap -classpath "$J" "$C" 2>&1 | head -30
+              done
             done
-          done
-          echo '```' >> "$OUT"
+            echo '```'
+            echo ""
+            echo "_Automatisch erzeugt von diag-modell.yml_"
+          } >> "$OUT" 2>&1
 
-          echo "" >> "$OUT"
-          echo "_Automatisch erzeugt von diag-modell.yml_" >> "$OUT"
-          head -c 60000 /tmp/bericht.md > /tmp/bericht-kurz.md || true
+          head -c 60000 "$OUT" > /tmp/bericht-kurz.md
+          wc -c /tmp/bericht-kurz.md >> "$OUT" 2>&1
 
       - name: Bericht als Commit-Kommentar ablegen
         if: always()
