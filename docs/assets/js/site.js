@@ -396,20 +396,18 @@
      ------------------------------------------------------------------ */
   const LOG = [
     {
-      v: '1.36', de: 'Modell startet, Fortschritt, klare Fehler', en: 'Model starts, progress, clear errors',
+      v: '1.37', de: 'LiteRT-LM-Version, vollständige Downloads', en: 'LiteRT-LM version, complete downloads',
       de_items: [
-        'EmbeddingGemma 2 startet jetzt wirklich: Die Reflection verglich die konkrete Klasse des Arguments mit dem deklarierten Parametertyp – das kann nie passen. Jetzt entscheidet die Zuweisbarkeit.',
-        'Statuszeile aus einer Quelle: wer rechnet und wie viele Fotos schon vorbereitet sind – kein Springen mehr zwischen „läuft nicht“ und leer.',
-        'Neu im Überlaufmenü: „Modell …“ (laden, ansehen, entfernen – jederzeit) und „Foto-Vorbereitung …“ (Fortschritt, Anhalten, neu starten).',
-        'Download-Fehler nennen den Grund (kein Internet, HTTP 404, Datei zu klein) statt „konnte nicht gelesen werden“.',
-        'Umlaute im eingebauten Wortmodell werden als UTF-8 gelesen – „Frühstück“ war vorher „FrÃ¼hstÃ¼ck“ und damit unauffindbar.'
+        'Der eigentliche Grund für „Suchmodell läuft nicht“: tasks-retrieval 1.2.3 bringt eine zu alte LiteRT-LM mit (0.17.0-alpha1), in der die Klasse ActivationDataType fehlt. Jetzt fest auf 0.19.1 – und der Build prüft das bei jedem Lauf.',
+        'Zweiter Weg ohne MediaPipe: dieselbe Datei lässt sich direkt über LiteRT-LM einbetten (CPU). Beide Wege werden mit einem Testlauf geprüft, welcher läuft steht in der Statuszeile.',
+        'Modelldownload prüft jetzt die Größe gegen den Server, setzt bei Abbruch fort (statt von vorn) und übernimmt keine halbe Datei mehr. Genau das war passiert: 462 MB von 462 MiB.',
+        'Unvollständige Modelldateien werden klar benannt, und Fehler wie „Klasse fehlt“ statt eines nackten Klassennamens.'
       ],
       en_items: [
-        'EmbeddingGemma 2 now actually starts: the reflection compared the concrete class of the argument with the declared parameter type, which can never match. Assignability now decides.',
-        'Status line from a single source: what is computing and how many photos are prepared – no more jumping between “not running” and blank.',
-        'New in the overflow menu: “Model …” (load, inspect, remove – at any time) and “Photo preparation …” (progress, stop, restart).',
-        'Download errors state the reason (no internet, HTTP 404, file too small) instead of “could not be read”.',
-        'Umlauts in the built-in word model are read as UTF-8 – “Frühstück” used to be “FrÃ¼hstÃ¼ck” and therefore unfindable.'
+        'The real reason for “search model not running”: tasks-retrieval 1.2.3 ships an outdated LiteRT-LM (0.17.0-alpha1) that lacks the ActivationDataType class. Now pinned to 0.19.1 – and the build verifies this on every run.',
+        'Second route without MediaPipe: the same file can be embedded directly via LiteRT-LM (CPU). Both routes are checked with a test run; the status line shows which one runs.',
+        'Model downloads now verify the size against the server, resume after an interruption instead of restarting, and never accept a half file. That is exactly what happened: 462 MB out of 462 MiB.',
+        'Incomplete model files are named clearly, and errors read “class missing” instead of a bare class name.'
       ]
     },
     {
@@ -608,7 +606,7 @@
     'hero.h1a': 'Apple screenshots.',
     'hero.h1b': 'Finally on Android.',
     'hero.lead': 'N3 Gallery opens Apple’s tiled HEIC containers – including 10-bit, HDR and gain maps. Plus 35 RAW formats, AVIF, SVG and HEVC video. Entirely offline.',
-    'hero.note': 'Version 1.36 · 44 MB · open source',
+    'hero.note': 'Version 1.37 · 44 MB · open source',
     'hero.f1': 'No internet access',
     'hero.f2': 'No accounts',
     'hero.f3': 'No ads',
@@ -695,7 +693,7 @@
     'privacy.c2': 'No account, no sign-in, no cloud, no server.',
     'privacy.c3': 'No ads, no telemetry, no analytics SDK.',
     'privacy.c4': 'Notes, tags and favourites are additionally backed up outside the app – a reinstall costs nothing.',
-    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.36-release.apk | grep uses-permission</code>',
+    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.37-release.apk | grep uses-permission</code>',
     'install.kicker': 'Installation',
     'install.h2': 'Three steps onto the device.',
     'install.p': 'The app is not distributed through a store: the finished APK comes straight from the build and the signing key stays the same. That is why new versions can simply be laid over the installed one.',

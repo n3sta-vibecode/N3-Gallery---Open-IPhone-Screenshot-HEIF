@@ -109,6 +109,7 @@ object AiEngine {
             if (gemma != null) {
                 chosen = gemma
                 st = Status(true, gemma.accelerator, gemma.modelName, gemma.detail, true)
+                Log.i("N3Ai", "Modellweg: ${GemmaEmbedder.lastRoute}")
             }
 
             // 2) Ersatz: eingebautes Wortmodell (immer verfügbar)

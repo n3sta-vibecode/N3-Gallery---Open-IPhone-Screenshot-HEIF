@@ -17,15 +17,22 @@ Foto-Beschreibung ──► EmbeddingGemma 2                                    
 veröffentlicht am 6. Oktober 2026. Google setzt es in „Google AI Edge Gallery“ für
 „Instant Media Search“ ein.
 
-Die App nutzt `com.google.mediapipe:tasks-retrieval` (**UniversalEmbedder**) auf der
-LiteRT-LM-Laufzeit. Die Modelldateien liegen im `.litertlm`-Format auf Hugging Face
+Die App nutzt `com.google.mediapipe:tasks-retrieval:1.2.3` (**UniversalEmbedder**) auf der
+LiteRT-LM-Laufzeit – mit **fest eingetragener** `litertlm-android:0.19.1`, weil die von
+MediaPipe mitgelieferte Version (0.17.0-alpha1) zu alt ist: dort fehlt die Klasse
+`ActivationDataType`, und der Start scheitert mit `NoClassDefFoundError`. Geprüft wird das
+in `diag-modell.yml` und bei jedem Bau in `build-apk.yml`. Die Modelldateien liegen im `.litertlm`-Format auf Hugging Face
 (LiteRT-Community):
 
 | Variante in der App | Datei | Größe | Inhalt |
 | --- | --- | --- | --- |
-| Text (270M) | `embeddinggemma-2-text-270m.litertlm` | ca. 163 MB | nur Text |
-| Text + Bild (440M) | `embeddinggemma-2-text-vision-440m.litertlm` | ca. 530 MB | empfohlen |
-| alles (740M) | `embeddinggemma-2-740m.litertlm` | ca. 1,3 GB | Text, Bild, Audio |
+| Text (270M) | `embeddinggemma-2-text-270m.litertlm` | 164 626 432 B ≈ 157 MiB | nur Text |
+| Text + Bild (440M) | `embeddinggemma-2-text-vision-440m.litertlm` | 387 710 976 B ≈ 370 MiB | empfohlen |
+| alles (740M) | `embeddinggemma-2-740m.litertlm` | 484 622 336 B ≈ 462 MiB | Text, Bild, Audio |
+
+Die Sollgrößen stehen in `ModelStore.Variant` und werden beim Download geprüft: Eine
+abgebrochene Datei wird nie als Modell verwendet, sondern als „unvollständig“ angezeigt und
+beim nächsten Versuch an derselben Stelle fortgesetzt.
 
 ## 2. Modell holen – direkt in der App
 
@@ -61,7 +68,7 @@ einem Testlauf**:
 
 > **Zur NPU:** EmbeddingGemma 1 ließ sich über den `TextEmbedder` noch mit `Delegate.NPU`
 > ansprechen. EmbeddingGemma 2 läuft über LiteRT-LM, das in MediaPipe nur GPU und CPU
-> anbietet – die NPU wird dort (Stand 1.36) nicht adressiert. Sobald Google das freigibt,
+> anbietet – die NPU wird dort (Stand 1.37) nicht adressiert. Sobald Google das freigibt,
 > kommt die Stufe in `GemmaEmbedder.create` einfach vor die GPU.
 
 ## 4. Was in den Foto-Vektor einfließt

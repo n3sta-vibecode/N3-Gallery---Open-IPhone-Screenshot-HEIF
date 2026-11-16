@@ -1,6 +1,65 @@
 # N3 Gallery – was neu ist
 
-## 1.36 – Modell startet wirklich, Fortschritt sichtbar, bessere Fehlermeldungen
+## 1.37 – Der eigentliche Grund: falsche LiteRT-LM-Version, halbe Modelldatei
+
+Auf dem Gerät stand bisher nur der Klassenname:
+
+```
+GPU: com.google.ai.edge.litertlm.ActivationDataType · CPU: com.google.ai.edge.litertlm.ActivationDataType
+```
+
+Das war kein Anzeigefehler, sondern die Ursache: **Die Klasse gibt es im ausgelieferten Paket
+nicht.**
+
+### 🔬 Nachgemessen statt geraten
+
+Ein neuer CI-Lauf (`diag-modell.yml`) lädt die Artefakte direkt und schaut hinein:
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| `tasks-retrieval` | 1.2.3 – deklariert selbst `litertlm-android:0.17.0-alpha1` |
+| `EmbeddingEngineConfig` in 0.17.0-alpha1 | 8 Parameter – **ohne** `activationDataType` |
+| `ActivationDataType` in 0.17.0-alpha1 | **fehlt** |
+| ab 0.18.0 / 0.18.1 / 0.19.0 / 0.19.1 | 9 Parameter, `ActivationDataType`, `InputData`, `EmbeddingResponse` – alles vorhanden |
+
+MediaPipe 1.2.3 ist also gegen eine **neuere** LiteRT-LM gebaut, als es selbst mitbringt. Der
+UniversalEmbedder konnte deshalb nie starten – unabhängig davon, wie gut die Reflection ist.
+
+**Behoben:** `litertlm-android:0.19.1` ist jetzt fest eingetragen, und ein Schritt im
+Build-Workflow prüft bei jedem Bau, dass die aufgelöste Version mindestens 0.18 ist
+(sonst bricht der Bau mit einer klaren Meldung ab).
+
+### 🔁 Zweiter Weg, wenn MediaPipe zickt
+
+Neben dem dokumentierten `UniversalEmbedder` kann die App das Modell jetzt auch **direkt über
+LiteRT-LM** einbetten (`EmbeddingEngine` + `computeEmbedding`), auf der CPU. Beide Wege werden
+ausprobiert und mit einem Testlauf geprüft; welcher läuft, steht in der Statuszeile.
+
+### 📦 Die 740M-Datei war abgeschnitten
+
+Auf dem Gerät lag `embeddinggemma-2-740m.litertlm` mit **462 MB** – die Datei ist 462 **MiB**
+groß, also genau 484 622 336 Bytes. Der Download hatte sie bei ~462 MB abgebrochen und die
+halbe Datei als fertig übernommen.
+
+Jetzt gilt:
+
+* **Größenprüfung gegen den Server** (und gegen die hinterlegte Sollgröße). Stimmt sie nicht,
+  wird die Datei **nicht** als Modell verwendet; sie erscheint als „unvollständig, 462 von
+  462 MB“ … bzw. mit dem echten Sollwert.
+* **Fortsetzen statt neu beginnen** (`Range: bytes=…`), bis zu drei Anläufe.
+* Antwortet der Server auf `Range` mit `200` statt `206`, wird korrekt **neu** begonnen
+  (sonst entstünde eine Datei mit doppelten Anfangsbytes).
+* Unvollständige Dateien werden nie geladen – die Suchseite sagt jetzt ausdrücklich:
+  „Modelldatei unvollständig … bitte erneut laden (er läuft an dieser Stelle weiter)“.
+
+### 🧾 Fehler, die man lesen kann
+
+`NoClassDefFoundError` ist ein `Error`, kein `Exception` – er wurde nicht gefangen und kam als
+nackter Klassenname an. Jetzt wird `Throwable` gefangen und übersetzt: „Klasse fehlt: … (LiteRT-
+LM/MediaPipe-Version passt nicht)“, „Natives Modul fehlt“, „Zu wenig Arbeitsspeicher für das
+Modell“.
+
+## 1.37 – Modell startet wirklich, Fortschritt sichtbar, bessere Fehlermeldungen
 
 1.35 hat die Ursachen benannt, aber einen Fehler selbst eingebaut – auf dem Gerät sichtbar als
 
@@ -44,7 +103,7 @@ Modelldatei.“) statt „Datei konnte nicht gelesen werden“. Das gilt auch f�
 „Frühstück“ wurde zu „FrÃ¼hstÃ¼ck“ und war nie auffindbar. Jetzt wird ausdrücklich UTF-8
 gelesen, alte doppelt kodierte Einträge werden beim Vergleich geradegezogen.
 
-## 1.36 – Suche rechnet im Hintergrund, Modell wird wirklich benutzt, Tastatur schließt
+## 1.37 – Suche rechnet im Hintergrund, Modell wird wirklich benutzt, Tastatur schließt
 
 Vier Beschwerden aus 1.34, alle mit derselben Wurzel: **Rechenarbeit lag auf dem Haupt-Thread
 oder wurde nie angestoßen.**
@@ -102,7 +161,7 @@ Kein stiller Rückfall mehr: Ist eine Modelldatei da, startet aber nicht, steht 
 der Statuszeile und im leeren Suchergebnis („Der Foto-Index ließ sich nicht aufbauen: …“).
 Ohne Modell steht dort, dass das eingebaute Wortmodell rechnet.
 
-## 1.36 – EmbeddingGemma 2, Download in der App, OpenStreetMap, Metadaten erreichbar
+## 1.37 – EmbeddingGemma 2, Download in der App, OpenStreetMap, Metadaten erreichbar
 
 ### 🧠 EmbeddingGemma 2 – das Modell aus Google Edge Gallery
 

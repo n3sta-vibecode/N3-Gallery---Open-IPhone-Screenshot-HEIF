@@ -228,10 +228,15 @@ class SearchActivity : AppCompatActivity() {
                 getString(R.string.ai_engine_status, "◆", st.modelName, st.accelerator.label)
             }
         )
-        if (installed.isNotEmpty()) {
+        val half = ModelStore.incomplete(this)
+        if (installed.isNotEmpty() || half.isNotEmpty()) {
             lines.add("")
             installed.forEach { f ->
                 lines.add("• ${f.name} · ${f.length() / 1048576} MB")
+            }
+            half.forEach { f ->
+                val known = ModelStore.Variant.entries.firstOrNull { it.file == f.name }
+                lines.add("• ${f.name} · ${f.length() / 1048576} von ${known?.expectedMb ?: "?"} MB (unvollständig)")
             }
         }
         MaterialAlertDialogBuilder(this)
@@ -323,24 +328,47 @@ class SearchActivity : AppCompatActivity() {
         // Vorher verschwand die Leiste, sobald eine Datei da war: Wer eine kaputte oder falsche
         // Datei erwischt hatte, konnte kein anderes Modell mehr laden.
         modelBox.visibility = View.VISIBLE
-        if (status.modelInstalled && status.failure.isBlank()) {
-            // Modell läuft → Leiste zu, aber über das Überlaufmenü erreichbar
+        if (status.accelerator != AiEngine.Accelerator.LOCAL) {
+            // EmbeddingGemma läuft → Leiste zu, im Überlaufmenü bleibt sie erreichbar
             modelBox.visibility = View.GONE
             return
         }
-        if (status.modelInstalled) {
-            tvModelTitle.text = getString(R.string.ai_model_broken_title)
-            tvModelHint.text = getString(R.string.ai_model_broken_hint, status.failure)
-        } else {
-            tvModelTitle.text = getString(R.string.ai_model_missing_title)
-            tvModelHint.text = getString(R.string.ai_model_missing_hint)
+        val half = ModelStore.incomplete(this).firstOrNull()
+        when {
+            // Wichtigster Fall auf dem Gerät: 740M-Datei mit 462 MB statt 1,3 GB
+            half != null -> {
+                val known = ModelStore.Variant.entries.firstOrNull { it.file == half.name }
+                tvModelTitle.text = getString(R.string.ai_model_incomplete_title)
+                tvModelHint.text = if (known != null) {
+                    getString(
+                        R.string.ai_model_incomplete_hint,
+                        half.name, (half.length() / 1048576).toInt(), known.expectedMb
+                    )
+                } else {
+                    getString(R.string.ai_model_incomplete_hint, half.name,
+                        (half.length() / 1048576).toInt(), 0)
+                }
+            }
+
+            ModelStore.hasModel(this) -> {
+                tvModelTitle.text = getString(R.string.ai_model_unavailable_title)
+                tvModelHint.text = getString(R.string.ai_model_unavailable_hint) +
+                    if (status.failure.isNotBlank()) {
+                        "\n" + getString(R.string.ai_model_diag, status.failure)
+                    } else ""
+            }
+
+            else -> {
+                tvModelTitle.text = getString(R.string.ai_model_missing_title)
+                tvModelHint.text = getString(R.string.ai_model_missing_hint)
+            }
         }
     }
 
     /** Auswahl: welches EmbeddingGemma-2-Modell geladen werden soll. */
     private fun chooseModelAndDownload() {
         val variants = ModelStore.Variant.entries
-        val labels = variants.map { v -> "${v.label}\n${v.note} · ca. ${v.sizeMb} MB" }
+        val labels = variants.map { v -> "${v.label}\n${v.note} · ca. ${v.expectedMb} MB" }
             .toTypedArray()
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.ai_model_choose)
@@ -354,7 +382,7 @@ class SearchActivity : AppCompatActivity() {
         if (!ModelStore.hasRoomFor(this, variant)) {
             MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.ai_model_no_space)
-                .setMessage(getString(R.string.ai_model_no_space_msg, variant.sizeMb))
+                .setMessage(getString(R.string.ai_model_no_space_msg, variant.expectedMb))
                 .setPositiveButton(R.string.ok, null)
                 .show()
             return
@@ -366,7 +394,7 @@ class SearchActivity : AppCompatActivity() {
         )
         val tv = findViewById<TextView>(R.id.tvModelProgress)
         bar.isIndeterminate = true
-        tv.text = getString(R.string.ai_model_starting, variant.sizeMb)
+        tv.text = getString(R.string.ai_model_starting, variant.expectedMb)
 
         Thread({
             ModelStore.download(applicationContext, variant,

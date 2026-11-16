@@ -351,4 +351,9 @@
     <string name="ai_model_manage_title">EmbeddingGemma 2</string>
     <string name="ai_index_status">Photo preparation …</string>
     <string name="ai_model_download_failed">Download failed: %1$s</string>
+    <string name="ai_model_incomplete_title">Model file incomplete – built-in word model is used</string>
+    <string name="ai_model_incomplete_hint">“%1$s” has only %2$d of %3$d MB – the download was interrupted. Load it again (it continues where it stopped) or remove the file.</string>
+    <string name="ai_model_unavailable_title">Search model not running – built-in word model is used</string>
+    <string name="ai_model_unavailable_hint">A model file is there, but it does not start. Please load the model again – or pick another variant.</string>
+    <string name="ai_model_diag">Details: %1$s</string>
 </resources>

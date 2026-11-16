@@ -22,8 +22,8 @@ android {
         applicationId = "com.n3vibecode.gallery"
         minSdk = 26
         targetSdk = 35
-        versionCode = 37
-        versionName = "1.36"
+        versionCode = 38
+        versionName = "1.37"
         resourceConfigurations += listOf("de", "en")
         vectorDrawables.useSupportLibrary = true
 
@@ -129,11 +129,21 @@ dependencies {
     implementation("com.caverock:androidsvg-aar:1.4")
 
     // Bildersuche mit **EmbeddingGemma 2** (Google AI Edge / MediaPipe Tasks).
-    // `tasks-retrieval` bringt den UniversalEmbedder mit (multimodal, LiteRT-LM) und
-    // zieht LiteRT-LM selbst mit. Rechnet auf GPU, sonst CPU – siehe ai/UniversalEmbedder.kt.
+    // `tasks-retrieval` bringt den UniversalEmbedder mit (multimodal, LiteRT-LM).
+    // Rechnet auf GPU, sonst CPU – siehe ai/GemmaEmbedder.kt.
     // WICHTIG: Ohne diese Bibliothek baut die App trotzdem – die Suche nutzt dann
     // automatisch das eingebaute Wortmodell (siehe ai/AiEngine.kt).
-    implementation("com.google.mediapipe:tasks-retrieval:latest.release")
+    implementation("com.google.mediapipe:tasks-retrieval:1.2.3")
+
+    // **Feste LiteRT-LM-Version – der eigentliche Fehler bis 1.36.**
+    // tasks-retrieval:1.2.3 deklariert selbst litertlm-android:0.17.0-alpha1, ist aber
+    // gegen eine neuere Fassung gebaut: Der Konstruktor von EmbeddingEngineConfig hat dort
+    // 9 Parameter (mit ActivationDataType), in 0.17.0-alpha1 nur 8 – die Klasse
+    // com.google.ai.edge.litertlm.ActivationDataType existiert gar nicht. Folge auf dem
+    // Gerät: „NoClassDefFoundError: com.google.ai.edge.litertlm.ActivationDataType“ und die
+    // Suche fiel auf das Wortmodell zurück. Ab 0.18.0 ist alles vorhanden (in CI geprüft:
+    // 0.18.0 / 0.18.1 / 0.19.0 / 0.19.1 – deshalb die neueste stabile).
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.19.1")
 
     // Eingebauter HEIF/AVIF-Decoder (libheif + libde265 + libdav1d).
     // Ohne ihn kann Android nur "einfache" HEICs öffnen – gekachelte Apple-Container
