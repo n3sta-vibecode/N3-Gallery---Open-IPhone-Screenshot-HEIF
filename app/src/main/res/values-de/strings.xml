@@ -273,4 +273,39 @@
     <string name="editor_save_heif_note">HEIC/HEIF lässt sich nicht überschreiben – die Kopie wird als JPEG gespeichert.</string>
     <string name="editor_share_only_msg">Die Galerie hat die Datei nicht angenommen. Das Bild liegt deshalb im Teilen-Ordner der App – über „Teilen“ kannst du es in Fotos sichern oder verschicken. Das Original bleibt unverändert.</string>
     <string name="editor_render_failed">Das bearbeitete Foto konnte nicht aufbereitet werden (zu wenig Speicher?). Versuche einen kleineren Zuschnitt.</string>
+
+    <!-- ============ Karte (offline) ============ -->
+    <string name="map_title">Karte</string>
+    <string name="map_show">Auf Karte zeigen</string>
+    <string name="map_subtitle">Offline · ohne Internet</string>
+    <string name="map_scanning">Foto-Positionen werden gelesen …</string>
+    <string name="map_scanning_count">Foto-Positionen werden gelesen … %1$d / %2$d</string>
+    <string name="map_zoom_in">Hineinzoomen</string>
+    <string name="map_zoom_out">Herauszoomen</string>
+    <string name="map_fit">Alle Fotos einpassen</string>
+    <string name="map_open_photos">Fotos zeigen</string>
+    <string name="map_photos_from">vom %1$s</string>
+    <string name="map_empty_title">Noch keine Foto-Standorte</string>
+    <string name="map_empty_hint">Fotos, die mit eingeschaltetem GPS entstanden sind, tragen ihren Ort in der Datei. Die App liest ihn direkt auf dem Gerät – Karte und Ortsnamen sind im App-Paket enthalten, es wird nichts aus dem Internet geladen.</string>
+
+    <!-- ============ Suche mit Embeddings ============ -->
+    <string name="search_ai">In eigenen Worten suchen</string>
+    <string name="search_title">Fotos suchen</string>
+    <string name="search_hint_ai">Beschreibe das Foto – z. B. Strand, Frühstück, Screenshot …</string>
+    <string name="search_idea_beach">Strand &amp; Meer</string>
+    <string name="search_idea_food">Essen</string>
+    <string name="search_idea_screenshot">Screenshot</string>
+    <string name="search_idea_person">Menschen &amp; Familie</string>
+    <string name="search_idea_mountain">Berge &amp; Schnee</string>
+    <string name="search_idea_pet">Tiere</string>
+    <string name="search_empty_title">Nichts gefunden</string>
+    <string name="search_empty_hint">Versuche andere Wörter – zum Beispiel, was auf dem Foto zu sehen ist, wann es entstanden ist oder wo. Auch Notizen und Tags, die du vergeben hast, helfen.</string>
+    <string name="ai_loading">Suche wird vorbereitet …</string>
+    <string name="ai_indexing">Fotos werden für die Suche vorbereitet … %1$d / %2$d</string>
+    <string name="ai_engine_status">%1$s %2$s (%3$s)</string>
+    <string name="ai_engine_npu">auf der NPU – am schnellsten</string>
+    <string name="ai_engine_gpu">GPU-Beschleunigung</string>
+    <string name="ai_engine_cpu">CPU – funktioniert auf jedem Gerät</string>
+    <string name="ai_engine_local">eingebautes Wortmodell – ohne Modell-Download</string>
+    <string name="fav_remove_short">Entfernen</string>
 </resources>

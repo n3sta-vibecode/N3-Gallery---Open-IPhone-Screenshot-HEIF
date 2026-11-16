@@ -299,8 +299,26 @@ object ExifRepository {
             val rows = mutableListOf<MetaRow>()
             val latLong: DoubleArray? = runCatching { e.latLong }.getOrNull()
             if (latLong != null && (latLong[0] != 0.0 || latLong[1] != 0.0)) {
+                // Ortsname offline bestimmen (GeoNames-Liste im App-Paket) – wie in Google Fotos
+                val loc = runCatching {
+                    com.n3vibecode.gallery.map.GeoIndex.load(ctx)
+                    com.n3vibecode.gallery.map.GeoIndex.nearest(latLong[0], latLong[1])
+                }.getOrNull()
+                if (loc != null) {
+                    // Ortsname (+ Entfernung, wenn das Foto nicht direkt im Ort entstand).
+                    // Der Abstandswert wird ohne Einheit eingesetzt, damit die Übersetzung
+                    // (Labels) „km entfernt“ → „km away“ sauber greifen kann.
+                    val label = loc.label()
+                    rows += if (loc.distanceKm < 1.0) {
+                        MetaRow("Ort", label)
+                    } else {
+                        MetaRow("Ort", "$label · ${Math.round(loc.distanceKm)} km entfernt")
+                    }
+                }
                 rows += MetaRow("Breitengrad", String.format(Locale.GERMAN, "%.6f° %s", Math.abs(latLong[0]), if (latLong[0] >= 0) "Nord" else "Süd"))
                 rows += MetaRow("Längengrad", String.format(Locale.GERMAN, "%.6f° %s", Math.abs(latLong[1]), if (latLong[1] >= 0) "Ost" else "West"))
+                // Tippen öffnet die Karte an dieser Stelle (siehe InfoActivity/DetailActivity)
+                rows += MetaRow("Auf Karte zeigen", "map:${latLong[0]},${latLong[1]}")
             }
             tag(rows, "GPSAltitude", "Höhe") { Fmt.rational(it)?.let { v -> "$v m" } ?: it }
             tag(rows, "GPSDateStamp", "GPS-Datum")

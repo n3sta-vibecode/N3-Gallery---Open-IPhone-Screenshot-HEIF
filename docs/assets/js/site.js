@@ -396,6 +396,21 @@
      ------------------------------------------------------------------ */
   const LOG = [
     {
+      v: '1.32', de: 'Karte, Vorschau, Gemma-Suche', en: 'Map, preview, Gemma search',
+      de_items: [
+        'Karte: alle Fotos mit GPS auf einer Karte, mit Ortsnamen („Luzern, Schweiz“) – Landflächen und 46 000 Orte liegen im App-Paket, kein Kartendienst, kein Netz.',
+        'Vorschau per Langdruck im Original-Seitenverhältnis: der hohe iPhone-Screenshot bleibt hoch, das Panorama breit – nichts beschnitten, nichts verzerrt.',
+        'Bildersuche in eigenen Worten mit Gemma-Embedding auf dem Gerät: NPU, sonst GPU, sonst CPU. Ohne Modell-Datei springt ein eingebautes Wortmodell ein.',
+        'Metadaten zeigen jetzt den Ort mit Entfernung und „Auf Karte zeigen“.'
+      ],
+      en_items: [
+        'Map: every photo with GPS on one map, with place names (“Luzern, Switzerland”) – coastlines and 46,000 places ship inside the app, no map service, no network.',
+        'Long-press preview in the original aspect ratio: the tall iPhone screenshot stays tall, the panorama stays wide – nothing cropped, nothing stretched.',
+        'Image search in your own words with on-device Gemma embedding: NPU, else GPU, else CPU. Without a model file a built-in word model steps in.',
+        'Metadata now shows the place with distance and “Show on map”.'
+      ]
+    },
+    {
       v: '1.31', de: 'SVG und SVGZ', en: 'SVG and SVGZ',
       de_items: [
         'SVG-Dateien werden angezeigt – Android kann das nicht von sich aus, dafür ist ein SVG-Renderer eingebaut.',
@@ -563,7 +578,7 @@
     'hero.h1a': 'Apple screenshots.',
     'hero.h1b': 'Finally on Android.',
     'hero.lead': 'N3 Gallery opens Apple’s tiled HEIC containers – including 10-bit, HDR and gain maps. Plus 35 RAW formats, AVIF, SVG and HEVC video. Entirely offline.',
-    'hero.note': 'Version 1.31 · 29 MB · open source',
+    'hero.note': 'Version 1.32 · 30 MB · open source',
     'hero.f1': 'No internet access',
     'hero.f2': 'No accounts',
     'hero.f3': 'No ads',
@@ -638,13 +653,19 @@
     'f7.d': 'German and English, following the rules of each language – including date and size formats.',
     'f8.t': 'Large libraries stay calm',
     'f8.d': 'Previews are created once and kept; the grid builds its rows in the background so swiping and tapping always come first.',
+    'f9.t': 'A map – without the internet',
+    'f9.d': 'Every photo with GPS on one map, with place names (“Luzern, Switzerland”). Coastlines and 46,000 places ship inside the app – no map service, no key, no network.',
+    'f10.t': 'Long press shows the whole picture',
+    'f10.d': 'The preview appears in its original aspect ratio – the tall iPhone screenshot stays tall, the panorama stays wide. Nothing cropped, nothing stretched.',
+    'f11.t': 'Image search in your own words',
+    'f11.d': 'Gemma embedding on the device, computed on the NPU: “beach holiday” finds the shot noted “summer by the sea”. Without a model file a built-in word model steps in.',
     'privacy.kicker': 'Offline',
     'privacy.claim': 'The app requests <em>no internet permission</em>. That is not a promise, it is a line that is missing from the manifest.',
     'privacy.c1': 'No <code>android.permission.INTERNET</code> in the manifest – verifiable right inside the APK.',
     'privacy.c2': 'No account, no sign-in, no cloud, no server.',
     'privacy.c3': 'No ads, no telemetry, no analytics SDK.',
     'privacy.c4': 'Notes, tags and favourites are additionally backed up outside the app – a reinstall costs nothing.',
-    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.31-release.apk | grep uses-permission</code>',
+    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.32-release.apk | grep uses-permission</code>',
     'install.kicker': 'Installation',
     'install.h2': 'Three steps onto the device.',
     'install.p': 'The app is not distributed through a store: the finished APK comes straight from the build and the signing key stays the same. That is why new versions can simply be laid over the installed one.',

@@ -549,6 +549,28 @@ object ImageLoader {
      * Schnelle Vorschau (1024 px) für die Großansicht: Antippen zeigt sofort etwas Scharfes,
      * während das Vollbild noch dekodiert. Läuft vor allen wartenden Raster-Kacheln.
      */
+    /**
+     * Wie [loadPreview], aber in einer gewünschten Größe – für die Vorschau nach langem
+     * Drücken (dort wird das Bild groß und im richtigen Seitenverhältnis gezeigt).
+     * Der Rückruf kommt garantiert im Haupt-Thread.
+     */
+    fun loadPreview(ctx: Context, item: MediaItem, sizePx: Int, onDone: (Bitmap?) -> Unit) {
+        val bucket = bucketFor(sizePx.coerceAtLeast(MICRO))
+        memGet(keyFor(item, bucket))?.let { onDone(it); return }
+        val appCtx = ctx.applicationContext
+        interactiveBusy.incrementAndGet()
+        fullPool.execute {
+            val bmp = try {
+                obtainThumb(appCtx, item, bucket, null)
+            } catch (_: Throwable) {
+                null
+            } finally {
+                interactiveBusy.decrementAndGet()
+            }
+            main.post { onDone(bmp) }
+        }
+    }
+
     fun loadPreview(ctx: Context, item: MediaItem, onDone: (Bitmap?) -> Unit) {
         memGet(keyFor(item, BUCKETS.last()))?.let { onDone(it); return }
         val appCtx = ctx.applicationContext

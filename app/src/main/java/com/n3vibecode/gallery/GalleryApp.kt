@@ -23,6 +23,8 @@ class GalleryApp : Application() {
             // Danach die Sicherung anlegen, falls noch keine da ist: So ist sie schon
             // vorhanden, bevor jemand die App deinstalliert.
             runCatching { com.n3vibecode.gallery.data.MetaBackup.saveIfAny() }
+            // Ortsliste (Karte + Ortsnamen in der Suche) im Hintergrund bereitstellen
+            runCatching { com.n3vibecode.gallery.map.GeoIndex.warmUp(this) }
         }, "n3-meta-restore").apply { priority = Thread.MIN_PRIORITY; isDaemon = true }.start()
     }
 

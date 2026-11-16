@@ -1,8 +1,6 @@
 package com.n3vibecode.gallery.ui
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.widget.LinearLayout
@@ -62,16 +60,33 @@ object MetaRenderer {
         section.rows.forEach { row ->
             val rowView = inflater.inflate(R.layout.item_meta_row, container, false)
             rowView.findViewById<TextView>(R.id.tvLabel).text = Labels.tr(context, row.label)
-            rowView.findViewById<TextView>(R.id.tvValue).text = Labels.tr(context, row.value)
+            val valueView = rowView.findViewById<TextView>(R.id.tvValue)
+            // Sonderfall „Auf Karte zeigen“: antippbar und öffnet die eingebaute Karte
+            // (ohne Internet, mit den Kartendaten aus dem App-Paket).
+            if (row.value.startsWith("map:")) {
+                val parts = row.value.removePrefix("map:").split(',')
+                val lat = parts.getOrNull(0)?.toDoubleOrNull()
+                val lon = parts.getOrNull(1)?.toDoubleOrNull()
+                if (lat != null && lon != null) {
+                    valueView.text = context.getString(R.string.map_show) + "  ›"
+                    valueView.setTextColor(context.getColor(R.color.n3_accent))
+                    valueView.setOnClickListener { v ->
+                        runCatching {
+                            v.context.startActivity(
+                                MapActivity.intentFor(v.context, lat, lon)
+                            )
+                        }
+                    }
+                    container.addView(rowView)
+                    return@forEach
+                }
+                valueView.text = "–"
+            } else {
+                valueView.text = Labels.tr(context, row.value)
+            }
             container.addView(rowView)
         }
     }
-
-    /** Karte in Google Maps öffnen – funktioniert nur, wenn die Notiz-Koordinaten vorhanden sind. */
-    fun mapIntent(lat: Double, lon: Double): Intent =
-        Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon")).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
 
     fun dp(context: Context, v: Int): Int = (v * context.resources.displayMetrics.density).toInt()
 }

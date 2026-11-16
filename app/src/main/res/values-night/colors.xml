@@ -11,4 +11,5 @@
     <color name="n3_scrim">#000000</color>
     <color name="n3_badge">#B3000000</color>
     <color name="n3_icon">#FFE6E6EE</color>
+    <color name="n3_delete">#FFFF6B6B</color>
 </resources>

@@ -21,3 +21,6 @@ keystore.properties
 
 # Das Projekt-ZIP wird auf Wunsch direkt im Ordner abgelegt (nicht im Git):
 /N3Gallery-Projekt-*.zip
+
+# Rohdaten für die Karte (nur zum Neuerzeugen nötig, siehe tools/karte/hole-daten.sh)
+tools/karte/.data/

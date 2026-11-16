@@ -73,6 +73,16 @@ class MainActivity : AppCompatActivity() {
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.action_search -> { openSearch(); true }
+                R.id.action_search_ai -> {
+                    startActivity(android.content.Intent(this, SearchActivity::class.java))
+                    true
+                }
+                R.id.action_map -> {
+                    // Gesamte Bibliothek auf der Karte zeigen
+                    ViewState.viewList = DataHub.all
+                    startActivity(android.content.Intent(this, MapActivity::class.java))
+                    true
+                }
                 R.id.action_refresh -> { reload(); true }
                 R.id.action_grid -> { openGridSizeDialog(); true }
                 R.id.action_language -> { openLanguageDialog(); true }
@@ -94,7 +104,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        searchBar.setOnClickListener { openSearch() }
+        // Tippen auf die Suchleiste = Bildersuche in eigenen Worten (Gemma-Embedding).
+        // Die klassische Suche nach Namen/Tags bleibt über das Menü erreichbar.
+        searchBar.setOnClickListener { openSearchAi() }
+        searchBar.setOnLongClickListener { openSearch(); true }
 
         // Dauerhafte Werbe-Leiste: iPhone-Screenshots / HEIC – tippen öffnet die Info
         findViewById<android.view.View>(R.id.promoBar).setOnClickListener { showAboutDialog() }
@@ -218,6 +231,11 @@ class MainActivity : AppCompatActivity() {
                 DataHub.setItems(full.items, full.hiddenByUserSelection)
             }
         }
+    }
+
+    /** Bildersuche in eigenen Worten (Embeddings auf NPU/GPU/CPU). */
+    private fun openSearchAi() {
+        startActivity(android.content.Intent(this, SearchActivity::class.java))
     }
 
     private fun openSearch() {

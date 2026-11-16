@@ -1,5 +1,57 @@
 # N3 Gallery – was neu ist
 
+## 1.32 – Karte, Vorschau im richtigen Seitenverhältnis, Bildersuche mit Gemma
+
+### 🗺️ Karte: wo sind meine Fotos entstanden?
+
+Ein neuer Knopf in der Kopfzeile (Karten-Symbol) zeigt alle Fotos auf einer **Karte**.
+Tippen auf einen Punkt zeigt Ort, Datum und die Fotos dieses Ortes; Punkte, die dicht
+beieinanderliegen, werden zu einer Blase mit Anzahl zusammengefasst.
+
+* **Ortsnamen offline:** „Luzern, Schweiz“ statt „47.0502, 8.3093“. Die Ortsliste
+  (46 000 Orte, GeoNames, CC BY 4.0) und die Landflächen (Natural Earth, gemeinfrei)
+  liegen im App-Paket (zusammen ~ 1,2 MB). Kein Kartendienst, kein Schlüssel, kein Internet.
+* **Positionen einmal gelesen, dann gespeichert:** zuerst aus dem Android-Medienindex,
+  sonst aus den EXIF-Daten der Datei. Das Ergebnis liegt in einer kleinen Datenbank –
+  die Karte ist deshalb beim zweiten Öffnen **sofort** da.
+* **Flüssig und scharf:** beim Wischen/Zoomen wird ein vorbereitetes Kartenbild bewegt,
+  sobald der Finger ruht, werden die Landflächen als Pfade scharf gezeichnet.
+  Zwei-Finger-Zoom, Verschieben, Doppeltipp, „alles einpassen“, −/+ Knöpfe.
+* In den **Metadaten** eines Fotos gibt es jetzt die Zeile „Ort“ (mit Entfernung) und
+  „Auf Karte zeigen“ – antippen öffnet die Karte genau an dieser Stelle.
+
+### 🔍 Vorschau nach langem Drücken – im richtigen Seitenverhältnis
+
+Langes Drücken auf eine Kachel zeigt das Foto groß – **vollständig und im Original-
+Seitenverhältnis** (iPhone-Screenshot 9:19,5 hochkant, Kamera 3:2, Panorama breit,
+RAW 4:3 …), nicht beschnitten und nicht verzerrt. Im Raster bleiben die Kacheln
+quadratisch (gleichmäßiges Raster wie bei Apple Fotos); die Vorschau zeigt das ganze Bild,
+begrenzt auf 58 % der Bildschirmhöhe, damit auch sehr hohe Screenshots passen.
+
+Darunter: Dateiname, Format/Größe, Datum, **Ort** (offline bestimmt) und Schnellaktionen
+(Favorit, Teilen, Bearbeiten, Details, Auf Karte zeigen, Löschen). Antippen der Vorschau
+öffnet das Foto in der Großansicht.
+
+### 🧠 Bildersuche in eigenen Worten – Gemma-Embedding, auf der NPU
+
+Tippen auf die Suchleiste öffnet die neue **Bildersuche** (Vorbild: Google Edge Gallery):
+
+* Der Suchtext wird mit einem **Embedding-Modell (Gemma / EmbeddingGemma)** in einen Vektor
+  umgerechnet, jedes Foto hat ebenfalls einen Vektor – gesucht wird nach Ähnlichkeit.
+* Beschleuniger automatisch: **NPU → GPU → CPU**. Jede Stufe wird mit einem Testlauf
+  geprüft; angezeigt wird, welche gerade rechnet („⚡ Gemma Embedding (NPU)“).
+* In den Foto-Vektor fließen alle vorhandenen Angaben ein: Notizen, Tags, Ort, Zeit
+  (Jahr/Monat/Tageszeit), Format (HEIC, RAW, Screenshot), Hochformat/Panorama, Kamera.
+  Die klassische Suche (Dateiname, Ordner, Tags) läuft immer mit.
+* **Ohne Modell-Download:** Liegt keine `.task`-Datei im App-Paket, springt ein eingebautes
+  Wort-Bedeutungsmodell ein (11 kB) – die Suche funktioniert also auf jedem Gerät sofort.
+  Wie man das volle Gemma-Modell einbindet, steht in **[README-KI.md](README-KI.md)**.
+* Der Index wird gespeichert (kein Neuberechnen nach einem Neustart) und im Hintergrund
+  aufgebaut, mit Fortschrittsanzeige.
+
+**Datenschutz unverändert:** kein Internet, keine Cloud, keine Konten. Karte, Ortsnamen und
+Modell liegen im App-Paket und rechnen auf dem Gerät.
+
 ## Produktseite im Projekt (`docs/`)
 
 Neu ist eine **Produktseite** als reine HTML-Seite ohne Bauwerkzeuge: `docs/index.html`.

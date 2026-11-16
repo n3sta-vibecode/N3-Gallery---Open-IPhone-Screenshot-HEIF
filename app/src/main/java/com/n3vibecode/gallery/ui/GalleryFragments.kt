@@ -220,28 +220,17 @@ abstract class BaseGridFragment : Fragment(), PageAware {
     @Volatile
     private var lastVisible: List<MediaItem>? = null
 
-    /** Langes Drücken: Bearbeiten, Teilen, Details, Löschen. */
+    /**
+     * Langes Drücken: **Vorschau im richtigen Seitenverhältnis** (wie auf dem iPhone) mit
+     * Ortsangabe und Schnellaktionen. Die Aktionen selbst stecken im Vorschau-Dialog
+     * (siehe [com.n3vibecode.gallery.ui.PeekPreview]).
+     */
     private fun onItemLongPress(item: MediaItem) {
-        val labels = arrayOf(
-            getString(R.string.editor_title),
-            getString(R.string.share),
-            getString(R.string.info),
-            getString(R.string.delete)
-        )
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-            .setTitle(item.name)
-            .setItems(labels) { _, which ->
-                when (which) {
-                    0 -> EditorActivity.start(requireContext(), item.uri)
-                    1 -> share(item)
-                    2 -> {
-                        val index = lastVisible?.indexOfFirst { it.uri == item.uri } ?: -1
-                        if (index >= 0) openDetail(index, item.uri)
-                    }
-                    else -> confirmDelete(item)
-                }
-            }
-            .show()
+        // Die sichtbare Liste ist die „Welt“ der Vorschau: Antippen des Bildes öffnet die
+        // Großansicht an genau dieser Stelle, „Details“ und „Karte“ arbeiten mit ihr.
+        lastVisible?.let { ViewState.viewList = it }
+        val index = lastVisible?.indexOfFirst { it.uri == item.uri } ?: -1
+        PeekPreview.show(requireActivity(), item, index)
     }
 
     // ------------------------------------------------------------------ Löschen

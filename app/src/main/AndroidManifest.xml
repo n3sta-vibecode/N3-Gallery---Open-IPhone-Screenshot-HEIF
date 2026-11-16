@@ -75,6 +75,23 @@
             android:parentActivityName=".ui.MainActivity"
             android:theme="@style/Theme.N3Gallery" />
 
+        <!-- Karte: zeigt, wo die Fotos entstanden sind (offline, ohne Kartendienst) -->
+        <activity
+            android:name=".ui.MapActivity"
+            android:exported="false"
+            android:label="@string/map_title"
+            android:parentActivityName=".ui.MainActivity"
+            android:theme="@style/Theme.N3Gallery" />
+
+        <!-- Bildersuche mit Gemma-Embedding (NPU/GPU/CPU) -->
+        <activity
+            android:name=".ui.SearchActivity"
+            android:exported="false"
+            android:label="@string/search_title"
+            android:parentActivityName=".ui.MainActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.N3Gallery" />
+
         <activity
             android:name=".ui.CollectionActivity"
             android:exported="false"

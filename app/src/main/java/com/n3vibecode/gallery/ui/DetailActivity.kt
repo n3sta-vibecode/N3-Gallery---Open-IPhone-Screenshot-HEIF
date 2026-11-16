@@ -577,5 +577,8 @@ class DetailActivity : AppCompatActivity() {
 
         /** Eindeutige Kennung des Fotos – verhindert, dass ein anderes Bild geöffnet wird. */
         const val EXTRA_URI = "uri"
+
+        /** Optionaler Titel (z. B. Ortsname, wenn die Liste von der Karte kommt). */
+        const val EXTRA_TITLE = "title"
     }
 }

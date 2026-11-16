@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.31-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3-Gallery-1.31-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.31-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3-Gallery-1.31-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.31.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3Gallery-Projekt-1.31.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.32-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.32/N3-Gallery-1.32-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.32-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.32/N3-Gallery-1.32-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.32.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.32/N3Gallery-Projekt-1.32.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -35,7 +35,19 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.31 – SVG wird angezeigt
+## 🆕 Version 1.32 – Karte, Vorschau im Seitenverhältnis, Gemma-Suche
+
+* **Karte (offline):** Wo sind meine Fotos entstanden? Mit Ortsnamen („Luzern, Schweiz“),
+  Zusammenfassung dicht beieinanderliegender Fotos, Zwei-Finger-Zoom und „auf Karte zeigen“
+  in den Metadaten. Landflächen (Natural Earth) und 46 000 Orte (GeoNames) liegen im
+  App-Paket – **kein Kartendienst, kein Schlüssel, kein Internet**.
+* **Vorschau bei langem Drücken im richtigen Seitenverhältnis:** iPhone-Screenshot hochkant,
+  Kamera 3:2, Panorama breit – vollständig statt beschnitten, mit Ort und Schnellaktionen.
+* **Bildersuche in eigenen Worten (Gemma-Embedding):** wie in Google Edge Gallery.
+  Rechnet auf der **NPU**, sonst GPU, sonst CPU. Modell-Einbindung: [README-KI.md](README-KI.md).
+  Ohne Modell-Datei nutzt die App ein eingebautes Wortmodell – die Suche funktioniert immer.
+
+## Version 1.31 – SVG wird angezeigt
 
 * **SVG und SVGZ öffnen** – Android kann das von sich aus nicht, dafür ist ein SVG-Renderer
   eingebaut.
@@ -217,6 +229,9 @@ Das komplette **Android-Studio-Projekt** liegt im Ordner `N3Gallery/`
 | **Detailansicht** | Vollbild, Wischen zwischen Bildern, Info-Blatt hochziehen, Favorit, Teilen, Löschen, „EXIF kopieren“, Tippen blendet Bedienelemente aus |
 | **Metadaten** | Datei & Format, **Sensor & Aufnahme**, Kamera & Optik, **GPS**, **RAW/DNG-Details**, **HEIF/AVIF-Containertechnik**, Notizen/XMP + Rohdump **aller** EXIF-Felder |
 | **Notizen & Tags** | Werden als **echte EXIF/XMP-Metadaten in die Bilddatei geschrieben** (ImageDescription, UserComment, XMP dc:description/dc:subject) |
+| **Karte** | Alle Fotos mit GPS auf einer Karte – mit Ortsnamen („Luzern, Schweiz“), Zusammenfassung dicht beieinanderliegender Fotos, Zwei-Finger-Zoom. Landflächen (Natural Earth) und 46 000 Orte (GeoNames) liegen im App-Paket: **kein Kartendienst, kein Schlüssel, kein Internet** |
+| **Vorschau (langes Drücken)** | Zeigt das Foto **vollständig im Original-Seitenverhältnis** (iPhone-Screenshot hochkant, Panorama breit …), nichts beschnitten – mit Ort und Schnellaktionen (Favorit, Teilen, Bearbeiten, Details, Karte, Löschen) |
+| **Bildersuche** | Suche in eigenen Worten („strandurlaub“, „rechnung vom montag“) mit **Gemma-Embedding auf dem Gerät** – rechnet auf der **NPU**, sonst GPU, sonst CPU. Index wird gespeichert; ohne Modell-Datei springt ein eingebautes Wortmodell ein (siehe [README-KI.md](README-KI.md)) |
 
 ### Warum HEIC/HEIF jetzt immer geht (Fix in 1.1)
 
@@ -378,6 +393,9 @@ Geräte unproblematisch, für eine kommerzielle Veröffentlichung im Play Store 
 * `ACCESS_MEDIA_LOCATION` (ungezensierte GPS-Daten)
 * `WRITE_EXTERNAL_STORAGE` (nur Android ≤ 10, fürs Metadaten-Schreiben)
 * **Kein** Internet, **kein** Netzwerkzugriff, **keine** Analyse-Bibliotheken
+
+Karte, Ortsnamen und das KI-Modell liegen im App-Paket und rechnen ausschließlich auf dem
+Gerät – auch die Bildersuche braucht kein Netz (siehe [README-KI.md](README-KI.md)).
 
 ---
 

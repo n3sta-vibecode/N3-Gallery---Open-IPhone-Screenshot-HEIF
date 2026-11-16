@@ -59,7 +59,27 @@ object DataHub {
         notifyChanged()
     }
 
-    fun find(uri: String): MediaItem? = all.firstOrNull { it.uri == uri }
+    fun find(uri: String): MediaItem? = byUri()[uri]
+
+    /**
+     * Zuordnung uri → Foto, einmal aufgebaut und bei jeder neuen Liste erneuert.
+     *
+     * Wichtig für die Karte und die Bildersuche: dort werden Positionen/Vektoren über alle
+     * Fotos gehalten. Mit [find] (lineare Suche) wäre das bei 20 000 Fotos quadratisch –
+     * also Millionen Vergleiche pro Kartenaufbau. Mit dieser Zuordnung ist es ein Zugriff.
+     */
+    fun byUri(): Map<String, MediaItem> {
+        val snapshot = all
+        byUriCache?.let { cached ->
+            if (cached.first === snapshot) return cached.second
+        }
+        val map = HashMap<String, MediaItem>(snapshot.size * 2)
+        snapshot.forEach { map[it.uri] = it }
+        byUriCache = snapshot to map
+        return map
+    }
+
+    @Volatile private var byUriCache: Pair<List<MediaItem>, Map<String, MediaItem>>? = null
 
     fun visible(base: List<MediaItem>): List<MediaItem> {
         val q = query.trim()

@@ -157,6 +157,9 @@ object Labels {
         "Nord" to "North",
         "Ost" to "East",
         "West" to "West",
+        "Ort" to "Place",
+        "Auf Karte zeigen" to "Show on map",
+        "km entfernt" to "km away",
         "Eingebettetes Kamerabild (größter JPEG-Block der Datei)" to
             "Embedded camera image (largest JPEG block in the file)",
         "Android-Medienindex" to "Android media index",
