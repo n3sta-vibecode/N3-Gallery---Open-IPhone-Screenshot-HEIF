@@ -273,13 +273,10 @@ internal class GemmaEmbedder(
                 val ctor = cls.declaredConstructors.maxByOrNull { it.parameterTypes.size }
                     ?: cls.getDeclaredConstructor()
                 ctor.isAccessible = true
-                val args = ctor.parameterTypes.map { type ->
-                    when {
-                        type == java.lang.Integer.TYPE || type == Int::class.javaObjectType -> null
-                        type == java.lang.Boolean.TYPE -> null
-                        else -> null
-                    }
-                }.toTypedArray()
+                // Alle Parameter bleiben auf ihren Standardwerten (null = Kotlin-Default).
+                // Wichtig: Array<Any?>, sonst leitet Kotlin Array<Nothing?> ab und der
+                // Compiler lehnt das ab ("not supported on the JVM").
+                val args = arrayOfNulls<Any?>(ctor.parameterTypes.size)
                 ctor.newInstance(*args)
             }.getOrElse {
                 error("Backend.$backendName nicht verfügbar")
