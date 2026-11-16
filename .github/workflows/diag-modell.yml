@@ -1,0 +1,143 @@
+name: Modell-Umgebung messen
+
+# Diagnose-Werkzeug: prüft, welche Klassen im ausgelieferten MediaPipe-Paket wirklich
+# vorhanden sind und welche Größe die Modelldateien auf dem Server haben.
+#
+# Warum: Die App baut die Engine per Reflection. Wenn eine Klasse fehlt, die MediaPipe
+# intern braucht (z. B. com.google.ai.edge.litertlm.ActivationDataType), scheitert der
+# Start mit einer Meldung, die auf dem Gerät nur als Klassenname ankommt. Dieses Werkzeug
+# schaut direkt in das AAR, das Gradle für die App auflöst – und schreibt die Fakten als
+# Commit-Kommentar heraus, damit man sie ohne Runner-Logs lesen kann.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'arena/**'
+    paths:
+      - '.github/workflows/diag-modell.yml'
+
+jobs:
+  messen:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Abhängigkeiten auflösen
+        shell: bash
+        run: |
+          # Nur auflösen, nicht bauen – das AAR landet dabei im Gradle-Cache.
+          ./gradlew :app:dependencies --configuration releaseRuntimeClasspath --no-daemon \
+            > /tmp/deps.txt 2>&1 || true
+          grep -iE "mediapipe|litert" /tmp/deps.txt | sort -u > /tmp/deps-mediapipe.txt || true
+
+      - name: AAR untersuchen
+        shell: bash
+        run: |
+          set -u
+          OUT=/tmp/bericht.md
+          echo "## Modell-Umgebung" > "$OUT"
+          echo "" >> "$OUT"
+
+          echo "### 1. Aufgelöste Abhängigkeiten" >> "$OUT"
+          echo '```' >> "$OUT"
+          cat /tmp/deps-mediapipe.txt >> "$OUT"
+          echo '```' >> "$OUT"
+          echo "" >> "$OUT"
+
+          # Verfügbare Versionen laut Google Maven
+          echo "### 2. Veröffentlichte Versionen (tasks-retrieval)" >> "$OUT"
+          echo '```' >> "$OUT"
+          curl -sS -m 60 "https://dl.google.com/dl/android/maven2/com/google/mediapipe/tasks-retrieval/maven-metadata.xml" \
+            | tr '>' '>\n' | grep -oE "[0-9]+\.[0-9]+\.[0-9]+[^<]*" | tail -25 >> "$OUT" || echo "nicht erreichbar" >> "$OUT"
+          echo '```' >> "$OUT"
+          echo "" >> "$OUT"
+
+          # Das AAR aus dem Cache holen
+          AAR=$(find ~/.gradle/caches -name "tasks-retrieval-*.aar" 2>/dev/null | head -1)
+          echo "AAR: ${AAR:-nicht gefunden}" >> "$OUT"
+          if [ -n "${AAR:-}" ]; then
+            VERSION=$(basename "$AAR" | sed 's/tasks-retrieval-//; s/\.aar$//')
+            echo "Aufgelöste Version: $VERSION" >> "$OUT"
+            rm -rf /tmp/aar && mkdir -p /tmp/aar && cd /tmp/aar && unzip -q "$AAR"
+            echo "" >> "$OUT"
+            echo "### 3. Enthält das AAR selbst LiteRT-LM-Klassen?" >> "$OUT"
+            echo '```' >> "$OUT"
+            unzip -l classes.jar | grep -E "ai/edge/litertlm" | awk '{print $4}' | head -40 >> "$OUT" || echo "keine" >> "$OUT"
+            echo '```' >> "$OUT"
+            echo "" >> "$OUT"
+            echo "### 4. UniversalEmbedder-Klassen" >> "$OUT"
+            echo '```' >> "$OUT"
+            unzip -l classes.jar | grep -E "UniversalEmbedder" | awk '{print $4}' >> "$OUT" || echo "keine" >> "$OUT"
+            echo '```' >> "$OUT"
+            echo "" >> "$OUT"
+          fi
+
+          # Transitive LiteRT-LM-Abhängigkeit (separates Artefakt?)
+          echo "### 5. LiteRT-LM als eigenes Artefakt im Cache" >> "$OUT"
+          echo '```' >> "$OUT"
+          find ~/.gradle/caches -iname "*litertlm*" 2>/dev/null | head -20 >> "$OUT" || true
+          find ~/.gradle/caches -iname "*litert-lm*" 2>/dev/null | head -20 >> "$OUT" || true
+          echo '```' >> "$OUT"
+          echo "" >> "$OUT"
+
+          # Signaturen der Klassen, die die App per Reflection braucht
+          if [ -f /tmp/aar/classes.jar ]; then
+            echo "### 6. Signaturen (javap)" >> "$OUT"
+            echo '```' >> "$OUT"
+            cd /tmp/aar
+            for C in \
+              com.google.mediapipe.tasks.core.BaseOptions\$Builder \
+              com.google.mediapipe.tasks.retrieval.universalembedder.UniversalEmbedderOptions\$Builder \
+              com.google.mediapipe.tasks.retrieval.universalembedder.UniversalEmbedder \
+              com.google.ai.edge.litertlm.EmbeddingEngineConfig \
+              com.google.ai.edge.litertlm.ActivationDataType ; do
+              echo "--- $C" >> "$OUT"
+              javap -classpath classes.jar "$C" 2>&1 | head -25 >> "$OUT"
+            done
+            echo '```' >> "$OUT"
+            echo "" >> "$OUT"
+          fi
+
+          # Modelldateien: erreichbar? Größe? HTML statt Datei?
+          echo "### 7. Modelldateien auf dem Server" >> "$OUT"
+          echo '```' >> "$OUT"
+          for U in \
+            "https://huggingface.co/litert-community/embeddinggemma-2-text-270m-litert-lm/resolve/main/embeddinggemma-2-text-270m.litertlm" \
+            "https://huggingface.co/litert-community/embeddinggemma-2-text-vision-440m-litert-lm/resolve/main/embeddinggemma-2-text-vision-440m.litertlm" \
+            "https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm/resolve/main/embeddinggemma-2-740m.litertlm" ; do
+            echo "URL: $U" >> "$OUT"
+            curl -sSL -m 120 -o /dev/null \
+              -w "  HTTP %{http_code} · %{size_download} Bytes · Typ %{content_type} · %{url_effective}\n" \
+              -r 0-0 "$U" 2>&1 | sed 's/%/%%/g' >> "$OUT" || echo "  nicht erreichbar" >> "$OUT"
+            # Gesamtgröße über HEAD
+            curl -sSIL -m 60 "$U" 2>/dev/null | grep -iE "^content-length|^content-type" | tail -2 >> "$OUT" || true
+          done
+          echo '```' >> "$OUT"
+
+          echo "" >> "$OUT"
+          echo "_Automatisch erzeugt von diag-modell.yml_" >> "$OUT"
+          head -c 60000 /tmp/bericht.md > /tmp/bericht-kurz.md || true
+
+      - name: Bericht als Commit-Kommentar ablegen
+        if: always()
+        shell: bash
+        run: |
+          test -f /tmp/bericht-kurz.md || echo "kein Bericht entstanden" > /tmp/bericht-kurz.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+            -F body=@/tmp/bericht-kurz.md -f path= >/dev/null \
+            && echo "Kommentar geschrieben" \
+            || echo "::error::Kommentar konnte nicht geschrieben werden"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
