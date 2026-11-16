@@ -182,7 +182,7 @@ object SearchIndex {
 
             // Ist das Modell überhaupt benutzbar? Sonst bleibt der Index leer und der Grund
             // steht in der Suchseite – statt still mit falschen Treffern zu arbeiten.
-            if (AiEngine.embed(PROBE).isNullOrEmpty()) {
+            if ((AiEngine.embed(PROBE)?.size ?: 0) == 0) {
                 lastProblem = AiEngine.failureReason().ifBlank {
                     "Das Suchmodell liefert keine Vektoren."
                 }
