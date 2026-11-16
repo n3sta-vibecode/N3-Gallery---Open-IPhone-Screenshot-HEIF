@@ -97,6 +97,34 @@ jobs:
 
           head -c 60000 "$OUT" > /tmp/bericht-kurz.md 2>/dev/null || echo "kein Bericht" > /tmp/bericht-kurz.md
 
+      - name: APK-Inhalt prüfen (Klassen wirklich enthalten?)
+        shell: bash
+        continue-on-error: true
+        run: |
+          set +e +o pipefail
+          OUT=/tmp/bericht-apk.md
+          APK=$(ls app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)
+          {
+            echo "## APK: sind die LiteRT-LM-Klassen drin?"
+            echo '```'
+            if [ -z "$APK" ]; then
+              echo "kein APK gefunden (Diagnose-Workflow baut keins)"
+            else
+              echo "APK: $APK"
+              # dex-Dateien nach Klassennamen durchsuchen
+              rm -rf /tmp/apk && mkdir -p /tmp/apk && cd /tmp/apk && unzip -oq "$APK" 'classes*.dex' 2>/dev/null
+              ls -l /tmp/apk
+              for K in ActivationDataType EmbeddingEngineConfig UniversalEmbedder; do
+                echo -n "$K: "
+                strings /tmp/apk/classes*.dex 2>/dev/null | grep -c "$K"
+              done
+              echo "--- native Bibliotheken:"
+              unzip -l "$APK" | grep -E "lib/.*\.so" | awk '{print $4}' | sed 's|lib/||; s|/.*||' | sort -u
+            fi
+            echo '```'
+          } > "$OUT" 2>&1
+          cat "$OUT" >> /tmp/bericht-kurz.md 2>/dev/null || cp "$OUT" /tmp/bericht-kurz.md
+
       - name: Bericht als Commit-Kommentar ablegen
         if: always()
         shell: bash
