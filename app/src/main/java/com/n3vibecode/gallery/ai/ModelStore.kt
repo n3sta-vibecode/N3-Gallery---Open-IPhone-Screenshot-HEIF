@@ -75,8 +75,14 @@ object ModelStore {
             484_622_336L
         );
 
-        /** Erwartete Größe in MB (gerundet) – für Anzeige und Platzprüfung. */
-        val expectedMb: Int get() = if (bytes > 0) (bytes / 1048576).toInt() else sizeMb
+        /**
+         * Erwartete Größe in MB – für Anzeige und Platzprüfung.
+         *
+         * Gerundet, nicht abgeschnitten: 387 710 976 B sind 369,75 MiB und werden als 370 MB
+         * angezeigt (Abschneiden ergäbe 369 – der Unit-Test hat das aufgedeckt).
+         */
+        val expectedMb: Int
+            get() = if (bytes > 0) Math.round(bytes / 1048576.0).toInt() else sizeMb
     }
 
     private val EXTENSIONS = listOf(".litertlm", ".task", ".tflite")
