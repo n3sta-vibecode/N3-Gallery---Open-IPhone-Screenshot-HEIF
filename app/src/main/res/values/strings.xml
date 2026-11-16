@@ -370,7 +370,6 @@
     <string name="share_received_hint">Shared photo received. Use the menu to save it to the gallery.</string>
     <string name="share_save">Save to gallery</string>
     <string name="share_saved">Saved: %1$s</string>
-    <string name="share_failed">Could not take over the photo: %1$s</string>
     <string name="share_open_in_app">Open in app</string>
     <string name="meta_note">Note</string>
     <string name="meta_tags">Tags</string>
@@ -378,4 +377,5 @@
     <string name="map_no_place_hint">The camera did not write GPS data (or location was switched off). Tap to open the map of all photos.</string>
     <string name="tab_title">Photos</string>
     <string name="nav_menu">Menu</string>
+    <string name="share_in_failed">Taken over failed: %1$s</string>
 </resources>

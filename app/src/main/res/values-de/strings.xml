@@ -369,7 +369,6 @@
     <string name="share_received_hint">Geteiltes Foto übernommen. Über das Menü in die Galerie speichern.</string>
     <string name="share_save">In Galerie speichern</string>
     <string name="share_saved">Gespeichert: %1$s</string>
-    <string name="share_failed">Foto konnte nicht übernommen werden: %1$s</string>
     <string name="share_open_in_app">In der App öffnen</string>
     <string name="meta_note">Notiz</string>
     <string name="meta_tags">Tags</string>
@@ -377,4 +376,5 @@
     <string name="map_no_place_hint">Die Kamera hat keine GPS-Daten geschrieben (oder der Ort war aus). Antippen öffnet die Karte aller Fotos.</string>
     <string name="tab_title">Bilder</string>
     <string name="nav_menu">Menü</string>
+    <string name="share_in_failed">Übernahme fehlgeschlagen: %1$s</string>
 </resources>

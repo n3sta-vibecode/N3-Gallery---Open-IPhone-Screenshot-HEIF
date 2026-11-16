@@ -66,7 +66,7 @@ class ShareInActivity : AppCompatActivity() {
             recycler.visibility = View.GONE
             btnSave.isEnabled = false
             btnOpen.isEnabled = false
-            tvHint.text = getString(R.string.share_failed, "kein Bild erhalten")
+            tvHint.text = getString(R.string.share_in_failed, "kein Bild erhalten")
         }
 
         btnSave.setOnClickListener { save() }
@@ -168,7 +168,7 @@ class ShareInActivity : AppCompatActivity() {
                 if (saved.isEmpty()) {
                     Toast.makeText(
                         this,
-                        getString(R.string.share_failed, errors.firstOrNull() ?: "unbekannt"),
+                        getString(R.string.share_in_failed, errors.firstOrNull() ?: "unbekannt"),
                         Toast.LENGTH_LONG
                     ).show()
                     return@runOnUiThread
