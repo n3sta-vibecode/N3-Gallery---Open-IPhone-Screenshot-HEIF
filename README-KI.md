@@ -68,7 +68,8 @@ einem Testlauf**:
 
 > **Zur NPU:** EmbeddingGemma 1 ließ sich über den `TextEmbedder` noch mit `Delegate.NPU`
 > ansprechen. EmbeddingGemma 2 läuft über LiteRT-LM, das in MediaPipe nur GPU und CPU
-> anbietet – die NPU wird dort (Stand 1.37) nicht adressiert. Sobald Google das freigibt,
+> anbietet – die NPU wird dort nicht adressiert. **Seit 1.38** probiert die App deshalb
+> zuerst `Backend.NPU` von LiteRT-LM direkt (mit Testlauf und Rückfall auf GPU → CPU).
 > kommt die Stufe in `GemmaEmbedder.create` einfach vor die GPU.
 
 ## 4. Was in den Foto-Vektor einfließt

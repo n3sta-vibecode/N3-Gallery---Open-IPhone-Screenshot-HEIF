@@ -361,4 +361,21 @@
     <string name="ai_selftest_ok">OK · %1$s</string>
     <string name="ai_selftest_failed">FAILED · %1$s</string>
     <string name="ai_selftest_nomodel">No complete model file found.</string>
+    <string name="key_facts">Key facts</string>
+    <string name="meta_when">When</string>
+    <string name="meta_format">Format</string>
+    <string name="meta_resolution">Resolution</string>
+    <string name="meta_file_size">File size</string>
+    <string name="share_received">Opened from another app</string>
+    <string name="share_received_hint">Shared photo received. Use the menu to save it to the gallery.</string>
+    <string name="share_save">Save to gallery</string>
+    <string name="share_saved">Saved: %1$s</string>
+    <string name="share_failed">Could not take over the photo: %1$s</string>
+    <string name="share_open_in_app">Open in app</string>
+    <string name="meta_note">Note</string>
+    <string name="meta_tags">Tags</string>
+    <string name="map_no_place_title">No location stored in this photo</string>
+    <string name="map_no_place_hint">The camera did not write GPS data (or location was switched off). Tap to open the map of all photos.</string>
+    <string name="tab_title">Photos</string>
+    <string name="nav_menu">Menu</string>
 </resources>

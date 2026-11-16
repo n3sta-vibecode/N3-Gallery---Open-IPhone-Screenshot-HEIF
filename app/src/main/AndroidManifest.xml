@@ -50,6 +50,20 @@
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <!-- Fotos aus anderen Apps ANNEHMEN: „Teilen“ in Galerie/Kamera/Messenger.
+                 Einzelbild (SEND) und mehrere Bilder (SEND_MULTIPLE) landen in der
+                 Übernahme-Ansicht (ShareInActivity). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
@@ -90,6 +104,13 @@
             android:theme="@style/Theme.N3Gallery" />
 
         <!-- Bildersuche mit Gemma-Embedding (NPU/GPU/CPU) -->
+        <activity
+            android:name=".ui.ShareInActivity"
+            android:exported="false"
+            android:label="@string/share_received"
+            android:parentActivityName=".ui.MainActivity"
+            android:theme="@style/Theme.N3Gallery" />
+
         <activity
             android:name=".ui.SearchActivity"
             android:exported="false"

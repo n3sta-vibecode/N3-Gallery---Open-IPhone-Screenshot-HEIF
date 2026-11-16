@@ -152,6 +152,34 @@ class ReflectTest {
         assertEquals("innen", Reflect.human(aussen))
     }
 
+    /**
+     * NPU-Erkennung: Die Vorprüfung darf nur bei Geräten anspringen, die überhaupt eine NPU
+     * haben könnten – sonst zahlt jedes Telefon einen fehlschlagenden NPU-Versuch.
+     * (Geprüft wird die reine Namenslogik, nicht das Gerät.)
+     */
+    private fun npuVerdacht(hardware: String): Boolean {
+        val known = listOf(
+            "qcom", "qualcomm", "sm8", "sm7", "tensor", "google", "mediatek", "mt6", "mt8",
+            "exynos", "s5e", "kirin", "unisoc"
+        )
+        val device = hardware.lowercase()
+        return known.any { device.contains(it) }
+    }
+
+    @Test
+    fun npuWirdBeiBekanntenSocsErkannt() {
+        assertTrue(npuVerdacht("qcom sm8650"))
+        assertTrue(npuVerdacht("Google Tensor G4"))
+        assertTrue(npuVerdacht("Mediatek MT6989"))
+        assertTrue(npuVerdacht("samsung exynos 2400"))
+    }
+
+    @Test
+    fun npuWirdOhneHinweisNichtAngenommen() {
+        assertTrue(!npuVerdacht("unknown"))
+        assertTrue(!npuVerdacht(""))
+    }
+
     @Test
     fun unbekannterFehlerFaelltNichtAus() {
         assertEquals("unbekannter Fehler", Reflect.human(null))

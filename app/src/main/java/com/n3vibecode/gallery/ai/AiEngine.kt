@@ -25,6 +25,7 @@ object AiEngine {
 
     /** Beschleunigung, mit der die Suche gerade rechnet. */
     enum class Accelerator(val label: String) {
+        // NPU nur, wenn LiteRT-LM sie wirklich nutzt (Android stellt sie nicht einheitlich bereit)
         NPU("NPU"),
         GPU("GPU"),
         CPU("CPU"),

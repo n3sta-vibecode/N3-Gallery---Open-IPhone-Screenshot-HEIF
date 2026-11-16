@@ -63,7 +63,14 @@ object MetaRenderer {
      * antippen öffnet sie groß. Ohne Position im Foto entfällt der Block.
      */
     private fun addMapCard(context: Context, container: LinearLayout, meta: MediaMeta) {
-        val point = meta.mapPoint ?: return
+        val point = meta.mapPoint
+        if (point == null) {
+            // „Karte bei jedem Foto“: Ist im Foto kein Ort gespeichert, steht hier trotzdem ein
+            // Karten-Block – mit der Wahrheit („kein Ort gespeichert“) und dem Weg zur Karte.
+            // Vorher fehlte der Block komplett, was wie ein Fehler aussah.
+            addNoMapCard(context, container)
+            return
+        }
         val height = dp(context, 190)
         val frame = FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -111,6 +118,38 @@ object MetaRenderer {
             }
         }
         container.addView(hint)
+    }
+
+    /** Karten-Platzhalter für Fotos ohne Ortsangabe – gleiche Höhe, klare Aussage. */
+    private fun addNoMapCard(context: Context, container: LinearLayout) {
+        val box = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(context, 10) }
+            setBackgroundResource(R.drawable.bg_map_card)
+            setPadding(dp(context, 14), dp(context, 14), dp(context, 14), dp(context, 14))
+            isClickable = true
+            setOnClickListener {
+                runCatching { context.startActivity(android.content.Intent(context, MapActivity::class.java)) }
+            }
+        }
+        val title = TextView(context).apply {
+            text = context.getString(R.string.map_no_place_title)
+            setTextColor(context.getColor(R.color.n3_on_bg))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPaintFlags(paintFlags or android.graphics.Paint.FAKE_BOLD_TEXT_FLAG)
+        }
+        val sub = TextView(context).apply {
+            text = context.getString(R.string.map_no_place_hint)
+            setTextColor(context.getColor(R.color.n3_on_surface_variant))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
+            setPadding(0, dp(context, 4), 0, 0)
+        }
+        box.addView(title)
+        box.addView(sub)
+        container.addView(box)
     }
 
     private fun addSection(context: Context, container: LinearLayout, inflater: LayoutInflater, section: MetaSection) {

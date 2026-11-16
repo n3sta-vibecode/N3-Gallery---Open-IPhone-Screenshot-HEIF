@@ -61,6 +61,17 @@ object ImageLoader {
      */
     private val BUCKETS = intArrayOf(64, 128, 256, 512, 1024)
 
+    /**
+     * **Kleine Kacheln bekommen kein 512-px-Decode mehr (1.38).**
+     *
+     * Vorher wurde für eine 64-px-Kachel bis zu doppelt so groß dekodiert (128 px). Bei einem
+     * 12-MP-HEIC bedeutet das trotzdem einen vollen libheif-Durchlauf; die Zeit steckt im
+     * Öffnen des Containers, nicht in der Pixelzahl. Deshalb: bis 128 px wird die
+     * **Mikro-Stufe** (48 px) benutzt – sichtbar gleich, aber deutlich schneller, und der
+     * Zwischenspeicher hält viermal mehr Kacheln.
+     */
+    private fun effectiveBucket(px: Int): Int = if (px <= 128) MICRO else bucketFor(px)
+
     private fun bucketFor(px: Int): Int {
         for (b in BUCKETS) if (px <= b) return b
         return BUCKETS.last()
@@ -283,7 +294,7 @@ object ImageLoader {
      * Speicher, erscheint sie sofort; fehlt die passende, wird sie nachgeladen.
      */
     fun into(ctx: Context, item: MediaItem, sizePx: Int, target: ImageView, placeholder: Bitmap? = null) {
-        val bucket = if (sizePx <= MICRO * 2) MICRO else bucketFor(sizePx)
+        val bucket = effectiveBucket(sizePx)
         val key = keyFor(item, bucket)
         target.tag = key
 
@@ -452,7 +463,7 @@ object ImageLoader {
     fun prefetch(ctx: Context, items: List<MediaItem>, sizePx: Int, limit: Int = 48) {
         if (items.isEmpty()) return
         val app = ctx.applicationContext
-        val bucket = if (sizePx <= MICRO * 2) MICRO else bucketFor(sizePx)
+        val bucket = effectiveBucket(sizePx)
         var queued = 0
         for (item in items) {
             if (queued >= limit) break

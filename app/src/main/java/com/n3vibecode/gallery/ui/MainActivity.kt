@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tabLayout: com.google.android.material.tabs.TabLayout
+    private lateinit var bottomNav: com.google.android.material.bottomnavigation.BottomNavigationView
     private lateinit var pager: androidx.viewpager2.widget.ViewPager2
     private lateinit var progress: com.google.android.material.progressindicator.LinearProgressIndicator
     private lateinit var searchBar: com.google.android.material.search.SearchBar
@@ -52,17 +53,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         toolbar = findViewById(R.id.toolbar)
-        // Voller App-Name in der Kopfzeile (zwei Zeilen, damit nichts abgeschnitten wird)
-        runCatching {
-            for (i in 0 until toolbar.childCount) {
-                val v = toolbar.getChildAt(i)
-                if (v is android.widget.TextView) {
-                    v.isSingleLine = false
-                    v.maxLines = 2
-                    v.textSize = 14f
-                }
-            }
-        }
+        // 1.38: Kopfzeile wie in einer normalen Foto-App – großer Titel „Bilder“, darunter
+        // die eine Suchleiste, rechts Karte und ⋮. Kein Quetschen mehr auf 14 sp. 
         searchBar = findViewById(R.id.searchBar)
         tabLayout = findViewById(R.id.tabLayout)
         pager = findViewById(R.id.viewPager)
@@ -137,17 +129,38 @@ class MainActivity : AppCompatActivity() {
         TabLayoutMediator(tabLayout, pager) { tab, position -> tab.text = titles[position] }.attach()
         applyPageVisibility(pager.currentItem)
 
+        // 1.38: gewechselt wird unten (Bilder / Alben / Formate / Sammlungen / Menü).
+        // „Menü“ ist kein Tab, sondern öffnet die ⋮-Liste – wie in Google Photos.
+        bottomNav = findViewById(R.id.bottomNav)
+        bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_photos -> { pager.setCurrentItem(0, false); true }
+                R.id.nav_albums -> { pager.setCurrentItem(3, false); true }
+                R.id.nav_formats -> { pager.setCurrentItem(2, false); true }
+                R.id.nav_tags -> { pager.setCurrentItem(1, false); true }
+                R.id.nav_menu -> { toolbar.showOverflowMenu(); true }
+                else -> false
+            }
+        }
+        pager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                val id = when (position) {
+                    1 -> R.id.nav_tags
+                    2 -> R.id.nav_formats
+                    3 -> R.id.nav_albums
+                    else -> R.id.nav_photos
+                }
+                if (bottomNav.selectedItemId != id) bottomNav.selectedItemId = id
+            }
+        })
+
         ensurePermissionsThenLoad()
 
-        if (intent?.action == Intent.ACTION_VIEW) handleViewIntent(intent)
+        forwardSharedIntent(intent)
 
         maybeShowWelcome()
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        handleViewIntent(intent)
-    }
 
     private fun ensurePermissionsThenLoad() {
         val needed = requiredPermissions().filter {
@@ -177,6 +190,44 @@ class MainActivity : AppCompatActivity() {
     private fun applyPageVisibility(current: Int) {
         pages.forEach { (position, fragment) ->
             (fragment as? PageAware)?.setPageActive(position == current)
+        }
+    }
+
+    /**
+     * Fotos aus anderen Apps: „Teilen“ und „Öffnen mit“ landen hier (Intent-Filter im
+     * Manifest) und werden an die Übernahme-Ansicht weitergereicht. Wichtig ist
+     * `onNewIntent`, weil die App meist schon läuft – sonst ginge ein zweites geteiltes
+     * Foto verloren.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        forwardSharedIntent(intent)
+    }
+
+    private fun forwardSharedIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action ?: return
+        if (action == Intent.ACTION_VIEW && intent.data != null) {
+            // „Öffnen mit“: das Bild direkt groß zeigen (bisheriges Verhalten)
+            handleViewIntent(intent)
+            return
+        }
+        if (action == Intent.ACTION_SEND || action == Intent.ACTION_SEND_MULTIPLE) {
+            val next = Intent(this, ShareInActivity::class.java).apply {
+                this.action = action
+                intent.data?.let { data = it }
+                intent.clipData?.let { clipData = it }
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let {
+                    putExtra(Intent.EXTRA_STREAM, it)
+                }
+                @Suppress("DEPRECATION")
+                intent.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let {
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, it)
+                }
+            }
+            startActivity(next)
         }
     }
 

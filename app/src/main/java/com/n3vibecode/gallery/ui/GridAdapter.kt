@@ -74,10 +74,13 @@ class GridAdapter(
     private fun measureTiles(anyView: View?) {
         val res = anyView?.resources ?: appResources ?: return
         val dm = res.displayMetrics
-        val w = (dm.widthPixels - 24 * dm.density) / spanCount
+        // 1.38: randloses Raster – die 3-dp-Ränder des Recyclers werden mitgerechnet,
+        // damit die Kacheln wirklich bis an den Bildschirmrand gehen.
+        val w = (dm.widthPixels - 6 * dm.density) / spanCount
         thumbPx = (w * 1.3f).toInt().coerceIn(64, 1024)
         tiny = spanCount >= 12
-        padPx = if (tiny) 1 else dm.density.toInt().coerceAtLeast(1)
+        // Randlos wie in einer Foto-App: nur ein Hauch Abstand, nie mehr als 1 dp.
+        padPx = if (tiny) 0 else (dm.density * 0.5f).toInt().coerceAtLeast(0)
     }
 
     private var appResources: android.content.res.Resources? = null

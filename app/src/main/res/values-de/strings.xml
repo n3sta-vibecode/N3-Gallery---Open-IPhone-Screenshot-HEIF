@@ -360,4 +360,21 @@
     <string name="ai_selftest_ok">OK · %1$s</string>
     <string name="ai_selftest_failed">FEHLGESCHLAGEN · %1$s</string>
     <string name="ai_selftest_nomodel">Keine vollständige Modelldatei gefunden.</string>
+    <string name="key_facts">Wichtigste Angaben</string>
+    <string name="meta_when">Wann</string>
+    <string name="meta_format">Format</string>
+    <string name="meta_resolution">Auflösung</string>
+    <string name="meta_file_size">Dateigröße</string>
+    <string name="share_received">Aus anderer App geöffnet</string>
+    <string name="share_received_hint">Geteiltes Foto übernommen. Über das Menü in die Galerie speichern.</string>
+    <string name="share_save">In Galerie speichern</string>
+    <string name="share_saved">Gespeichert: %1$s</string>
+    <string name="share_failed">Foto konnte nicht übernommen werden: %1$s</string>
+    <string name="share_open_in_app">In der App öffnen</string>
+    <string name="meta_note">Notiz</string>
+    <string name="meta_tags">Tags</string>
+    <string name="map_no_place_title">In diesem Foto ist kein Ort gespeichert</string>
+    <string name="map_no_place_hint">Die Kamera hat keine GPS-Daten geschrieben (oder der Ort war aus). Antippen öffnet die Karte aller Fotos.</string>
+    <string name="tab_title">Bilder</string>
+    <string name="nav_menu">Menü</string>
 </resources>

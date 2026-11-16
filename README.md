@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.37-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.37/N3-Gallery-1.37-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.37-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.37/N3-Gallery-1.37-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.37.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.37/N3Gallery-Projekt-1.37.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.38-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.38/N3-Gallery-1.38-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.38-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.38/N3-Gallery-1.38-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.38.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.38/N3Gallery-Projekt-1.38.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -35,7 +35,18 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.37 – Ursache gefunden: LiteRT-LM-Version und unvollständige Downloads
+## 🆕 Version 1.38 – Foto-App-Optik, Fotos aus anderen Apps annehmen, NPU-Versuch
+
+* Untere Leiste **Bilder · Alben · Formate · Sammlungen · Menü**, großer Titel, randloses Raster.
+* **Teilen** aus anderen Apps: `SEND`/`SEND_MULTIPLE` → Ansicht „Aus anderer App geöffnet“ mit
+  „In Galerie speichern“.
+* **Wichtigste Angaben** als Knopf, Metadaten-Blatt nur noch sichtbar, wenn offen.
+* **Karte bei jedem Foto** – ohne GPS mit klarer Aussage statt fehlendem Block.
+* **NPU** wird probiert (`Backend.NPU`) und nur bei bestandenem Testlauf gemeldet.
+* Kleine HEIF-Kacheln in 48 px → weniger Arbeit beim Scrollen.
+* **Keine Cloud** in dieser Version.
+
+## 🔧 Version 1.37 – Ursache gefunden: LiteRT-LM-Version und unvollständige Downloads
 
 * **EmbeddingGemma 2 kommt jetzt wirklich hoch.** Der Grund für „Modell läuft nicht“ war eine
   zu alte LiteRT-LM: `tasks-retrieval` bringt 0.17.0-alpha1 mit, in der `ActivationDataType`

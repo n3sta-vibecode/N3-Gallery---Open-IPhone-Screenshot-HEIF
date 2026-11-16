@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Untere Leiste wie in einer normalen Foto-App (Google Photos):
+    Bilder · Alben · Formate · Sammlungen · Menü
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/nav_photos"
+        android:icon="@drawable/ic_timeline"
+        android:title="@string/tab_title" />
+
+    <item
+        android:id="@+id/nav_albums"
+        android:icon="@drawable/ic_folder"
+        android:title="@string/tab_folders" />
+
+    <item
+        android:id="@+id/nav_formats"
+        android:icon="@drawable/ic_format"
+        android:title="@string/tab_formats" />
+
+    <item
+        android:id="@+id/nav_tags"
+        android:icon="@drawable/ic_tag"
+        android:title="@string/tab_tags" />
+
+    <item
+        android:id="@+id/nav_menu"
+        android:icon="@drawable/ic_more_vert"
+        android:title="@string/nav_menu" />
+</menu>

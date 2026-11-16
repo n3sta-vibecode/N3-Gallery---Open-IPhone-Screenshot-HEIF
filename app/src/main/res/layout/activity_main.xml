@@ -19,8 +19,8 @@
             android:layout_height="wrap_content"
             android:background="@color/n3_bg"
             android:minHeight="?attr/actionBarSize"
-            app:title="@string/brand_short_en"
-            app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge"
+            app:title="@string/tab_title"
+            app:titleTextAppearance="@style/TextAppearance.Material3.HeadlineMedium"
             app:menu="@menu/main" />
 
         <TextView
@@ -57,23 +57,36 @@
             android:focusable="false"
             app:iconifiedByDefault="false" />
 
+        <!--
+            1.38: Die Tab-Leiste oben ist raus. Gewechselt wird unten über die Leiste
+            „Bilder / Alben / Formate / Sammlungen / Menü“ (Google-Photos-Prinzip).
+            Das TabLayout bleibt als unsichtbare Steuerung im Layout – der ViewPager2
+            braucht sonst keine Verbindung, und so bleibt der Code an einer Stelle.
+        -->
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabLayout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@color/n3_bg"
-            app:tabGravity="start"
-            app:tabIndicatorColor="@color/n3_accent"
-            app:tabIndicatorFullWidth="false"
-            app:tabMode="scrollable"
-            app:tabTextColor="@color/n3_on_surface_variant"
-            app:tabSelectedTextColor="@color/n3_on_bg" />
+            android:layout_height="0dp"
+            android:visibility="gone" />
     </com.google.android.material.appbar.AppBarLayout>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@color/n3_surface"
+        app:elevation="3dp"
+        app:itemIconTint="@color/n3_nav_item"
+        app:itemTextColor="@color/n3_nav_item"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/bottom_nav" />
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_marginBottom="80dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
     <com.google.android.material.progressindicator.LinearProgressIndicator

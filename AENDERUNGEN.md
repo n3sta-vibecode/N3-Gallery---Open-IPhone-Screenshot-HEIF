@@ -1,5 +1,61 @@
 # N3 Gallery – was neu ist
 
+## 1.38 – Sieht aus wie eine Foto-App, nimmt Fotos an, probiert die NPU
+
+Diese Runde ist **nur Oberfläche und Verhalten** – **keine Cloud** (so gewünscht). Was drin ist:
+
+### 🖼️ Galerie statt Tab-Leiste (Google-Photos-Prinzip)
+
+* Kopfzeile mit **großem Titel „Bilder“**, darunter unverändert die **eine** Suchleiste.
+  Die Tab-Leiste oben ist weg – sie war das, was nach „Einstellungen“ aussah.
+* **Untere Leiste**: `Bilder · Alben · Formate · Sammlungen · Menü`. „Menü“ öffnet die
+  ⋮-Liste (Karte, Aktualisieren, Sprache, Info …), genau wie in Google Photos.
+* **Randloses Raster**: 3 dp Rand statt 12 dp, Kachel-Abstand 0,5 dp statt 1–2 dp. Die
+  Kachelgröße wird daraus neu berechnet, damit rechts keine Lücke bleibt.
+
+### 📥 Fotos aus anderen Apps annehmen
+
+Neu im Manifest: `SEND` und `SEND_MULTIPLE` für `image/*`. Die App taucht damit im
+**Teilen-Menü** auf. Geteilte Bilder landen in einer eigenen Ansicht:
+
+* Vorschau-Liste (3 Spalten) der übernommenen Bilder,
+* **„In Galerie speichern“** → kopiert nach `<App-Ordner>/Uebernommen`, nummeriert bei
+  gleichem Namen, ohne Überschreiben,
+* **„In der App öffnen“** → zeigt das erste Bild groß,
+* funktioniert auch **ohne** Zugriff auf die Galerie (die Daten kommen vom absendenden
+  Programm), und auch, wenn die App schon läuft (`onNewIntent`).
+
+### 📌 „Wichtigste Angaben“ und die Karte bei **jedem** Foto
+
+* Neuer Knopf **„Wichtigste Angaben“** in der Leiste unten der Detailansicht: Wann, Wo,
+  Format, Auflösung, Dateigröße, Notiz, Tags, Favorit – auf einen Blick, ohne Wischen.
+  Der Knopf „nach oben“ öffnet weiterhin das große Blatt.
+* Das Metadaten-Blatt ist jetzt **nur sichtbar, wenn es offen ist**. Vorher lag es
+  geschlossen unsichtbar über dem Bild und konnte Berührungen abfangen – das ist der
+  Grund, warum „nach oben scrollen“ nicht zuverlässig traf.
+* Fotos **ohne** GPS-Daten bekommen keinen fehlenden Block mehr, sondern eine Karte-Karte
+  mit der klaren Aussage „In diesem Foto ist kein Ort gespeichert“ und dem Weg zur
+  Gesamtkarte.
+
+### ⚡ HEIF schneller
+
+Kleine Kacheln (bis 128 px) werden jetzt mit der **48-px-Stufe** dekodiert statt mit bis zu
+128 px. Bei iPhone-HEIFs steckt die Zeit im Öffnen des Containers, nicht in der Pixelzahl –
+weniger Pixel heißt hier also direkt weniger Arbeit und ein viermal größerer Bildspeicher.
+„in Anzeigegröße dekodieren“ bleibt für alle großen Ansichten erhalten.
+
+### 🧠 NPU – ehrlicher Versuch mit Rückfall
+
+* Neuer erster Weg: **`Backend.NPU` von LiteRT-LM** (MediaPipe kennt nur CPU/GPU).
+* Vorher wird geprüft, ob das Gerät überhaupt eine NPU haben kann (Qualcomm/QNN, Tensor,
+  MediaTek APU, Exynos, Kirin) – sonst kostet jedes Telefon einen Fehlversuch.
+* Der Weg gilt nur als gelungen, wenn ein **Testlauf** danach wirklich einen Vektor liefert;
+  andernfalls fällt die App still auf GPU → CPU zurück und schreibt den Grund in die
+  Statuszeile. Es wird also nichts behauptet, was nicht gemessen ist.
+
+**Nicht** enthalten und bewusst offen: Cloud-Anbindung (Google Drive ist in dieser Sitzung
+ausgeschaltet), echte Gesichtserkennung, Videos.
+
 ## 1.37 – Der eigentliche Grund: falsche LiteRT-LM-Version, halbe Modelldatei
 
 Auf dem Gerät stand bisher nur der Klassenname:

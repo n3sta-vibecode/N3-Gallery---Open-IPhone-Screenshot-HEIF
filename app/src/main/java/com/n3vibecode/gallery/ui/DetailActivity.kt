@@ -171,6 +171,9 @@ class DetailActivity : AppCompatActivity() {
         })
         applySheetState(BottomSheetBehavior.STATE_HIDDEN)
 
+        // „Wichtigste Angaben“ – ohne Scrollen, ohne Blatt: das Wichtigste in einem Dialog
+        findViewById<View>(R.id.btnKeyFacts).setOnClickListener { showKeyFacts() }
+
         // Kopfzeile antippen = auf-/zuklappen
         findViewById<View>(R.id.sheetHeader).setOnClickListener {
             behavior.state = if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
@@ -341,7 +344,63 @@ class DetailActivity : AppCompatActivity() {
      * Wischgesten „verschlucken“ sich – das Blatt lässt sich dann nicht mehr sauber ziehen.
      * In allen anderen Zuständen wandern Gesten direkt an das Blatt (auf-/zuklappen/schließen).
      */
+    /**
+     * Die **wichtigsten Angaben** zu einem Foto – direkt erreichbar über die Leiste unten
+     * und über das Info-Menü. Absichtlich kurz: Datum, Ort, Kamera, Format, Auflösung,
+     * Dateigröße, eigene Notiz und Tags. Alles Weitere steht im großen Blatt.
+     */
+    private fun showKeyFacts() {
+        val item = current ?: return
+        val rows = ArrayList<Pair<String, String>>(8)
+        rows.add(getString(R.string.meta_when) to
+            if (item.time > 0) Fmt.dateTime(item.time) else getString(R.string.date_unknown))
+        GeoStore.pointFor(item)?.let { p ->
+            val place = runCatching {
+                com.n3vibecode.gallery.map.GeoIndex.nearest(p.first, p.second)?.let { loc ->
+                    "${loc.place.name}, ${loc.place.country}"
+                }
+            }.getOrNull()
+            rows.add(
+                getString(R.string.map_title) to
+                    (place ?: "%.5f, %.5f".format(java.util.Locale.US, p.first, p.second))
+            )
+        }
+        rows.add(getString(R.string.meta_format) to item.format)
+        if (item.width > 0 && item.height > 0) {
+            rows.add(getString(R.string.meta_resolution) to "${item.width} × ${item.height}")
+        }
+        rows.add(getString(R.string.meta_file_size) to Fmt.bytes(item.size))
+        val note = MetaStore.note(item.uri)
+        if (note.isNotBlank()) rows.add(getString(R.string.meta_note) to note)
+        val tags = MetaStore.tags(item.uri)
+        if (tags.isNotEmpty()) {
+            rows.add(getString(R.string.meta_tags) to tags.joinToString(", "))
+        }
+        if (MetaStore.isFavorite(item.uri)) {
+            rows.add(getString(R.string.favorite) to "★")
+        }
+
+        val text = rows.joinToString("\n\n") { (k, v) -> "$k\n$v" }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.key_facts)
+            .setMessage(text)
+            .setPositiveButton(R.string.ok) { _, _ -> }
+            .setNeutralButton(R.string.sheet_pull_title) { _, _ ->
+                behavior.state = BottomSheetBehavior.STATE_EXPANDED
+            }
+            .show()
+    }
+
     private fun applySheetState(newState: Int) {
+        // Wichtig (1.38): Ein geschlossenes BottomSheet hat zwar Höhe 0 bzw. liegt unter dem
+        // Rand, fängt aber in manchen Zuständen trotzdem Berührungen ab. Genau deshalb ließ
+        // sich „irgendwo nach oben scrollen“ nicht zuverlässig treffen. Jetzt ist das Blatt
+        // nur sichtbar, wenn es offen ist – sonst geht jede Berührung an das Foto/den Pager.
+        val open = newState == BottomSheetBehavior.STATE_EXPANDED ||
+            newState == BottomSheetBehavior.STATE_COLLAPSED ||
+            newState == BottomSheetBehavior.STATE_HALF_EXPANDED
+        findViewById<View>(R.id.sheet)?.visibility = if (open) View.VISIBLE else View.GONE
+
         when (newState) {
             BottomSheetBehavior.STATE_EXPANDED -> {
                 // Offen: Liste darf frei scrollen. Das Blatt selbst ist dann NICHT mehr ziehbar,

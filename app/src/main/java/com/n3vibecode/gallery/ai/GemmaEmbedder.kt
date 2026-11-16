@@ -101,6 +101,26 @@ internal class GemmaEmbedder(
 
             val reasons = ArrayList<String>(4)
 
+            // ---- Weg 0: NPU (LiteRT-LM direkt). Der UniversalEmbedder von MediaPipe kennt nur
+            //      CPU/GPU; LiteRT-LM selbst hat ein NPU-Backend. Deshalb zuerst dieser Weg –
+            //      er wird mit einem Testlauf geprüft und fällt still auf GPU/CPU zurück.
+            if (classOrNull(CLASS_EMBEDDING_ENGINE) != null && hasNpu()) {
+                val result = runCatching { buildEngineDirect(ctx, source, "NPU") }
+                val built = result.getOrNull()
+                if (built != null) {
+                    val (problem, dims) = probe(built)
+                    if (problem == null) {
+                        lastRoute = "LiteRT-LM NPU"
+                        Log.i(TAG, "EmbeddingGemma 2 läuft auf der NPU ($dims Dimensionen)")
+                        return built
+                    }
+                    reasons.add("NPU: $problem")
+                    runCatching { built.close() }
+                } else {
+                    reasons.add("NPU: ${human(result.exceptionOrNull())}")
+                }
+            }
+
             // ---- Weg 1: UniversalEmbedder (dokumentierte MediaPipe-API), GPU → CPU
             if (classOrNull(CLASS_UNIVERSAL) != null) {
                 for ((acc, delegateName) in listOf(
@@ -128,7 +148,7 @@ internal class GemmaEmbedder(
 
             // ---- Weg 2: EmbeddingEngine direkt (LiteRT-LM), CPU
             if (classOrNull(CLASS_EMBEDDING_ENGINE) != null) {
-                val result = runCatching { buildEngineDirect(ctx, source) }
+                val result = runCatching { buildEngineDirect(ctx, source, "CPU") }
                 val built = result.getOrNull()
                 if (built != null) {
                     val (problem, dims) = probe(built)
@@ -235,19 +255,35 @@ internal class GemmaEmbedder(
          * `EmbeddingEngine(config)` → `initialize()` → `computeEmbedding(listOf(InputData.Text(x)))`
          * → `response.embedding` (float[]).
          */
-        private fun buildEngineDirect(ctx: Context, source: ModelSource): GemmaEmbedder {
+        private fun buildEngineDirect(
+            ctx: Context,
+            source: ModelSource,
+            backendName: String
+        ): GemmaEmbedder {
             val engineClass = Class.forName(CLASS_EMBEDDING_ENGINE)
             val configClass = Class.forName(CLASS_EMBEDDING_CONFIG)
             val backendClass = Class.forName(CLASS_BACKEND)
             val inputDataClass = Class.forName(CLASS_INPUT_DATA)
 
-            val cpu = runCatching { findMethod(backendClass, "CPU", emptyArray()) }
-                .getOrNull()
-                ?.invoke(null)
-                ?: runCatching { Class.forName("$CLASS_BACKEND\$CPU")
-                    .getDeclaredConstructor().also { it.isAccessible = true }.newInstance() }
-                    .getOrNull()
-                ?: error("Backend.CPU nicht gefunden")
+            // Backend.CPU / -GPU / -NPU sind Kotlin-Datenklassen (Backend.CPU(threadCount)).
+            // Genommen wird der Konstruktor mit den meisten Parametern, fehlende Werte bleiben
+            // auf ihren Standardwerten (Boxing: Integer statt int).
+            val backend = runCatching {
+                val cls = Class.forName("$CLASS_BACKEND\$$backendName")
+                val ctor = cls.declaredConstructors.maxByOrNull { it.parameterTypes.size }
+                    ?: cls.getDeclaredConstructor()
+                ctor.isAccessible = true
+                val args = ctor.parameterTypes.map { type ->
+                    when {
+                        type == java.lang.Integer.TYPE || type == Int::class.javaObjectType -> null
+                        type == java.lang.Boolean.TYPE -> null
+                        else -> null
+                    }
+                }.toTypedArray()
+                ctor.newInstance(*args)
+            }.getOrElse {
+                error("Backend.$backendName nicht verfügbar")
+            }
 
             val path = when (source) {
                 is ModelSource.Asset -> source.path
@@ -263,7 +299,7 @@ internal class GemmaEmbedder(
             val args = ctor.parameterTypes.mapIndexed { i, type ->
                 when {
                     i == 0 -> path
-                    type.isAssignableFrom(cpu.javaClass) || type.name == CLASS_BACKEND -> cpu
+                    type.isAssignableFrom(backend.javaClass) || type.name == CLASS_BACKEND -> backend
                     type == String::class.java -> ctx.cacheDir.absolutePath   // cacheDir
                     else -> null                                             // übrige: Standard
                 }
@@ -288,12 +324,35 @@ internal class GemmaEmbedder(
                 val vec = fieldOf(response, "embedding") ?: invoke(response, "getEmbedding")
                 (vec as? FloatArray)?.takeIf { it.isNotEmpty() } ?: error("Embedding ist leer")
             }
-            return GemmaEmbedder(engine, AiEngine.Accelerator.CPU, "EmbeddingGemma 2", "LiteRT-LM · CPU", fn)
+            val acc = if (backendName == "NPU") AiEngine.Accelerator.NPU else AiEngine.Accelerator.CPU
+            return GemmaEmbedder(engine, acc, "EmbeddingGemma 2", "LiteRT-LM · $backendName", fn)
         }
 
         // ------------------------------------------------------------------ Reflection
 
         private fun classOrNull(name: String): Class<*>? = runCatching { Class.forName(name) }.getOrNull()
+
+        /**
+         * Ist auf diesem Gerät überhaupt eine NPU denkbar?
+         *
+         * Geprüft wird die LiteRT-LM-Klasse `Backend.NPU` **und** ob das Gerät einen der
+         * bekannten NPU-Treiber mitbringt (Qualcomm QNN, Google Tensor/EdgeTPU, MediaTek APU).
+         * Ohne diese Vorprüfung würde jedes Gerät einen fehlschlagenden NPU-Versuch bezahlen.
+         * Der eigentliche Beweis ist danach der Testlauf in [create].
+         */
+        fun hasNpu(): Boolean {
+            if (classOrNull("$CLASS_BACKEND\$NPU") == null) return false
+            val device = android.os.Build.HARDWARE.orEmpty().lowercase() + " " +
+                android.os.Build.SOC_MANUFACTURER.orEmpty().lowercase() + " " +
+                android.os.Build.SOC_MODEL.orEmpty().lowercase() + " " +
+                android.os.Build.MANUFACTURER.orEmpty().lowercase() + " " +
+                android.os.Build.MODEL.orEmpty().lowercase()
+            val known = listOf(
+                "qcom", "qualcomm", "sm8", "sm7", "tensor", "google", "mediatek", "mt6", "mt8",
+                "exynos", "s5e", "kirin", "unisoc"
+            )
+            return known.any { device.contains(it) }
+        }
 
         // Die eigentliche Suche/Aufruf-Logik liegt in Reflect (ohne Android-Abhängigkeit,
         // damit sie per Unit-Test geprüft werden kann – siehe app/src/test/.../ReflectTest.kt).
