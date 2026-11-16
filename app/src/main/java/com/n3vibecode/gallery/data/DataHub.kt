@@ -23,6 +23,14 @@ object DataHub {
     private val listeners = mutableListOf<() -> Unit>()
 
     /**
+     * Wird nach **jedem** neuen Scanergebnis aufgerufen – auch wenn kein Bildschirm zuhört.
+     * Die Bildersuche hängt daran und baut ihren Index im Hintergrund auf, sobald die
+     * Bibliothek da ist (vorher passierte das erst beim Öffnen der Suchseite).
+     */
+    @Volatile
+    var onLibraryChanged: (() -> Unit)? = null
+
+    /**
      * Wird von Ansichten gesetzt, die einen Neuscan anstoßen können (Hauptbildschirm).
      * So kann z. B. der Editor nach dem Speichern sagen: „Liste bitte neu einlesen“.
      */
@@ -57,6 +65,7 @@ object DataHub {
         hiddenByUserSelection = limited
         lastScanMs = System.currentTimeMillis()
         notifyChanged()
+        onLibraryChanged?.invoke()
     }
 
     fun find(uri: String): MediaItem? = byUri()[uri]

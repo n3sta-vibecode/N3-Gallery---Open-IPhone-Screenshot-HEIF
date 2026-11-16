@@ -316,8 +316,8 @@
     <string name="ai_model_pick">Datei wählen</string>
     <string name="ai_model_ready">Modell bereit: %1$s</string>
     <string name="ai_model_imported">Modell übernommen: %1$s</string>
-    <string name="ai_model_import_failed">Datei konnte nicht gelesen werden. Bitte die .task-Datei noch einmal auswählen.</string>
-    <string name="ai_model_download_hint">Der Browser öffnet die offizielle Google-Adresse. Nach dem Herunterladen „Datei wählen“ antippen.</string>
+    <string name="ai_model_import_failed">Die Modelldatei konnte nicht gelesen werden. Bitte erneut versuchen oder eine andere Datei wählen.</string>
+    <string name="ai_model_download_hint">Das Modell wird direkt in die App geladen.</string>
     <string name="ai_model_size">%1$s MB</string>
     <string name="ai_model_remove">Modell entfernen</string>
     <string name="search_open_ai">In eigenen Worten suchen</string>
@@ -333,4 +333,10 @@
     <string name="map_osm_on">OpenStreetMap</string>
     <string name="map_osm_off">Offline-Karte</string>
     <string name="map_osm_hint">OpenStreetMap lädt Kartenkacheln aus dem Internet. Bereits geladene Bereiche bleiben auf dem Gerät und erscheinen beim nächsten Mal ohne Verbindung.</string>
+    <string name="ai_model_broken_title">Suchmodell läuft nicht – eingebautes Wortmodell wird benutzt</string>
+    <string name="ai_model_broken_hint">Die Modelldatei ist da, sie startet aber nicht: %1$s. Du kannst sie neu laden oder eine andere Variante wählen.</string>
+    <string name="ai_engine_failed">%1$s – läuft nicht: %2$s</string>
+    <string name="search_empty_error">Der Foto-Index ließ sich nicht aufbauen: %1$s</string>
+    <string name="search_empty_indexing">Die Fotos werden noch für die Suche vorbereitet – der Fortschrittsbalken oben zeigt, wie weit.</string>
+    <string name="search_empty_no_model">Dazu passt noch kein Foto. Tipp: Oben EmbeddingGemma 2 laden – damit sucht die App in eigenen Worten, auch über Notizen, Tags, Ort und Zeit.</string>
 </resources>

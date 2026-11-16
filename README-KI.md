@@ -58,7 +58,7 @@ einem Testlauf**:
 
 > **Zur NPU:** EmbeddingGemma 1 ließ sich über den `TextEmbedder` noch mit `Delegate.NPU`
 > ansprechen. EmbeddingGemma 2 läuft über LiteRT-LM, das in MediaPipe nur GPU und CPU
-> anbietet – die NPU wird dort (Stand 1.34) nicht adressiert. Sobald Google das freigibt,
+> anbietet – die NPU wird dort (Stand 1.35) nicht adressiert. Sobald Google das freigibt,
 > kommt die Stufe in `GemmaEmbedder.create` einfach vor die GPU.
 
 ## 4. Was in den Foto-Vektor einfließt
@@ -75,8 +75,19 @@ Damit die Suche ohne Bildanalyse treffsicher ist, wird zu jedem Foto ein
 
 Der Suchtext wird mit demselben Modell eingebettet – dadurch findet „strandurlaub“ auch
 Bilder mit der Notiz „Sommer am Meer“. Zusätzlich läuft immer die klassische Suche
-(Dateiname/Ordner/Tags) mit. Der Index wird in `n3_search_index.v1` gespeichert und beim
-nächsten Start wiederverwendet; nach einem Modellwechsel wird er neu berechnet.
+(Dateiname/Ordner/Tags) mit. Der Index wird in `n3_search_index.v2` gespeichert – zusammen mit einem Stempel, zu welchem
+Modell und Beschleuniger die Vektoren gehören. Dadurch wird nach einem Modellwechsel neu
+gerechnet und nach einem normalen Start nichts doppelt.
+
+**Wann rechnet die App?** Beim Start und nach jedem Neuscan, im Hintergrund
+(`SearchIndex.warmUp`, angestoßen über `DataHub.onLibraryChanged`). Nach jedem Foto gibt es eine
+kurze Pause, damit Scrollen und Tastatur Vorrang haben; ist die App im Hintergrund, wird
+länger gewartet (Akku). Alle Modellaufrufe laufen nacheinander – die LiteRT-LM-Laufzeit ist
+nicht thread-sicher.
+
+**Wenn es nicht läuft**, sagt die App es: Statuszeile („läuft nicht: GPU: … · CPU: …“) und
+leeres Suchergebnis nennen den Grund aus `GemmaEmbedder.lastFailure` / `SearchIndex.lastError()`
+– kein stiller Rückfall auf das Wortmodell mehr.
 
 > Mit der **Text+Bild-Variante** (440M) kann später zusätzlich der Bildinhalt selbst
 > eingebettet werden (`embedImage`) – der Aufbau dafür steht schon.

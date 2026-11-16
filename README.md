@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.34-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.34/N3-Gallery-1.34-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.34-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.34/N3-Gallery-1.34-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.34.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.34/N3Gallery-Projekt-1.34.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.35-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.35/N3-Gallery-1.35-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.35-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.35/N3-Gallery-1.35-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.35.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.35/N3Gallery-Projekt-1.35.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -35,7 +35,7 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.34 – EmbeddingGemma 2, Download in der App, OpenStreetMap, Metadaten erreichbar
+## 🆕 Version 1.35 – Suche im Hintergrund, Modell wirklich in Benutzung, Tastatur schließt
 
 * **EmbeddingGemma 2** (das Modell aus Google Edge Gallery, 740 M, multimodal) über
   `tasks-retrieval` + LiteRT-LM – echte Modell-Dateien, nicht mehr der alte Text-Embedder.

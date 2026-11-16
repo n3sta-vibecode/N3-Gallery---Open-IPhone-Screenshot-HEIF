@@ -1,6 +1,64 @@
 # N3 Gallery – was neu ist
 
-## 1.34 – EmbeddingGemma 2, Download in der App, OpenStreetMap, Metadaten erreichbar
+## 1.35 – Suche rechnet im Hintergrund, Modell wird wirklich benutzt, Tastatur schließt
+
+Vier Beschwerden aus 1.34, alle mit derselben Wurzel: **Rechenarbeit lag auf dem Haupt-Thread
+oder wurde nie angestoßen.**
+
+### 🧠 Das Modell wurde tatsächlich nie benutzt
+
+`GemmaEmbedder` baute die Engine per Reflection – und griff dabei daneben:
+`BaseOptions.Builder` und `UniversalEmbedderOptions.Builder` sind `abstract`, die Methode
+`build()` steckt in der generierten Klasse `AutoValue_…Builder`. `getMethod("build")` findet
+sie dort **nicht**, also scheiterte jede Stufe (GPU wie CPU), und die Suche fiel still auf das
+eingebaute Wortmodell zurück – ohne dass irgendwo stand, warum.
+
+Jetzt sucht `findMethod` die ganze Klassenhierarchie ab, jeder Fehlversuch wird gesammelt und
+in der Suchseite angezeigt („läuft nicht: GPU: … · CPU: …“). Steht dort nichts, rechnet
+EmbeddingGemma 2 wirklich – 768 Dimensionen, GPU oder CPU.
+
+### ⏳ „Bilder werden am Anfang nicht analysiert“
+
+Der Index wurde nur gebaut, wenn man die Suchseite öffnete – und blieb dort bei `0 / n`
+stehen. Drei Fehler auf einmal:
+
+* `if (!building.compareAndSet(false, true)) return` verwarf den Aufruf still, **ohne** das
+  versprochene `onDone`. Die Suchseite wartete bei „Suche wird vorbereitet …“.
+* `if (entries.isEmpty()) loadFromDisk(...)` lud Vektoren des **vorigen** Modells. Sie
+  blockierten jede Neuberechnung, weil das Foto ja „schon einen Vektor“ hatte.
+* Ein `catch (_: Throwable) {}` verschluckte jeden Fehler und meldete trotzdem fertig.
+
+Jetzt baut die App den Index **beim Start und nach jedem Neuscan** im Hintergrund
+(`SearchIndex.warmUp`, angestoßen von `DataHub.onLibraryChanged`), zeigt den Fortschritt in der
+Suchseite und merkt sich mit einem Stempeleintrag, zu welchem Modell die Vektoren gehören.
+
+### 🥶 Die App fror nach der Suche ein
+
+Zwei Ursachen:
+
+1. **Jede Suche startete einen neuen Thread**, der erneut `AiEngine.prepare()` aufrief – also
+   das 163–1300 MB große Modell **noch einmal** lud, während der Haupt-Thread auf Sperren
+   wartete. Jetzt wird nie doppelt geladen, und `AiEngine.embed` ist mit einem Schloss
+   serialisiert (die LiteRT-LM-Laufzeit ist nicht thread-sicher).
+2. **Die klassische Suche lief auf dem Haupt-Thread**: Bei jedem Tastendruck wurde für *jedes*
+   Foto der Beschreibungstext neu gebaut, inklusive Datenbankabfrage für den Ort. Bei einigen
+   tausend Fotos stand die App. Jetzt rechnet die Suche komplett im Hintergrund, der Text wird
+   zwischengespeichert, und der Index macht nach jedem Foto eine kurze Pause (im Hintergrund
+   länger, für den Akku).
+
+### ⌨️ Tastatur bleibt nicht mehr stehen
+
+Tippen auf die Treffer – oder irgendwo daneben – schließt die Tastatur (der Fokus wandert auf
+die Wurzel, sonst holt das Feld ihn zurück). „Suchen“ auf der Tastatur schließt sie ebenfalls.
+Umgesetzt über einen `OnItemTouchListener`, damit auch ein Tippen **auf ein Bild** zählt.
+
+### 🔍 Ehrliche Statuszeile
+
+Kein stiller Rückfall mehr: Ist eine Modelldatei da, startet aber nicht, steht der Grund in
+der Statuszeile und im leeren Suchergebnis („Der Foto-Index ließ sich nicht aufbauen: …“).
+Ohne Modell steht dort, dass das eingebaute Wortmodell rechnet.
+
+## 1.35 – EmbeddingGemma 2, Download in der App, OpenStreetMap, Metadaten erreichbar
 
 ### 🧠 EmbeddingGemma 2 – das Modell aus Google Edge Gallery
 

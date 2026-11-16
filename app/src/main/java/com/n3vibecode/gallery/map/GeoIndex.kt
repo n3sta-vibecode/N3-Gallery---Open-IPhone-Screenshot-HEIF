@@ -87,6 +87,23 @@ object GeoIndex {
         }, "n3-geo-warm").apply { priority = Thread.MIN_PRIORITY; isDaemon = true }.start()
     }
 
+    /**
+     * Wartet (höchstens [maxMs]) bis die Ortsliste im Speicher ist.
+     *
+     * Wozu: Der Suchindex schreibt Ortsnamen in den Foto-Text. Läuft er los, bevor die
+     * Ortsliste da ist, fehlen sie – und „Luzern“ findet dann nur noch die klassische Suche.
+     * Aufruf nur aus einem Hintergrund-Thread.
+     */
+    fun awaitReady(maxMs: Long): Boolean {
+        if (data != null) return true
+        val until = System.currentTimeMillis() + maxMs
+        while (System.currentTimeMillis() < until) {
+            if (data != null) return true
+            runCatching { Thread.sleep(50) }
+        }
+        return data != null
+    }
+
     /** Lädt die Ortsliste, falls noch nicht geschehen (im Hintergrund aufrufen). */
     fun load(ctx: Context): Boolean {
         if (data != null) return true

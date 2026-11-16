@@ -1,21 +1,24 @@
 package com.n3vibecode.gallery.ai
 
 import android.content.Context
+import android.util.Log
 import com.n3vibecode.gallery.data.DataHub
 import com.n3vibecode.gallery.data.GeoStore
 import com.n3vibecode.gallery.data.MediaItem
 import com.n3vibecode.gallery.data.MetaStore
 import com.n3vibecode.gallery.map.GeoIndex
+import com.n3vibecode.gallery.util.AppVisibility
 import com.n3vibecode.gallery.util.Fmt
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.sqrt
 
 /**
  * Bildersuche mit Embeddings – wie in „Google Edge Gallery“/Google Fotos auf dem Gerät:
  * Der Suchbegriff wird in einen Vektor umgerechnet, jedes Foto hat ebenfalls einen Vektor
- * (aus **allen** Angaben, die es zu dem Foto gibt), und gesucht wird nach der größten
+ * (aus **allen** Angaben, die es zu dem Foto gibt), gesucht wird nach der größten
  * Ähnlichkeit (Kosinus).
  *
  * Woher der Foto-Vektor kommt – bewusst nur aus **vorhandenen** Angaben, also ohne das Bild
@@ -26,87 +29,249 @@ import kotlin.math.sqrt
  *   • Format (HEIC, RAW, Screenshot …), Kamera/Objektiv, Video
  *   • Bildmaße (Panorama, Hochformat/Screenshot, Quadrat)
  *
- * Diese Vektoren werden einmal berechnet und im App-Speicher gehalten; die Berechnung läuft
- * im Hintergrund und meldet ihren Fortschritt.
+ * **Was in 1.35 repariert wurde:** Der Aufbau lief nur, wenn man die Suchseite öffnete und
+ * blieb dort bei „0 / n“ stehen, weil drei Fehler zusammenkamen (siehe [build]).
  */
 object SearchIndex {
 
-    private const val FILE = "n3_search_index.v1"
-
-    /** Ein Eintrag je Foto. */
-    private class Entry(
-        val uri: String,
-        val vector: FloatArray
-    )
+    private const val FILE = "n3_search_index.v2"
+    private const val TAG = "N3Ai"
 
     private val entries = ConcurrentHashMap<String, FloatArray>()
     private val building = AtomicBoolean(false)
 
-    @Volatile private var builtForScanMs: Long = -1
-    @Volatile private var progress: Pair<Int, Int> = 0 to 0
+    /**
+     * Wie viele Aufrufer gerade auf den Index warten. Zähler statt Ja/Nein, weil der Aufbau
+     * beim Start, nach einem Neuscan und nach einem Modellwechsel angestoßen werden kann –
+     * vorher setzte der zweite Aufruf den ersten auf „läuft nicht mehr“.
+     */
+    private val runningCount = AtomicInteger(0)
 
-    fun progress(): Pair<Int, Int> = progress
+    @Volatile private var builtForScanMs: Long = -1
+    @Volatile private var doneCount: Int = 0
+    @Volatile private var totalCount: Int = 0
+
+    /** Ergebnis des letzten Aufbaus: leer = alles gut, sonst der Grund. */
+    @Volatile private var lastProblem: String = ""
+
+    /** Ein Suchbegriff, mit dem geprüft wird, ob das Modell überhaupt nutzbar ist. */
+    private const val PROBE = "foto"
+
+    fun progress(): Pair<Int, Int> = doneCount to totalCount
     fun indexedCount(): Int = entries.size
     fun isBuilding(): Boolean = building.get()
+    fun isRunning(): Boolean = runningCount.get() > 0
+    fun lastError(): String = lastProblem
+
+    /**
+     * **Im Hintergrund vorbereiten** – beim Start der App und nach einem Neuscan.
+     *
+     * Läuft nur, wenn wirklich etwas fehlt (neue Fotos, anderes Modell, anderer Beschleuniger)
+     * und nie doppelt. Das Modell wird dabei zuerst geprüft: Läuft EmbeddingGemma 2 nicht,
+     * erscheint der Grund in der Suchseite.
+     */
+    fun warmUp(ctx: Context, delayMs: Long = 0L) {
+        if (building.get()) return
+        val app = ctx.applicationContext
+        if (delayMs > 0) {
+            // Erst den Bildschirm ankommen lassen (Wischen nach dem Start bleibt flüssig)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                Thread({ warmNow(app) }, "n3-search-warmup").apply { isDaemon = true }.start()
+            }, delayMs)
+            return
+        }
+        Thread({ warmNow(app) }, "n3-search-warmup").apply { isDaemon = true }.start()
+    }
+
+    /** Arbeit von [warmUp] auf einem Hintergrund-Thread. */
+    private fun warmNow(app: Context) {
+        if (building.get()) return
+        runningCount.incrementAndGet()
+        try {
+            // Ortsliste abwarten: Der Foto-Text enthält den Ortsnamen („Luzern“). Läuft der
+            // Aufbau los, bevor die Ortsliste geladen ist, fehlt er im Index – dann findet
+            // „Luzern“ nur noch über die klassische Suche. Nach dem ersten Start ist das
+            // sofort da (das Warten endet, sobald die Liste bereit ist).
+            runCatching { GeoIndex.awaitReady(4_000) }
+            AiEngine.prepare(app)
+            val items = DataHub.all
+            if (!needsBuild(app, items)) {
+                Log.i(TAG, "Suchindex ist aktuell (${entries.size} Fotos)")
+                return
+            }
+            buildWork(app, items)
+        } finally {
+            runningCount.decrementAndGet()
+        }
+    }
+
+    /** Muss der Index neu gebaut werden? */
+    private fun needsBuild(ctx: Context, items: List<MediaItem>): Boolean {
+        if (items.isEmpty()) return false
+        if (entries.isEmpty()) return true
+        if (builtForScanMs != DataHub.lastScanMs) return true
+        // Beschleuniger gewechselt (z. B. GPU → CPU) oder Modell getauscht? → andere Vektoren
+        val stamp = runCatching { File(ctx.filesDir, "$FILE.stamp").readText().trim() }.getOrNull()
+        return stamp != entryStamp()
+    }
+
+    /** Kennung der aktuell rechnenden Engine (Modell + Beschleuniger). */
+    private fun entryStamp(): String {
+        val s = AiEngine.currentStatus()
+        return "${s.modelName}|${s.accelerator.name}|${s.modelInstalled}"
+    }
 
     // ------------------------------------------------------------------ Aufbau
 
     /**
-     * Index für die aktuelle Bibliothek aufbauen (im Hintergrund). Wird nach einem Neuscan
-     * oder beim ersten Öffnen der Suche aufgerufen; ein zweiter Aufruf während des Aufbaus
-     * bewirkt nichts.
+     * Index aufbauen. Wird vom Hauptbildschirm ([warmUp]) und nach einem Modellwechsel
+     * aufgerufen; ein zweiter Aufruf während des Aufbaus bewirkt nichts.
+     *
+     * [onDone] kommt auf dem Haupt-Thread.
      */
     fun build(ctx: Context, items: List<MediaItem>, onDone: (() -> Unit)? = null) {
-        if (!building.compareAndSet(false, true)) return
         val app = ctx.applicationContext
-        val main = android.os.Handler(android.os.Looper.getMainLooper())
         Thread({
+            runningCount.incrementAndGet()
             try {
                 AiEngine.prepare(app)
-                // Gemerkte Vektoren laden (App-Neustart: kein Neuberechnen)
-                if (entries.isEmpty()) loadFromDisk(app, items)
-
-                var done = 0
-                val total = items.size
-                progress = 0 to total
-                var sinceSave = 0
-                for (item in items) {
-                    done++
-                    if (!entries.containsKey(item.uri)) {
-                        embedItem(app, item)?.let { v ->
-                            entries[item.uri] = v
-                            sinceSave++
-                        }
-                    }
-                    if (done % 50 == 0 || done == total) {
-                        progress = done to total
-                        if (sinceSave >= 400) {
-                            saveToDisk(app)
-                            sinceSave = 0
-                        }
-                    }
-                }
-                saveToDisk(app)
-                builtForScanMs = DataHub.lastScanMs
-            } catch (_: Throwable) {
+                buildWork(app, items)
             } finally {
-                building.set(false)
-                main.post { onDone?.invoke() }
+                runningCount.decrementAndGet()
+                if (onDone != null) {
+                    android.os.Handler(android.os.Looper.getMainLooper()).post { onDone() }
+                }
             }
         }, "n3-search-index").apply { priority = Thread.MIN_PRIORITY; isDaemon = true }.start()
     }
 
-    /** Index verwerfen (nach Löschen/Bearbeiten von Fotos sinnvoll). */
+    /**
+     * Eigentliche Arbeit – **läuft immer, auch wenn der Aufrufer schon weg ist**.
+     *
+     * Drei Fehler aus 1.34 steckten hier:
+     *  1. `if (!building.compareAndSet(false, true)) return` verwarf den Aufruf still – ohne
+     *     `onDone`. Die Suchseite wartete bei „Modell wird vorbereitet“ und ihr Fortschritt
+     *     blieb bei 0 / n stehen, weil der Aufbau nie lief.
+     *  2. `if (entries.isEmpty()) loadFromDisk(...)` lud den Stand des **vorigen** Modells: Die
+     *     alten Vektoren (andere Dimension, anderes Modell) blockierten jede Neuberechnung.
+     *  3. Ein `catch (_: Throwable) {}` verschluckte jeden Fehler und meldete trotzdem fertig.
+     */
+    private fun buildWork(app: Context, items: List<MediaItem>) {
+        if (!building.compareAndSet(false, true)) {
+            Log.i(TAG, "Index-Aufbau läuft bereits")
+            return
+        }
+        try {
+            lastProblem = ""
+            // Gespeicherte Vektoren nur übernehmen, wenn sie zum aktuellen Modell gehören.
+            val stamp = runCatching { File(app.filesDir, "$FILE.stamp").readText().trim() }.getOrNull()
+            if (stamp == entryStamp()) {
+                loadFromDisk(app, items)
+            } else if (stamp != null || entries.isNotEmpty()) {
+                Log.i(TAG, "Modell/Beschleuniger geändert – Suchindex wird neu berechnet")
+                entries.clear()
+            }
+
+            val total = items.size
+            totalCount = total
+            doneCount = 0
+            if (total == 0) {
+                saveToDisk(app)
+                return
+            }
+
+            // Ist das Modell überhaupt benutzbar? Sonst bleibt der Index leer und der Grund
+            // steht in der Suchseite – statt still mit falschen Treffern zu arbeiten.
+            if (AiEngine.embed(PROBE).isNullOrEmpty()) {
+                lastProblem = AiEngine.failureReason().ifBlank {
+                    "Das Suchmodell liefert keine Vektoren."
+                }
+                Log.w(TAG, "Index nicht möglich: $lastProblem")
+                return
+            }
+
+            var done = 0
+            var sinceSave = 0
+            var fails = 0
+            // Höflich zur Bedienung: nach jedem Foto kurz Luft lassen. Das Modell rechnet
+            // ohnehin seriell (AiEngine.embedLock); die Pause sorgt dafür, dass Scrollen,
+            // Tastatur und Bildaufbau dazwischenkommen können. Ist die App im Hintergrund,
+            // wird länger gewartet (Akku) – beim Zurückkommen geht es sofort weiter.
+            for (item in items) {
+                if (!entries.containsKey(item.uri)) {
+                    val v = embedItem(app, item)
+                    if (v != null) {
+                        entries[item.uri] = v
+                        sinceSave++
+                    } else {
+                        fails++
+                    }
+                }
+                done++
+                doneCount = done
+                runCatching { Thread.sleep(if (AppVisibility.isVisible()) PACE_MS else PACE_BG_MS) }
+                if (done % 40 == 0) {
+                    if (sinceSave >= 300) {
+                        saveToDisk(app)
+                        sinceSave = 0
+                    }
+                    Thread.yield()
+                }
+            }
+            saveToDisk(app)
+            builtForScanMs = DataHub.lastScanMs
+            doneCount = total
+            if (fails > 0 && entries.isEmpty()) {
+                lastProblem = AiEngine.failureReason().ifBlank {
+                    "Kein Foto konnte eingebettet werden."
+                }
+            }
+            Log.i(TAG, "Suchindex fertig: ${entries.size} Vektoren (${aiName()}), $fails ohne Vektor")
+        } catch (t: Throwable) {
+            lastProblem = t.message ?: t.javaClass.simpleName
+            Log.w(TAG, "Suchindex abgebrochen: $lastProblem", t)
+        } finally {
+            building.set(false)
+        }
+    }
+
+    private fun aiName(): String = AiEngine.currentStatus().modelName
+
+    /** Index verwerfen (Modellwechsel, Fotos gelöscht). */
     fun invalidate(ctx: Context) {
         entries.clear()
         builtForScanMs = -1
+        doneCount = 0
+        totalCount = 0
+        lastProblem = ""
+        descriptionCache.clear()
         runCatching { File(ctx.filesDir, FILE).delete() }
+        runCatching { File(ctx.filesDir, "$FILE.stamp").delete() }
     }
 
-    private fun embedItem(ctx: Context, item: MediaItem): FloatArray? {
+    private fun embedItem(ctx: Context, item: MediaItem): FloatArray? = AiEngine.embed(describeCached(ctx, item))
+
+    /**
+     * Beschreibungstexte im Speicher halten.
+     *
+     * Sie werden zweimal gebraucht (Index-Aufbau und klassische Suche). Vorher entstand der
+     * Text bei **jeder** Suche für **jedes** Foto neu – inklusive Datenbankzugriff für den Ort.
+     * Bei einigen tausend Fotos blockierte das die Suche und die Tastatur hakte.
+     */
+    private val descriptionCache = ConcurrentHashMap<String, String>()
+
+    fun describeCached(ctx: Context, item: MediaItem): String {
+        val key = "${item.uri}|${MetaStore.note(item.uri).hashCode()}|" +
+            "${MetaStore.tags(item.uri).hashCode()}|${MetaStore.isFavorite(item.uri)}"
+        descriptionCache[key]?.let { return it }
         val text = describe(ctx, item)
-        return AiEngine.embed(text)
+        if (descriptionCache.size > 60_000) descriptionCache.clear()
+        descriptionCache[key] = text
+        return text
     }
+
+    /** Nur für Tests/Diagnose: gibt es einen Vektor zu diesem Foto? */
+    fun hasVector(uri: String): Boolean = entries.containsKey(uri)
 
     /**
      * Alles, was das Foto beschreibt, als Text. Je aussagekräftiger dieser Text, desto besser
@@ -119,7 +284,7 @@ object SearchIndex {
         sb.append(item.bucket.replace('_', ' ')).append(' ')
         sb.append(item.format).append(' ')
         sb.append(item.family).append(' ')
-        if (item.isVideoFile) sb.append(" video film ")
+        if (item.isVideoFile) sb.append("video film ")
         if (item.isHeif) sb.append(" heic heif ")
         if (item.isRaw) sb.append(" raw rohdaten ")
         if (item.ext.equals("png", true)) sb.append(" png grafik ")
@@ -145,13 +310,13 @@ object SearchIndex {
                 .get(java.util.Calendar.HOUR_OF_DAY)
             when {
                 hour < 5 -> sb.append(" nacht dunkel ")
-                hour < 9 -> sb.append(" morgen früh fruehstueck frühstück ")
+                hour < 9 -> sb.append(" morgen frueh fruehstueck ")
                 hour < 12 -> sb.append(" vormittag ")
                 hour < 17 -> sb.append(" mittag nachmittag ")
                 hour < 21 -> sb.append(" abend sonnenuntergang ")
                 else -> sb.append(" nacht dunkel ")
             }
-            if (item.time > 0) sb.append(Fmt.dateTime(item.time)).append(' ')
+            sb.append(Fmt.dateTime(item.time)).append(' ')
         }
         // Notizen und Tags (die stärksten Hinweise – der Nutzer hat sie selbst vergeben)
         val note = MetaStore.note(item.uri)
@@ -179,6 +344,7 @@ object SearchIndex {
      */
     fun search(query: String, limit: Int = 0): List<MediaItem> {
         if (query.isBlank()) return emptyList()
+        if (entries.isEmpty()) return emptyList()
         val q = AiEngine.embed(query) ?: return emptyList()
         val scores = ArrayList<Triple<MediaItem, Float, String>>(entries.size)
         val byUri = DataHub.byUri()
@@ -191,7 +357,7 @@ object SearchIndex {
         }
         if (scores.isEmpty() || maxScore <= 0f) return emptyList()
         // Mindestähnlichkeit relativ zum besten Treffer: so findet man auch bei schwacher
-        // Ähnlichkeit (kleines Modell) alle sinnvollen Bilder, aber kein Rauschen.
+        // Ähnlichkeit alle sinnvollen Bilder, aber kein Rauschen.
         val threshold = (maxScore * 0.62f).coerceAtLeast(0.10f)
         val hits = scores.filter { it.second >= threshold }
             .sortedByDescending { it.second }
@@ -239,8 +405,11 @@ object SearchIndex {
                 data.flush()
             }
             if (!tmp.renameTo(file)) tmp.delete()
+            // Zu welchem Modell gehören diese Vektoren?
+            runCatching { File(ctx.filesDir, "$FILE.stamp").writeText(entryStamp()) }
             builtForScanMs = DataHub.lastScanMs
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            Log.w(TAG, "Suchindex speichern: ${t.message}")
         }
     }
 
@@ -269,11 +438,17 @@ object SearchIndex {
                 }
                 if (map.size >= (known * 0.6f).toInt()) {
                     map.forEach { (k, v) -> entries[k] = v }
+                    Log.i(TAG, "Suchindex geladen: ${map.size} Vektoren")
                 }
             }
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            Log.w(TAG, "Suchindex lesen: ${t.message}")
         }
     }
 
-    private const val MAGIC = 0x4E335331 // 'N3S1'
+    /** Pause zwischen zwei Fotos (ms) – sichtbar bzw. im Hintergrund. */
+    private const val PACE_MS = 12L
+    private const val PACE_BG_MS = 60L
+
+    private const val MAGIC = 0x4E335332 // 'N3S2'
 }

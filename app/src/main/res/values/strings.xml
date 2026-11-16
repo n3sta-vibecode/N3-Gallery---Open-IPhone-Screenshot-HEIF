@@ -317,8 +317,8 @@
     <string name="ai_model_pick">Pick file</string>
     <string name="ai_model_ready">Model ready: %1$s</string>
     <string name="ai_model_imported">Model loaded: %1$s</string>
-    <string name="ai_model_import_failed">File could not be read. Please pick the .task file again.</string>
-    <string name="ai_model_download_hint">The browser opens the official Google address. Download, then tap “Pick file”.</string>
+    <string name="ai_model_import_failed">The model could not be read. Please try again or pick another file.</string>
+    <string name="ai_model_download_hint">The model is downloaded straight into the app.</string>
     <string name="ai_model_size">%1$s MB</string>
     <string name="ai_model_remove">Remove model</string>
     <string name="search_open_ai">Search in your own words</string>
@@ -334,4 +334,10 @@
     <string name="map_osm_on">OpenStreetMap</string>
     <string name="map_osm_off">Offline map</string>
     <string name="map_osm_hint">OpenStreetMap loads map tiles from the internet. Loaded areas stay on the device and are shown without a connection next time.</string>
+    <string name="ai_model_broken_title">Search model not running – built-in word model is used</string>
+    <string name="ai_model_broken_hint">The model file is there, but it could not start: %1$s. You can reload it or pick another variant.</string>
+    <string name="ai_engine_failed">%1$s – not running: %2$s</string>
+    <string name="search_empty_error">The photo index could not be built: %1$s</string>
+    <string name="search_empty_indexing">The photos are still being prepared for the search – the progress bar above shows how far it is.</string>
+    <string name="search_empty_no_model">No photo matches that yet. Tip: load EmbeddingGemma 2 above for search in your own words – it works with notes, tags, place and time.</string>
 </resources>

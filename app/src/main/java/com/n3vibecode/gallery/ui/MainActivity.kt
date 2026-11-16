@@ -184,6 +184,10 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         // Nach dem Speichern im Editor (oder anderen Änderungen) Liste neu einlesen
         DataHub.rescanHandler = { reload() }
+        // Suchindex im Hintergrund aufbauen/prüfen – die App „analysiert“ die Fotos damit
+        // schon beim Start, nicht erst beim Öffnen der Suche. Kurz warten, damit das Wischen
+        // durch die Galerie Vorrang hat.
+        com.n3vibecode.gallery.ai.SearchIndex.warmUp(applicationContext, delayMs = 1200)
         // Wurde gespeichert, während die Liste nicht sichtbar war? Jetzt nachziehen.
         if (DataHub.consumePendingRescan()) reload()
     }

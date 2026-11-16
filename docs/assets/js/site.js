@@ -396,18 +396,18 @@
      ------------------------------------------------------------------ */
   const LOG = [
     {
-      v: '1.34', de: 'EmbeddingGemma 2, OSM, Metadaten', en: 'EmbeddingGemma 2, OSM, metadata',
+      v: '1.35', de: 'Suche im Hintergrund, Modell in Benutzung', en: 'Background index, model actually used',
       de_items: [
-        'Bildersuche mit EmbeddingGemma 2 (das Modell aus Google Edge Gallery) – inklusive Download direkt in der App: Text 163 MB, Text+Bild 530 MB, alles 1,3 GB, mit Fortschritt und Abbrechen.',
-        'OpenStreetMap auf der Karte zuschalten: echte Straßen statt gezeichneter Umrisse; geladene Kacheln bleiben auf dem Gerät.',
-        'Metadaten wieder erreichbar: dauerhafte Leiste unten „Metadaten, Karte & Notizen“ – antippen oder nach oben streichen.',
-        'Karte steht in den Metadaten ganz oben; zusätzlich ein Karten-Knopf in der Detailansicht.'
+        'Der Suchindex wird jetzt beim Start der App und nach jedem Neuscan im Hintergrund aufgebaut – mit Fortschritt in der Suchseite, statt bei „0 / n“ stehen zu bleiben.',
+        'EmbeddingGemma 2 wird wirklich benutzt: Die Reflection suchte die Builder-Methoden in der falschen Klasse, jeder Start scheiterte still und die Suche fiel auf das Wortmodell zurück. Ist ein Modell da, das nicht startet, steht der Grund jetzt in der Statuszeile.',
+        'Kein Einfrieren mehr: Die klassische Suche lief bei jedem Tastendruck auf dem Haupt-Thread und baute die Beschreibung jedes Fotos neu. Jetzt rechnet alles im Hintergrund, Texte werden zwischengespeichert, das Modell wird nur einmal geladen und alle Modellaufrufe laufen nacheinander.',
+        'Tastatur schließt beim Tippen auf die Treffer oder daneben – und beim Antippen von „Suchen“.'
       ],
       en_items: [
-        'Search with EmbeddingGemma 2 (the model from Google Edge Gallery) – with in-app download: text 163 MB, text+vision 530 MB, everything 1.3 GB, with progress and cancel.',
-        'OpenStreetMap on the map: real streets instead of drawn outlines; loaded tiles stay on the device.',
-        'Metadata reachable again: permanent bar at the bottom “Metadata, map & notes” – tap or swipe up.',
-        'Map sits at the top of the metadata; plus a map button in the detail view.'
+        'The search index is now built in the background at app start and after every rescan – with progress in the search screen instead of sitting at “0 / n”.',
+        'EmbeddingGemma 2 is actually used: the reflection looked for the builder methods in the wrong class, every start failed silently and search fell back to the word model. If a model is present but will not start, the reason now shows in the status line.',
+        'No more freezing: the classic search ran on the main thread on every keystroke, rebuilding the description of every photo. Everything now runs in the background, texts are cached, the model is loaded only once and all model calls are serialised.',
+        'The keyboard closes when you tap the results or beside them – and when you tap “Search”.'
       ]
     },
     {
@@ -606,7 +606,7 @@
     'hero.h1a': 'Apple screenshots.',
     'hero.h1b': 'Finally on Android.',
     'hero.lead': 'N3 Gallery opens Apple’s tiled HEIC containers – including 10-bit, HDR and gain maps. Plus 35 RAW formats, AVIF, SVG and HEVC video. Entirely offline.',
-    'hero.note': 'Version 1.34 · 44 MB · open source',
+    'hero.note': 'Version 1.35 · 44 MB · open source',
     'hero.f1': 'No internet access',
     'hero.f2': 'No accounts',
     'hero.f3': 'No ads',
@@ -693,7 +693,7 @@
     'privacy.c2': 'No account, no sign-in, no cloud, no server.',
     'privacy.c3': 'No ads, no telemetry, no analytics SDK.',
     'privacy.c4': 'Notes, tags and favourites are additionally backed up outside the app – a reinstall costs nothing.',
-    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.34-release.apk | grep uses-permission</code>',
+    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.35-release.apk | grep uses-permission</code>',
     'install.kicker': 'Installation',
     'install.h2': 'Three steps onto the device.',
     'install.p': 'The app is not distributed through a store: the finished APK comes straight from the build and the signing key stays the same. That is why new versions can simply be laid over the installed one.',
