@@ -42,68 +42,51 @@ jobs:
             > /tmp/deps.txt 2>&1 || true
           grep -iE "mediapipe|litert" /tmp/deps.txt | sort -u > /tmp/deps-mediapipe.txt || true
 
-      - name: AARs direkt laden und untersuchen
+      - name: LiteRT-LM-Versionen vergleichen
         shell: bash
         continue-on-error: true
         run: |
-          # WICHTIG: GitHub startet "bash -eo pipefail". Ohne set +e bricht der erste
-          # fehlgeschlagene Befehl ab, und der Bericht entsteht nie.
           set +e +o pipefail
           OUT=/tmp/bericht.md
-          {
-            echo "## LiteRT-LM im Paket"
-            echo ""
-          } > "$OUT"
-
-          D="https://dl.google.com/dl/android/maven2"
-          rm -rf /tmp/x
-          mkdir -p /tmp/x/mp /tmp/x/lm
-
-          AAR_MP="$D/com/google/mediapipe/tasks-retrieval/1.2.3/tasks-retrieval-1.2.3.aar"
-          AAR_LM="$D/com/google/ai/edge/litertlm/litertlm-android/0.17.0-alpha1/litertlm-android-0.17.0-alpha1.aar"
+          D="https://dl.google.com/dl/android/maven2/com/google/ai/edge/litertlm/litertlm-android"
 
           {
-            echo "### Download"
-            curl -sSL -m 240 -o /tmp/x/mp.aar -w "tasks-retrieval: HTTP %{http_code}, %{size_download} Bytes\n" "$AAR_MP" || echo "tasks-retrieval: curl-Fehler"
-            curl -sSL -m 240 -o /tmp/x/lm.aar -w "litertlm: HTTP %{http_code}, %{size_download} Bytes\n" "$AAR_LM" || echo "litertlm: curl-Fehler"
-            ls -l /tmp/x
+            echo "## Welche LiteRT-LM-Version passt zu tasks-retrieval 1.2.3?"
             echo ""
-          } >> "$OUT" 2>&1
+            echo "### Verfügbare Versionen"
+            echo '```'
+            curl -sSL -m 90 "$D/maven-metadata.xml" | tr '<' '\n<' | grep -oE "^<version>[^<]+" | sed 's/<version>//' | tail -40
+            echo '```'
+            echo ""
+          } > "$OUT" 2>&1
 
-          ( cd /tmp/x/mp && unzip -oq ../mp.aar && echo "mp entpackt" && ls -l ) >> "$OUT" 2>&1
-          ( cd /tmp/x/lm && unzip -oq ../lm.aar && echo "lm entpackt" && ls -l ) >> "$OUT" 2>&1
+          # Welche Klasse fehlt? ActivationDataType + InputData + passende Signatur prüfen
+          for V in $(curl -sSL -m 90 "$D/maven-metadata.xml" | tr '<' '\n<' | grep -oE "^<version>[^<]+" | sed 's/<version>//' | tail -12); do
+            JAR="/tmp/lm-$V.jar"
+            mkdir -p /tmp/unz
+            rm -rf /tmp/unz/*
+            if curl -sSL -m 180 -o "/tmp/lm-$V.aar" "$D/$V/litertlm-android-$V.aar"; then
+              ( cd /tmp/unz && unzip -oq "/tmp/lm-$V.aar" classes.jar ) && mv /tmp/unz/classes.jar "$JAR"
+              {
+                echo "### Version $V"
+                echo '```'
+                echo -n "ActivationDataType: "
+                unzip -l "$JAR" | grep -q "ActivationDataType" && echo "vorhanden" || echo "FEHLT"
+                echo -n "InputData:          "
+                unzip -l "$JAR" | grep -q "InputData" && echo "vorhanden" || echo "FEHLT"
+                echo -n "EmbeddingResponse:  "
+                unzip -l "$JAR" | grep -q "EmbeddingResponse" && echo "vorhanden" || echo "FEHLT"
+                echo "Konstruktor EmbeddingEngineConfig:"
+                javap -classpath "$JAR" com.google.ai.edge.litertlm.EmbeddingEngineConfig 2>&1 | grep "EmbeddingEngineConfig(" | head -3
+                echo '```'
+                echo ""
+              } >> "$OUT" 2>&1
+            else
+              echo "### Version $V – nicht ladbar" >> "$OUT"
+            fi
+          done
 
-          {
-            echo ""
-            echo "### LiteRT-LM-Klassen im MediaPipe-AAR"
-            echo '```'
-            unzip -l /tmp/x/mp/classes.jar 2>&1 | grep -E "litertlm|UniversalEmbedder" | awk '{print $4}' | head -40
-            echo '```'
-            echo ""
-            echo "### Klassen im LiteRT-LM-AAR"
-            echo '```'
-            unzip -l /tmp/x/lm/classes.jar 2>&1 | grep -E "ActivationDataType|EmbeddingEngine|Backend|EmbeddingOptions" | awk '{print $4}' | head -40
-            echo '```'
-            echo ""
-            echo "### Signaturen (javap)"
-            echo '```'
-            for J in /tmp/x/lm/classes.jar /tmp/x/mp/classes.jar; do
-              echo "== $J"
-              for C in \
-                com.google.ai.edge.litertlm.EmbeddingEngineConfig \
-                com.google.ai.edge.litertlm.ActivationDataType \
-                com.google.mediapipe.tasks.retrieval.universalembedder.UniversalEmbedderOptions\$Builder ; do
-                echo "--- $C"
-                javap -classpath "$J" "$C" 2>&1 | head -30
-              done
-            done
-            echo '```'
-            echo ""
-            echo "_Automatisch erzeugt von diag-modell.yml_"
-          } >> "$OUT" 2>&1
-
-          head -c 60000 "$OUT" > /tmp/bericht-kurz.md 2>/dev/null
-          ls -l /tmp/bericht-kurz.md || echo "kein Bericht" > /tmp/bericht-kurz.md
+          head -c 60000 "$OUT" > /tmp/bericht-kurz.md 2>/dev/null || echo "kein Bericht" > /tmp/bericht-kurz.md
 
       - name: Bericht als Commit-Kommentar ablegen
         if: always()
