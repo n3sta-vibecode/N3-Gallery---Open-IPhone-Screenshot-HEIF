@@ -96,6 +96,11 @@ android {
         }
     }
 
+    testOptions {
+        // Reine Logik-Tests (Reflection, Größenprüfung, Suche) laufen ohne Gerät in CI.
+        unitTests.isReturnDefaultValues = true
+    }
+
     lint {
         abortOnError = false
         checkReleaseBuilds = false
@@ -158,6 +163,9 @@ dependencies {
     // Suche fiel auf das Wortmodell zurück. Ab 0.18.0 ist alles vorhanden (in CI geprüft:
     // 0.18.0 / 0.18.1 / 0.19.0 / 0.19.1 – deshalb die neueste stabile).
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.19.1")
+
+    // Tests: reine JVM-Unit-Tests (laufen in CI mit `gradlew test`)
+    testImplementation("junit:junit:4.13.2")
 
     // Eingebauter HEIF/AVIF-Decoder (libheif + libde265 + libdav1d).
     // Ohne ihn kann Android nur "einfache" HEICs öffnen – gekachelte Apple-Container

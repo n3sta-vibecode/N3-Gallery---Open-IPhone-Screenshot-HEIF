@@ -42,6 +42,24 @@ jobs:
           ls "$SDK/platforms" || true
           ls "$SDK/build-tools" || true
 
+      # Reine Logik-Tests (Reflection-Suche, Größenprüfung der Modelldateien, Trefferbewertung).
+      # Sie laufen ohne Gerät und prüfen genau die Stellen, an denen 1.35/1.36 gescheitert sind.
+      - name: Unit-Tests
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:testReleaseUnitTest --no-daemon --stacktrace 2>&1 | tee /tmp/test.log
+          echo "--- Ergebnisse:"
+          find app/build/test-results -name "*.xml" -exec grep -h "<testsuite" {} \; | \
+            sed -E 's/.*tests="([0-9]+)".*failures="([0-9]+)".*errors="([0-9]+)".*/Tests: \1, Fehler: \2, Abbrüche: \3/' || true
+
+      - name: Testergebnisse melden
+        if: failure()
+        shell: bash
+        run: |
+          ZEILE=$(grep -E "FAILED|AssertionError" /tmp/test.log | head -5 | tr '\n' ' ') || true
+          echo "::error::Unit-Tests fehlgeschlagen: ${ZEILE:-siehe Protokoll}"
+
       # Schutzprüfung gegen einen Fehler, der 1.37 gekostet hat: tasks-retrieval deklariert eine
       # litertlm-android-Version, die zu alt für den eigenen Code ist (ActivationDataType fehlt
       # in 0.17.0-alpha1). Wir pinnen 0.19.1 – hier wird geprüft, dass die Auflösung wirklich

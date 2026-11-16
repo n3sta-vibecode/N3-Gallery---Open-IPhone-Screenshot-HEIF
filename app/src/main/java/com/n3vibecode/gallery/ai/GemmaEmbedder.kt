@@ -295,95 +295,19 @@ internal class GemmaEmbedder(
 
         private fun classOrNull(name: String): Class<*>? = runCatching { Class.forName(name) }.getOrNull()
 
-        /** Methode in der ganzen Klassenhierarchie – die Parameter müssen **zuweisbar** sein. */
-        private fun findMethod(target: Class<*>, name: String, args: Array<out Any?>): Method? {
-            val wanted = args.map { it?.javaClass }
-            var c: Class<*>? = target
-            while (c != null) {
-                for (m in c.declaredMethods) {
-                    if (m.name != name) continue
-                    if (m.parameterTypes.size != wanted.size) continue
-                    val fits = m.parameterTypes.indices.all { i ->
-                        val declared = m.parameterTypes[i].let { if (it.isPrimitive) boxed(it) else it }
-                        val value = wanted[i]
-                        if (value == null) !declared.isPrimitive else declared.isAssignableFrom(value)
-                    }
-                    if (!fits) continue
-                    runCatching { m.isAccessible = true }
-                    return m
-                }
-                c = c.superclass
-            }
-            return null
-        }
+        // Die eigentliche Suche/Aufruf-Logik liegt in Reflect (ohne Android-Abhängigkeit,
+        // damit sie per Unit-Test geprüft werden kann – siehe app/src/test/.../ReflectTest.kt).
+        private fun findMethod(target: Class<*>, name: String, args: Array<out Any?>): Method? =
+            Reflect.findMethod(target, name, args.map { it?.javaClass })
 
-        private fun boxed(c: Class<*>): Class<*> = when (c) {
-            java.lang.Boolean.TYPE -> java.lang.Boolean::class.java
-            java.lang.Byte.TYPE -> java.lang.Byte::class.java
-            java.lang.Character.TYPE -> java.lang.Character::class.java
-            java.lang.Short.TYPE -> java.lang.Short::class.java
-            java.lang.Integer.TYPE -> java.lang.Integer::class.java
-            java.lang.Long.TYPE -> java.lang.Long::class.java
-            java.lang.Float.TYPE -> java.lang.Float::class.java
-            java.lang.Double.TYPE -> java.lang.Double::class.java
-            else -> c
-        }
+        private fun invoke(target: Any, name: String, vararg args: Any?): Any? =
+            Reflect.call(target, name, *args)
 
-        private fun invoke(target: Any, name: String, vararg args: Any?): Any? {
-            val m = findMethod(target.javaClass, name, args)
-                ?: throw NoSuchMethodException("$name an ${target.javaClass.simpleName}")
-            return try {
-                m.invoke(target, *args)
-            } catch (e: InvocationTargetException) {
-                throw e.cause ?: e
-            }
-        }
+        private fun invokeStatic(target: Class<*>, name: String, vararg args: Any?): Any? =
+            Reflect.callStatic(target, name, *args)
 
-        private fun invokeStatic(target: Class<*>, name: String, vararg args: Any?): Any? {
-            val m = findMethod(target, name, args)
-                ?: throw NoSuchMethodException("$name an ${target.simpleName}")
-            return try {
-                m.invoke(null, *args)
-            } catch (e: InvocationTargetException) {
-                throw e.cause ?: e
-            }
-        }
+        private fun fieldOf(target: Any, name: String): Any? = Reflect.field(target, name)
 
-        private fun fieldOf(target: Any, name: String): Any? = runCatching {
-            var c: Class<*>? = target.javaClass
-            while (c != null) {
-                c.declaredFields.firstOrNull { it.name == name }?.let {
-                    it.isAccessible = true
-                    return@runCatching it.get(target)
-                }
-                c = c.superclass
-            }
-            null
-        }.getOrNull()
-
-        /**
-         * Fehler lesbar machen.
-         *
-         * Wichtig: `NoClassDefFoundError` ist ein `Error`, kein `Exception` – in 1.35/1.36 kam
-         * er deshalb als nackter Klassenname in der Oberfläche an („com.google.ai.edge.
-         * litertlm.ActivationDataType“). Hier wird er zu einem Satz.
-         */
-        private fun human(t: Throwable?): String {
-            if (t == null) return "unbekannter Fehler"
-            var root: Throwable = t
-            while (root.cause != null && root.cause !== root) root = root.cause!!
-            val msg = root.message?.takeIf { it.isNotBlank() }
-            return when (root) {
-                is NoClassDefFoundError -> {
-                    val cls = msg ?: root.javaClass.simpleName
-                    "Klasse fehlt: $cls (LiteRT-LM/MediaPipe-Version passt nicht)"
-                }
-                is UnsatisfiedLinkError -> "Natives Modul fehlt (${msg ?: "LiteRT-LM"})"
-                is OutOfMemoryError -> "Zu wenig Arbeitsspeicher für das Modell"
-                is NoSuchMethodException -> "API nicht gefunden ($msg)"
-                is NoSuchFieldException -> "Feld nicht gefunden ($msg)"
-                else -> msg ?: root.javaClass.simpleName
-            }
-        }
+        private fun human(t: Throwable?): String = Reflect.human(t)
     }
 }
