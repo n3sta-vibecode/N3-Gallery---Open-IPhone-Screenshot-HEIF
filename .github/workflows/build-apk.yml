@@ -57,7 +57,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          ZEILE=$(grep -E "FAILED|AssertionError" /tmp/test.log | head -5 | tr '\n' ' ') || true
+          ZEILE=$(grep -E "^e: |AssertionError|FAILED" /tmp/test.log | head -8 | tr '\n' ' ') || true
           echo "::error::Unit-Tests fehlgeschlagen: ${ZEILE:-siehe Protokoll}"
 
       # Schutzprüfung gegen einen Fehler, der 1.37 gekostet hat: tasks-retrieval deklariert eine
