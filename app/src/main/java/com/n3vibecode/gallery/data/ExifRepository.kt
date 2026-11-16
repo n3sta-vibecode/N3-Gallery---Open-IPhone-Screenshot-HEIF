@@ -809,7 +809,9 @@ object ExifRepository {
 
     /** Liest `47,050641N` (XMP) oder `+47.050641+008.306603/` (ISO 6709) in Grad um. */
     fun xmpCoordinate(text: String, key: String): Double? {
-        val re = Regex(key + """[^0-9+\-]{0,24}([+\-]?\d{1,3}(?:[.,]\d+)?)[^0-9]{0,4}([NSEWnsew])?""")
+        // Wichtig: das Richtungszeichen (N/S/O/W) darf NICHT als Füllzeichen gelten, sonst
+        // wird aus „8,3065W“ ein positives 8,3065 statt −8,3065.
+        val re = Regex(key + """[^0-9+\-]{0,24}([+\-]?\d{1,3}(?:[.,]\d+)?)[^0-9NSEWnsew]{0,4}([NSEWnsew])?""")
         val m = re.find(text) ?: return null
         var value = m.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return null
         val hemi = m.groupValues[2].uppercase()

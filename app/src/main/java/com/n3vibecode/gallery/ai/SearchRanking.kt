@@ -45,13 +45,26 @@ object SearchRanking {
         .replace(Regex("[^a-z0-9]+"), " ")
         .trim()
 
+    /**
+     * Zweite Schreibweise ohne Umlaut-Ersatz: „grün“ wird zu `gruen`, aber wer `grun` tippt,
+     * soll es trotzdem finden. Deshalb wird zusätzlich `ue → u`, `ae → a`, `oe → o` gefaltet.
+     */
+    private fun withoutUmlautFiller(text: String): String = text
+        .replace("ue", "u").replace("ae", "a").replace("oe", "o")
+
     /** Passt der Suchtext? Alle Wörter müssen vorkommen – als Teilwort oder Wortanfang. */
     fun matches(query: String, candidate: String): Boolean {
         val terms = normalize(query).split(' ').filter { it.isNotBlank() }
         if (terms.isEmpty()) return false
         val text = normalize(candidate)
         if (text.isEmpty()) return false
-        val words = text.split(' ')
-        return terms.all { t -> text.contains(t) || words.any { it.startsWith(t) } }
+        // Beide Schreibweisen prüfen: mit und ohne Umlaut-Ersatz (grün/gruen/grun)
+        val variants = listOf(text, withoutUmlautFiller(text))
+        val words = variants.flatMap { it.split(' ') }
+        return terms.all { t ->
+            val folded = withoutUmlautFiller(t)
+            variants.any { v -> v.contains(t) || v.contains(folded) } ||
+                words.any { w -> w.startsWith(folded) || w.startsWith(t) }
+        }
     }
 }
