@@ -108,6 +108,15 @@ kotlin {
     }
 }
 
+// LiteRT-LM-Version hart festlegen. Grund: tasks-retrieval 1.2.3 bringt 0.17.0-alpha1 mit,
+// ist aber gegen 0.18+ gebaut (ActivationDataType/InputData fehlen in der alten Fassung).
+// "force" gewinnt auch gegen eine exakte Angabe der Bibliothek.
+configurations.all {
+    resolutionStrategy {
+        force("com.google.ai.edge.litertlm:litertlm-android:0.19.1")
+    }
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
@@ -133,7 +142,12 @@ dependencies {
     // Rechnet auf GPU, sonst CPU – siehe ai/GemmaEmbedder.kt.
     // WICHTIG: Ohne diese Bibliothek baut die App trotzdem – die Suche nutzt dann
     // automatisch das eingebaute Wortmodell (siehe ai/AiEngine.kt).
-    implementation("com.google.mediapipe:tasks-retrieval:1.2.3")
+    // Die von MediaPipe mitgelieferte LiteRT-LM-Version wird hier ausgeschlossen: Sie ist zu
+    // alt (siehe unten) und wurde von Gradle auch gegen eine neuere Angabe durchgesetzt –
+    // ohne exclude kam trotz eigener Version 0.17.0 im Ergebnis heraus.
+    implementation("com.google.mediapipe:tasks-retrieval:1.2.3") {
+        exclude(group = "com.google.ai.edge.litertlm", module = "litertlm-android")
+    }
 
     // **Feste LiteRT-LM-Version – der eigentliche Fehler bis 1.36.**
     // tasks-retrieval:1.2.3 deklariert selbst litertlm-android:0.17.0-alpha1, ist aber
