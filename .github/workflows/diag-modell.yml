@@ -55,13 +55,22 @@ jobs:
             echo ""
             echo "### Verfügbare Versionen"
             echo '```'
-            curl -sSL -m 90 "$D/maven-metadata.xml" | tr '<' '\n<' | grep -oE "^<version>[^<]+" | sed 's/<version>//' | tail -40
+            curl -sSL -m 90 -o /tmp/lm-meta.xml -w "metadata HTTP %{http_code}\n" "$D/maven-metadata.xml"
+            head -c 2000 /tmp/lm-meta.xml
+            echo ""
+            echo "-- gefiltert:"
+            tr '<' '\n' < /tmp/lm-meta.xml | sed -n 's/^version>\(.*\)/\1/p'
             echo '```'
             echo ""
           } > "$OUT" 2>&1
 
           # Welche Klasse fehlt? ActivationDataType + InputData + passende Signatur prüfen
-          for V in $(curl -sSL -m 90 "$D/maven-metadata.xml" | tr '<' '\n<' | grep -oE "^<version>[^<]+" | sed 's/<version>//' | tail -12); do
+          VERSIONS=$(curl -sSL -m 90 "$D/maven-metadata.xml" 2>/dev/null | tr '<' '\n' | sed -n 's/^version>\(.*\)/\1/p' | tail -12)
+          if [ -z "$VERSIONS" ]; then
+            echo "Keine Versionen gelesen – feste Liste" >> "$OUT"
+            VERSIONS="0.17.0-alpha1 0.16.0 0.15.0 0.14.0"
+          fi
+          for V in $VERSIONS; do
             JAR="/tmp/lm-$V.jar"
             mkdir -p /tmp/unz
             rm -rf /tmp/unz/*
