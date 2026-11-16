@@ -18,6 +18,12 @@
     <!-- Unzensierte GPS-Daten lesen (Android 10+) -->
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
 
+    <!-- Suchmodell (EmbeddingGemma 2, ~163 MB bis 1,3 GB) einmalig herunterladen.
+         Die App geht NUR dafür online – ausgelöst durch den Knopf in der Bildersuche.
+         Ohne Download funktioniert die Suche mit dem eingebauten Wortmodell. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- Bewusst KEINE INTERNET-Berechtigung: die App arbeitet zu 100 % offline. -->
 
     <application

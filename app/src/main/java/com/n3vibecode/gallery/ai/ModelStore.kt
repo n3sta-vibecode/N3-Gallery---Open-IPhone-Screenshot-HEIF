@@ -1,57 +1,70 @@
 package com.n3vibecode.gallery.ai
 
 import android.content.Context
-import android.net.Uri
 import android.util.Log
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Verwaltet das **Gemma-Embedding-Modell** auf dem Gerät.
+ * Verwaltet das **EmbeddingGemma-2-Modell** auf dem Gerät – inklusive **Download in der App**.
  *
- * Warum eine eigene Ablage? Das Modell ist ~ 200 MB groß. Es liegt deshalb **nicht** im
- * App-Paket (das würde jede Installation aufblähen), sondern wird einmal heruntergeladen und
- * im App-Speicher abgelegt:
+ * Die Dateien sind zu groß für das App-Paket (163 MB / 530 MB / 1,3 GB), deshalb werden sie
+ * einmal heruntergeladen und im App-Speicher abgelegt:
  *
  * ```
- * /data/data/com.n3vibecode.gallery/files/models/embedding_gemma.task
+ * /data/data/com.n3vibecode.gallery/files/models/<datei>.litertlm
  * ```
  *
- * **Der Download selbst läuft nicht durch die App.** Die App hat bewusst keine
- * Internet-Berechtigung (das ist eine Zusage dieser App, prüfbar in der Manifest-Datei).
- * Der Knopf in der Suche übergibt die offizielle Adresse an den Browser bzw. den
- * Download-Manager des Geräts – das Herunterladen macht also der Browser, nicht die App.
- * Danach wird die Datei einmal ausgewählt ([importFrom]) und liegt im App-Speicher; ab dann
- * arbeitet die Suche vollständig offline.
+ * Der Download läuft in einem eigenen Thread, meldet Fortschritt und lässt sich abbrechen.
+ * Er wird nur durch eine bewusste Handlung ausgelöst (Knopf in der Bildersuche) – die App
+ * geht nicht von sich aus online. Gesucht wird danach vollständig offline.
  */
 object ModelStore {
 
     private const val TAG = "N3Ai"
-
-    /** Ordner im App-Speicher (kein Zugriff von außen nötig → keine Berechtigung). */
     private const val DIR = "models"
 
-    /**
-     * Offizielle Bezugsadresse des Gemma-Embedding-Modells (Google AI Edge / MediaPipe).
-     * EmbeddingGemma 300M, int4/int8-quantisiert – läuft per LiteRT auch auf der NPU.
-     */
-    const val DOWNLOAD_URL =
-        "https://storage.googleapis.com/mediapipe-models/text_embedder/embedding_gemma/int4int8/latest/embedding_gemma.task"
+    /** Ein anwählbares Modell. */
+    enum class Variant(
+        val file: String,
+        val url: String,
+        val label: String,
+        val sizeMb: Int,
+        val note: String
+    ) {
+        TEXT(
+            "embeddinggemma-2-text-270m.litertlm",
+            "https://huggingface.co/litert-community/embeddinggemma-2-text-270m-litert-lm/resolve/main/embeddinggemma-2-text-270m.litertlm",
+            "EmbeddingGemma 2 · Text (270M)",
+            163,
+            "kleinste Variante · nur Text"
+        ),
+        TEXT_VISION(
+            "embeddinggemma-2-text-vision-440m.litertlm",
+            "https://huggingface.co/litert-community/embeddinggemma-2-text-vision-440m-litert-lm/resolve/main/embeddinggemma-2-text-vision-440m.litertlm",
+            "EmbeddingGemma 2 · Text + Bild (440M)",
+            530,
+            "empfohlen · Text und Bilder in einem Raum"
+        ),
+        FULL(
+            "embeddinggemma-2-740m.litertlm",
+            "https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm/resolve/main/embeddinggemma-2-740m.litertlm",
+            "EmbeddingGemma 2 · alles (740M)",
+            1300,
+            "größte Variante · Text, Bild, Audio"
+        )
+    }
 
-    /** Kleiner Ersatz (6 MB) – falls jemand kein 200-MB-Modell laden möchte. */
-    const val DOWNLOAD_URL_SMALL =
-        "https://storage.googleapis.com/mediapipe-models/text_embedder/universal_sentence_encoder/float32/latest/universal_sentence_encoder.tflite"
-
-    const val FILE_NAME = "embedding_gemma.task"
-
-    /** Erwartete Dateiendungen eines Modells. */
-    private val EXTENSIONS = listOf(".task", ".tflite")
+    private val EXTENSIONS = listOf(".litertlm", ".task", ".tflite")
 
     fun dir(ctx: Context): File = File(ctx.filesDir, DIR).apply { if (!exists()) mkdirs() }
 
-    /** Alle vorhandenen Modelldateien, größte zuerst (das große Modell ist das gute). */
+    /** Alle vorhandenen Modelldateien, größte zuerst. */
     fun models(ctx: Context): List<File> =
         dir(ctx).listFiles()
-            ?.filter { f -> f.isFile && EXTENSIONS.any { f.name.endsWith(it, true) } && f.length() > 1024 }
+            ?.filter { f -> f.isFile && EXTENSIONS.any { f.name.endsWith(it, true) } && f.length() > 1024 * 1024 }
             ?.sortedByDescending { it.length() }
             ?: emptyList()
 
@@ -60,21 +73,136 @@ object ModelStore {
 
     fun hasModel(ctx: Context): Boolean = best(ctx) != null
 
+    // ------------------------------------------------------------------ Download
+
+    @Volatile private var downloading = false
+    @Volatile private var cancelRequested = false
+    private val cancelled = AtomicBoolean(false)
+
+    fun isDownloading(): Boolean = downloading
+
+    fun cancel() {
+        cancelRequested = true
+        cancelled.set(true)
+    }
+
     /**
-     * Kopiert eine vom Nutzer ausgewählte Datei in den App-Speicher.
-     * Gibt die Zieldatei zurück oder `null`, wenn das Lesen scheitert.
+     * Lädt ein Modell herunter (im Hintergrund-Thread, den der Aufrufer stellt).
+     *
+     * [onProgress] bekommt (geladene Bytes, Gesamt-Bytes oder -1). [onDone] bekommt die
+     * fertige Datei oder `null` (abgebrochen/fehlgeschlagen).
      */
-    fun importFrom(ctx: Context, uri: Uri): File? {
-        val name = queryName(ctx, uri) ?: FILE_NAME
-        // Sicherer Dateiname: keine Pfadanteile, nur Buchstaben/Ziffern/Punkt/Bindestrich
-        val safe = name.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { FILE_NAME }
-        val target = File(dir(ctx), if (EXTENSIONS.any { safe.endsWith(it, true) }) safe else "$safe.task")
-        val tmp = File(dir(ctx), "${target.name}.part")
-        return try {
+    fun download(
+        ctx: Context,
+        variant: Variant,
+        onProgress: ((Long, Long) -> Unit)? = null,
+        onDone: ((File?) -> Unit)? = null
+    ) {
+        if (downloading) {
+            onDone?.invoke(null)
+            return
+        }
+        downloading = true
+        cancelRequested = false
+        cancelled.set(false)
+        val app = ctx.applicationContext
+        val target = File(dir(app), variant.file)
+        val tmp = File(dir(app), "${variant.file}.part")
+        var connection: HttpURLConnection? = null
+        try {
+            var url = URL(variant.url)
+            // Hugging Face leitet auf den CDN um – Redirects manuell folgen (max. 5)
+            var hops = 0
+            while (hops++ < 5) {
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 20_000
+                    readTimeout = 30_000
+                    instanceFollowRedirects = false
+                    setRequestProperty("User-Agent", "N3Gallery/1.34 (Android)")
+                }
+                val code = connection.responseCode
+                if (code in 300..399) {
+                    val location = connection.getHeaderField("Location") ?: break
+                    url = URL(location)
+                    connection.disconnect()
+                    continue
+                }
+                if (code != 200) {
+                    Log.w(TAG, "Download HTTP $code für ${variant.file}")
+                    onDone?.invoke(null)
+                    return
+                }
+                break
+            }
+            val conn = connection ?: run { onDone?.invoke(null); return }
+            val total = conn.contentLengthLong
+            tmp.delete()
+            conn.inputStream.use { input ->
+                tmp.outputStream().buffered(1 shl 16).use { out ->
+                    val buffer = ByteArray(1 shl 16)
+                    var done = 0L
+                    var lastReport = 0L
+                    while (true) {
+                        if (cancelled.get()) {
+                            tmp.delete()
+                            onDone?.invoke(null)
+                            return
+                        }
+                        val n = input.read(buffer)
+                        if (n <= 0) break
+                        out.write(buffer, 0, n)
+                        done += n
+                        // höchstens alle 2 MB melden (spart UI-Arbeit)
+                        if (done - lastReport > 2L * 1024 * 1024 || done == total) {
+                            lastReport = done
+                            onProgress?.invoke(done, total)
+                        }
+                    }
+                }
+            }
+            if (tmp.length() < 1024 * 1024) {
+                tmp.delete()
+                onDone?.invoke(null)
+                return
+            }
+            if (!tmp.renameTo(target)) {
+                tmp.delete()
+                onDone?.invoke(null)
+                return
+            }
+            Log.i(TAG, "Modell geladen: ${target.name} (${target.length() / 1048576} MB)")
+            onProgress?.invoke(target.length(), target.length())
+            onDone?.invoke(target)
+        } catch (t: Throwable) {
+            Log.w(TAG, "Download fehlgeschlagen: ${t.message}")
+            tmp.delete()
+            onDone?.invoke(null)
+        } finally {
+            runCatching { connection?.disconnect() }
+            downloading = false
+            cancelRequested = false
+        }
+    }
+
+    /**
+     * Übernimmt eine vom Nutzer gewählte Datei (z. B. schon vorhandenes `.litertlm`)
+     * in den App-Speicher.
+     */
+    fun importTo(ctx: Context, uri: android.net.Uri): File? {
+        val name = runCatching {
+            ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && c.moveToFirst()) c.getString(idx) else null
+            }
+        }.getOrNull() ?: uri.lastPathSegment ?: Variant.TEXT.file
+        val safe = name.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { Variant.TEXT.file }
+        val target = File(dir(ctx), safe)
+        val tmp = File(dir(ctx), "$safe.part")
+        return runCatching {
             ctx.contentResolver.openInputStream(uri)?.use { input ->
                 tmp.outputStream().buffered(1 shl 16).use { out -> input.copyTo(out, 1 shl 16) }
             } ?: return null
-            if (tmp.length() < 1024) {
+            if (tmp.length() < 1024 * 1024) {
                 tmp.delete()
                 return null
             }
@@ -84,8 +212,7 @@ object ModelStore {
             }
             Log.i(TAG, "Modell übernommen: ${target.name} (${target.length() / 1048576} MB)")
             target
-        } catch (t: Throwable) {
-            Log.w(TAG, "Modell konnte nicht übernommen werden: ${t.message}")
+        }.getOrElse {
             tmp.delete()
             null
         }
@@ -93,16 +220,17 @@ object ModelStore {
 
     fun delete(file: File): Boolean = runCatching { file.delete() }.getOrDefault(false)
 
-    /** Alle Modelle löschen (z. B. um Platz zu schaffen). */
     fun clear(ctx: Context) {
         models(ctx).forEach { delete(it) }
     }
 
-    /** Dateiname aus einer Content-URI lesen (Anzeigename des Dokuments). */
-    private fun queryName(ctx: Context, uri: Uri): String? = runCatching {
-        ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
-            val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-            if (idx >= 0 && c.moveToFirst()) c.getString(idx) else null
-        }
-    }.getOrNull() ?: uri.lastPathSegment
+    /** Freier Speicher im App-Datenordner (Bytes). */
+    fun freeBytes(ctx: Context): Long = runCatching {
+        val stat = android.os.StatFs(ctx.filesDir.absolutePath)
+        stat.availableBlocksLong * stat.blockSizeLong
+    }.getOrDefault(0L)
+
+    /** Reicht der Platz für ein Modell? (mit 150 MB Reserve) */
+    fun hasRoomFor(ctx: Context, variant: Variant): Boolean =
+        freeBytes(ctx) > variant.sizeMb.toLong() * 1024 * 1024 + 150L * 1024 * 1024
 }

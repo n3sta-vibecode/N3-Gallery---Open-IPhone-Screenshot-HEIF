@@ -13,6 +13,7 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
@@ -47,6 +48,21 @@ class MapView @JvmOverloads constructor(
 
     var onMarkerClick: ((Marker) -> Unit)? = null
     var onZoomChanged: ((Int) -> Unit)? = null
+
+    /** Wird gerufen, wenn der OSM-Schalter seine Meinung ändert (für den Knopf). */
+    var onProviderChanged: ((Boolean) -> Unit)? = null
+
+    /**
+     * OpenStreetMap statt der gezeichneten Landflächen (auf Wunsch). Standard: **aus** –
+     * die App bleibt offline, solange niemand die Karte umschaltet.
+     */
+    var useOsm: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            onProviderChanged?.invoke(value)
+            invalidate()
+        }
 
     // ------------------------------------------------------------------ Zustand
 
@@ -118,6 +134,9 @@ class MapView @JvmOverloads constructor(
     }
 
     private val clusterRect = RectF()
+
+    /** Helle Fläche, solange OSM-Kacheln noch geladen werden. */
+    private val OSM_BG = Color.rgb(242, 239, 233)
 
     init {
         isClickable = true
@@ -231,10 +250,13 @@ class MapView @JvmOverloads constructor(
         super.onDraw(canvas)
         if (width == 0 || height == 0) return
 
-        val sharp = !gesturing
-        if (sharp) drawVector(canvas) else drawBitmap(canvas)
-
-        drawGraticule(canvas)
+        if (useOsm) {
+            drawOsm(canvas)
+        } else {
+            val sharp = !gesturing
+            if (sharp) drawVector(canvas) else drawBitmap(canvas)
+            drawGraticule(canvas)
+        }
         buildClusters()
         drawClusters(canvas)
         drawAttribution(canvas)
@@ -474,8 +496,66 @@ class MapView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * OpenStreetMap-Kacheln zeichnen (Web-Mercator).
+     *
+     * Fehlende Kacheln werden im Hintergrund geholt und lösen ein Neuzeichnen aus. Solange
+     * eine Kachel noch fehlt, bleibt die Fläche leer (helle Fläche) – kein Flackern, kein
+     * Springen: die Positionen werden aus derselben Mercator-Rechnung bestimmt wie die Kacheln.
+     */
+    private fun drawOsm(canvas: Canvas) {
+        canvas.drawColor(OSM_BG)
+        val center = OsmTiles.worldPx(centerLat, centerLon, OSM_Z)
+        // px je Weltpixel der Zoomstufe: wie viel Grad sieht man?
+        val osmPxPerDeg = (1 shl OSM_Z) * OsmTiles.TILE.toDouble() / 360.0
+        // Unsere Karte rechnet in px/Grad – daraus den Mercator-Maßstab ableiten
+        val scale = (pxPerDeg / osmPxPerDeg).toFloat()
+        if (scale <= 0f) return
+        canvas.save()
+        canvas.translate(width / 2f, height / 2f)
+        canvas.scale(scale, scale)
+        canvas.translate(-center.first.toFloat(), -center.second.toFloat())
+
+        val halfW = (width / 2f / scale)
+        val halfH = (height / 2f / scale)
+        val left = center.first - halfW
+        val top = center.second - halfH
+        val right = center.first + halfW
+        val bottom = center.second + halfH
+
+        val n = 1 shl OSM_Z
+        var ty = floor(top / OsmTiles.TILE).toInt()
+        while (ty * OsmTiles.TILE <= bottom) {
+            if (ty in 0 until n) {
+                var tx = floor(left / OsmTiles.TILE).toInt()
+                while (tx * OsmTiles.TILE <= right) {
+                    val x = ((tx % n) + n) % n // Welt umlaufend
+                    val bmp = OsmTiles.cached(context, OSM_Z, x, ty)
+                    if (bmp != null) {
+                        canvas.drawBitmap(
+                            bmp,
+                            (tx * OsmTiles.TILE).toFloat(),
+                            (ty * OsmTiles.TILE).toFloat(),
+                            bitmapPaint
+                        )
+                    } else if (!gesturing) {
+                        OsmTiles.request(context, OSM_Z, x, ty) { post { invalidate() } }
+                    }
+                    tx++
+                }
+            }
+            ty++
+        }
+        canvas.restore()
+    }
+
+    /** Zoomstufe der OSM-Kacheln (folgt der aktuellen Ansicht). */
+    private val OSM_Z: Int
+        get() = OsmTiles.zoomFor(pxPerDeg)
+
     private fun drawAttribution(canvas: Canvas) {
-        val text = "Karte: Natural Earth · Orte: GeoNames (CC BY 4.0)"
+        val text = if (useOsm) "© OpenStreetMap-Mitwirkende"
+        else "Karte: Natural Earth · Orte: GeoNames (CC BY 4.0)"
         attributionPaint.textSize = 9 * density
         canvas.drawText(text, 8 * density, height - 8 * density, attributionPaint)
     }

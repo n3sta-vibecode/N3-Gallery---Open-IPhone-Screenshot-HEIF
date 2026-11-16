@@ -312,8 +312,8 @@
 
     <!-- Bildersuche: Modell holen/auswählen -->
     <string name="ai_model_missing_title">Search engine: built-in word model</string>
-    <string name="ai_model_missing_hint">For real Gemma embedding (like Google Edge Gallery) the model file is needed – about 200 MB. Download it once: the browser fetches it, then pick the file here. The app itself never goes online.</string>
-    <string name="ai_model_download">Download model</string>
+    <string name="ai_model_missing_hint">EmbeddingGemma 2 (like in Google Edge Gallery) is not installed yet. Download it once – about 163 MB to 1.3 GB. Afterwards search runs on the device, fully offline.</string>
+    <string name="ai_model_download">Load model</string>
     <string name="ai_model_pick">Pick file</string>
     <string name="ai_model_ready">Model ready: %1$s</string>
     <string name="ai_model_imported">Model loaded: %1$s</string>
@@ -323,4 +323,15 @@
     <string name="ai_model_remove">Remove model</string>
     <string name="search_open_ai">Search in your own words</string>
     <string name="map_tap_to_open">Tap the map for the full view</string>
+    <string name="ai_model_choose">Which model?</string>
+    <string name="ai_model_starting">Starting download · about %1$d MB</string>
+    <string name="ai_model_progress">%1$d of %2$d MB</string>
+    <string name="ai_model_progress_unknown">%1$d MB downloaded</string>
+    <string name="ai_model_no_space">Not enough space</string>
+    <string name="ai_model_no_space_msg">The model needs about %1$d MB. Please free up some space first.</string>
+    <string name="sheet_pull_title">Metadata, map &amp; notes</string>
+    <string name="sheet_pull_hint">swipe up · tap to open</string>
+    <string name="map_osm_on">OpenStreetMap</string>
+    <string name="map_osm_off">Offline map</string>
+    <string name="map_osm_hint">OpenStreetMap loads map tiles from the internet. Loaded areas stay on the device and are shown without a connection next time.</string>
 </resources>

@@ -396,6 +396,21 @@
      ------------------------------------------------------------------ */
   const LOG = [
     {
+      v: '1.34', de: 'EmbeddingGemma 2, OSM, Metadaten', en: 'EmbeddingGemma 2, OSM, metadata',
+      de_items: [
+        'Bildersuche mit EmbeddingGemma 2 (das Modell aus Google Edge Gallery) – inklusive Download direkt in der App: Text 163 MB, Text+Bild 530 MB, alles 1,3 GB, mit Fortschritt und Abbrechen.',
+        'OpenStreetMap auf der Karte zuschalten: echte Straßen statt gezeichneter Umrisse; geladene Kacheln bleiben auf dem Gerät.',
+        'Metadaten wieder erreichbar: dauerhafte Leiste unten „Metadaten, Karte & Notizen“ – antippen oder nach oben streichen.',
+        'Karte steht in den Metadaten ganz oben; zusätzlich ein Karten-Knopf in der Detailansicht.'
+      ],
+      en_items: [
+        'Search with EmbeddingGemma 2 (the model from Google Edge Gallery) – with in-app download: text 163 MB, text+vision 530 MB, everything 1.3 GB, with progress and cancel.',
+        'OpenStreetMap on the map: real streets instead of drawn outlines; loaded tiles stay on the device.',
+        'Metadata reachable again: permanent bar at the bottom “Metadata, map & notes” – tap or swipe up.',
+        'Map sits at the top of the metadata; plus a map button in the detail view.'
+      ]
+    },
+    {
       v: '1.33', de: 'Modell-Download, Karte in den Details', en: 'Model download, map in the details',
       de_items: [
         'Gemma-Modell direkt in der App holen: „Modell laden“ öffnet die offizielle Adresse im Browser, „Datei wählen“ übernimmt sie – danach rechnet die Suche auf der NPU. Die App bleibt ohne Internet-Berechtigung.',
@@ -591,7 +606,7 @@
     'hero.h1a': 'Apple screenshots.',
     'hero.h1b': 'Finally on Android.',
     'hero.lead': 'N3 Gallery opens Apple’s tiled HEIC containers – including 10-bit, HDR and gain maps. Plus 35 RAW formats, AVIF, SVG and HEVC video. Entirely offline.',
-    'hero.note': 'Version 1.33 · 44 MB · open source',
+    'hero.note': 'Version 1.34 · 44 MB · open source',
     'hero.f1': 'No internet access',
     'hero.f2': 'No accounts',
     'hero.f3': 'No ads',
@@ -678,7 +693,7 @@
     'privacy.c2': 'No account, no sign-in, no cloud, no server.',
     'privacy.c3': 'No ads, no telemetry, no analytics SDK.',
     'privacy.c4': 'Notes, tags and favourites are additionally backed up outside the app – a reinstall costs nothing.',
-    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.33-release.apk | grep uses-permission</code>',
+    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.34-release.apk | grep uses-permission</code>',
     'install.kicker': 'Installation',
     'install.h2': 'Three steps onto the device.',
     'install.p': 'The app is not distributed through a store: the finished APK comes straight from the build and the signing key stays the same. That is why new versions can simply be laid over the installed one.',

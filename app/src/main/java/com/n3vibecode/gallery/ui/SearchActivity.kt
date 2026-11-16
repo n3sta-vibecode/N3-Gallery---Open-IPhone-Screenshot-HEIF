@@ -93,7 +93,10 @@ class SearchActivity : AppCompatActivity() {
         toolbar.setNavigationOnClickListener { finish() }
 
         // Modell holen: der Browser lädt die offizielle Datei, die App liest sie danach ein.
-        findViewById<View>(R.id.btnModelDownload).setOnClickListener { openModelDownload() }
+        findViewById<View>(R.id.btnModelDownload).setOnClickListener { chooseModelAndDownload() }
+        findViewById<View>(R.id.btnModelCancel).setOnClickListener {
+            ModelStore.cancel()
+        }
         findViewById<View>(R.id.btnModelPick).setOnClickListener { pickModelFile() }
 
         val root = findViewById<View>(R.id.searchRoot)
@@ -165,7 +168,7 @@ class SearchActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    /** Modell-Leiste zeigen, solange kein Gemma-Modell vorhanden ist. */
+    /** Modell-Leiste: zeigen, solange kein EmbeddingGemma-2-Modell da ist. */
     private fun refreshModelBox(status: AiEngine.Status) {
         if (status.modelInstalled) {
             modelBox.visibility = View.GONE
@@ -176,33 +179,78 @@ class SearchActivity : AppCompatActivity() {
         tvModelHint.text = getString(R.string.ai_model_missing_hint)
     }
 
-    /**
-     * Modell besorgen. Die App hat keine Internet-Berechtigung – deshalb übergibt sie die
-     * offizielle Adresse an den Browser/Download-Manager des Geräts. Danach „Datei wählen“.
-     */
-    private fun openModelDownload() {
-        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(ModelStore.DOWNLOAD_URL))
-        val opened = runCatching { startActivity(intent) }.isSuccess
-        if (!opened) {
-            // Kein Browser: Adresse zum Kopieren anzeigen
+    /** Auswahl: welches EmbeddingGemma-2-Modell geladen werden soll. */
+    private fun chooseModelAndDownload() {
+        val variants = ModelStore.Variant.entries
+        val labels = variants.map { v ->
+            "${v.label}\n${v.note} · ca. ${v.sizeMb} MB"
+        }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.ai_model_choose)
+            .setItems(labels) { _, which -> startDownload(variants[which]) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    /** Download in der App – mit Fortschritt, Abbrechen und Platzprüfung. */
+    private fun startDownload(variant: ModelStore.Variant) {
+        if (!ModelStore.hasRoomFor(this, variant)) {
             MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.ai_model_download)
-                .setMessage(ModelStore.DOWNLOAD_URL)
-                .setPositiveButton(R.string.ok) { _, _ ->
-                    val clip = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    clip.setPrimaryClip(
-                        android.content.ClipData.newPlainText("model", ModelStore.DOWNLOAD_URL)
-                    )
-                    Toast.makeText(this, R.string.ai_model_download_hint, Toast.LENGTH_LONG).show()
-                }
-                .setNegativeButton(R.string.cancel, null)
+                .setTitle(R.string.ai_model_no_space)
+                .setMessage(getString(R.string.ai_model_no_space_msg, variant.sizeMb))
+                .setPositiveButton(R.string.ok, null)
                 .show()
             return
         }
-        Toast.makeText(this, R.string.ai_model_download_hint, Toast.LENGTH_LONG).show()
+        findViewById<View>(R.id.modelButtons).visibility = View.GONE
+        findViewById<View>(R.id.modelProgressBox).visibility = View.VISIBLE
+        val bar = findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.modelProgress)
+        val tv = findViewById<TextView>(R.id.tvModelProgress)
+        bar.isIndeterminate = true
+        tv.text = getString(R.string.ai_model_starting, variant.sizeMb)
+
+        Thread({
+            ModelStore.download(applicationContext, variant,
+                onProgress = { done, total ->
+                    runOnUiThread {
+                        if (total > 0) {
+                            bar.isIndeterminate = false
+                            bar.progress = ((done * 100) / total).toInt()
+                            tv.text = getString(
+                                R.string.ai_model_progress,
+                                done / 1048576, total / 1048576
+                            )
+                        } else {
+                            tv.text = getString(R.string.ai_model_progress_unknown, done / 1048576)
+                        }
+                    }
+                },
+                onDone = { file ->
+                    runOnUiThread {
+                        findViewById<View>(R.id.modelButtons).visibility = View.VISIBLE
+                        findViewById<View>(R.id.modelProgressBox).visibility = View.GONE
+                        if (file == null) {
+                            bar.isIndeterminate = false
+                            bar.progress = 0
+                            Toast.makeText(
+                                this,
+                                getString(R.string.ai_model_import_failed),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            Toast.makeText(
+                                this,
+                                getString(R.string.ai_model_imported, file.name),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            reloadEngine()
+                        }
+                    }
+                })
+        }, "n3-model-download").apply { isDaemon = true }.start()
     }
 
-    /** Datei-Auswahl (SAF) – die gewählte .task-Datei wird in den App-Speicher kopiert. */
+    /** Datei-Auswahl (SAF) – falls das Modell schon auf dem Gerät liegt. */
     private fun pickModelFile() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -219,7 +267,7 @@ class SearchActivity : AppCompatActivity() {
         progress.visibility = View.VISIBLE
         tvEngine.text = getString(R.string.ai_loading)
         Thread({
-            val file = ModelStore.importFrom(applicationContext, uri)
+            val file = ModelStore.importTo(applicationContext, uri)
             runOnUiThread {
                 progress.visibility = View.GONE
                 if (file == null) {
@@ -245,7 +293,6 @@ class SearchActivity : AppCompatActivity() {
                 SearchIndex.build(applicationContext, DataHub.all) {
                     runOnUiThread {
                         showEngineStatus(status)
-                        refreshModelBox(status)
                         search()
                     }
                 }

@@ -124,13 +124,13 @@ object AiEngine {
      */
     object Prompt {
         const val ASSET_DIR = "models"
-        /** Reihenfolge = Vorliebe (NPU-taugliche Variante zuerst). */
+
+        /** Reihenfolge = Vorliebe: großes Modell (Text+Bild) zuerst, dann kleiner. */
         val CANDIDATES = listOf(
-            "gemma_embedding_npu.task",
-            "embedding_gemma.task",
-            "gemma_embedding.task",
-            "embedding_gemma_300m.task",
-            "universal_sentence_encoder.tflite"
+            "embeddinggemma-2-740m.litertlm",
+            "embeddinggemma-2-text-vision-440m.litertlm",
+            "embeddinggemma-2-text-270m.litertlm",
+            "embedding_gemma.task"
         )
     }
 }

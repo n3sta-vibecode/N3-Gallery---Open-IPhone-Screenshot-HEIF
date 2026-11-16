@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -66,6 +67,25 @@ class MapActivity : AppCompatActivity() {
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
+        }
+
+        // Kartenstil: gezeichnete Karte (offline) oder OpenStreetMap (lädt Kacheln)
+        val btnProvider = findViewById<com.google.android.material.button.MaterialButton>(R.id.btnProvider)
+        val prefs = getSharedPreferences("n3_map", MODE_PRIVATE)
+        mapView.useOsm = prefs.getBoolean("osm", false)
+        mapView.onProviderChanged = { osm ->
+            btnProvider.text = getString(if (osm) R.string.map_osm_off else R.string.map_osm_on)
+        }
+        btnProvider.text = getString(
+            if (mapView.useOsm) R.string.map_osm_off else R.string.map_osm_on
+        )
+        btnProvider.setOnClickListener {
+            val next = !mapView.useOsm
+            mapView.useOsm = next
+            prefs.edit().putBoolean("osm", next).apply()
+            if (next) {
+                Toast.makeText(this, R.string.map_osm_hint, Toast.LENGTH_LONG).show()
+            }
         }
 
         findViewById<View>(R.id.btnZoomIn).setOnClickListener { mapView.zoomBy(1.7f) }

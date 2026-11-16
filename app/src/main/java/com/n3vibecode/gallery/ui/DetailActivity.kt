@@ -130,6 +130,32 @@ class DetailActivity : AppCompatActivity() {
         // Es gibt bewusst NUR zwei Zustände: ganz zu oder ganz offen.
         // Ein „halb“ angepeektes Blatt war die Ursache dafür, dass die Detail-Liste
         // Wischgesten verschluckt hat (Scrollbereich größer als der sichtbare Ausschnitt).
+        // Immer sichtbare Leiste unten: antippen = auf, hochstreichen = auf.
+        val pull = findViewById<View>(R.id.sheetPull)
+        val pullArrow = findViewById<TextView>(R.id.tvPullArrow)
+        pull.setOnClickListener { behavior.state = BottomSheetBehavior.STATE_EXPANDED }
+        pull.setOnTouchListener(object : View.OnTouchListener {
+            private var startY = 0f
+            override fun onTouch(v: View, e: android.view.MotionEvent): Boolean {
+                when (e.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        startY = e.rawY
+                        return true
+                    }
+                    android.view.MotionEvent.ACTION_UP -> {
+                        // Schon ein kleines Hochwischen öffnet (wie „hochscrollen“ erwartet)
+                        if (startY - e.rawY > 12 * resources.displayMetrics.density) {
+                            behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                        } else {
+                            v.performClick()
+                        }
+                        return true
+                    }
+                }
+                return false
+            }
+        })
+
         behavior = BottomSheetBehavior.from(sheet)
         behavior.isHideable = true
         behavior.isDraggable = true
@@ -276,6 +302,8 @@ class DetailActivity : AppCompatActivity() {
             append("   ")
             append(position + 1).append(" / ").append(ViewState.viewList.size)
         }
+        findViewById<TextView>(R.id.tvPullSub)?.text =
+            item.name + " · " + getString(R.string.sheet_pull_hint)
         tvSheetTitle.text = item.name
         tvSheetSub.text = item.shortInfo() + " · " + Fmt.dateTime(item.time)
         btnFav.setImageResource(
@@ -324,6 +352,8 @@ class DetailActivity : AppCompatActivity() {
                 behavior.isDraggable = false
                 sheetHint.visibility = View.VISIBLE
                 topBar.visibility = View.GONE
+                // Offen: die Leiste unten verschwindet (das Blatt füllt den Bildschirm)
+                findViewById<View>(R.id.sheetPull)?.visibility = View.GONE
             }
             else -> {
                 // Zu (HIDDEN oder Übergang): Liste gesperrt, Blatt lässt sich hochziehen.
@@ -331,6 +361,7 @@ class DetailActivity : AppCompatActivity() {
                 behavior.isDraggable = true
                 sheetHint.visibility = View.GONE
                 topBar.visibility = View.VISIBLE
+                findViewById<View>(R.id.sheetPull)?.visibility = View.VISIBLE
             }
         }
     }

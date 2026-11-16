@@ -1,102 +1,95 @@
-# KI-Suche: Gemma-Embedding im Modell (offline, auf der NPU)
+# KI-Suche: EmbeddingGemma 2 auf dem Gerät
 
 Die Bildersuche arbeitet **wie in „Google Edge Gallery“**: Der Suchtext und jedes Foto
 bekommen einen Zahlenvektor (Embedding), gesucht wird nach der größten Ähnlichkeit.
-Gerechnet wird **auf dem Gerät** – die App hat bewusst **keine Internet-Berechtigung**.
+Gerechnet wird **auf dem Gerät**.
 
 ```
-Suchtext ──► Gemma-Embedding (MediaPipe / LiteRT)  ──►  Vektor ─┐
-                                                               ├─► Kosinus-Ähnlichkeit ──► Treffer
-Foto-Beschreibung ──► Gemma-Embedding              ──►  Vektor ─┘
+Suchtext ──► EmbeddingGemma 2 (MediaPipe Tasks Retrieval / LiteRT-LM) ──► Vektor ─┐
+                                                                                  ├─► Kosinus-Ähnlichkeit ──► Treffer
+Foto-Beschreibung ──► EmbeddingGemma 2                                            ─┘
 ```
 
-## 1. Beschleuniger: NPU → GPU → CPU (automatisch)
+## 1. Welches Modell?
 
-`ai/GemmaEmbedder.kt` startet das Modell in dieser Reihenfolge und **prüft jede Stufe mit
-einem Testlauf**. Erst wenn ein Vektor zurückkommt, gilt die Stufe als aktiv:
+[**EmbeddingGemma 2**](https://blog.google/innovation-and-ai/technology/developers-tools/embeddinggemma-2/):
+740 M Parameter, nativ multimodal (Text, Bild, Audio in einem Vektorraum), Apache 2.0,
+veröffentlicht am 6. Oktober 2026. Google setzt es in „Google AI Edge Gallery“ für
+„Instant Media Search“ ein.
 
-| Stufe | Bibliothek | Hinweis |
-| --- | --- | --- |
-| **NPU** | MediaPipe `Delegate.NPU` (LiteRT + NPU-Treiber) | schnellste Stufe; braucht ein NPU-taugliches Modell und eine NPU im Gerät (Snapdragon 8 Gen 3+, Tensor G3+, Dimensity 9000+ …) |
-| **GPU** | MediaPipe `Delegate.GPU` | funktioniert auf fast allen Geräten ab Android 8 |
-| **CPU** | MediaPipe `Delegate.CPU` | immer möglich, langsamer |
-| *Ersatz* | eingebautes Wortmodell (`ai/LocalTextModel.kt`) | wenn **kein** Modell im App-Paket liegt – dann funktioniert die Suche trotzdem, nur weniger klug |
+Die App nutzt `com.google.mediapipe:tasks-retrieval` (**UniversalEmbedder**) auf der
+LiteRT-LM-Laufzeit. Die Modelldateien liegen im `.litertlm`-Format auf Hugging Face
+(LiteRT-Community):
 
-In der Suchseite steht unter dem Eingabefeld, welche Stufe gerade rechnet
-(`⚡ Gemma Embedding (NPU)`, `◦ Wortmodell (eingebaut)` …).
+| Variante in der App | Datei | Größe | Inhalt |
+| --- | --- | --- | --- |
+| Text (270M) | `embeddinggemma-2-text-270m.litertlm` | ca. 163 MB | nur Text |
+| Text + Bild (440M) | `embeddinggemma-2-text-vision-440m.litertlm` | ca. 530 MB | empfohlen |
+| alles (740M) | `embeddinggemma-2-740m.litertlm` | ca. 1,3 GB | Text, Bild, Audio |
 
 ## 2. Modell holen – direkt in der App
 
-In der **Bildersuche** steht unter dem Suchfeld eine Leiste, solange kein Modell vorhanden ist:
+In der **Bildersuche** steht unter dem Suchfeld eine Leiste, solange kein Modell vorhanden
+ist:
 
-* **„Modell laden“** → der **Browser** (oder Download-Manager) öffnet die offizielle
-  Google-Adresse und lädt `embedding_gemma.task` (~ 200 MB).
-* **„Datei wählen“** → die heruntergeladene Datei einmal antippen. Die App kopiert sie in
-  ihren eigenen Speicher (`files/models/`), prüft sie und startet die Suchmaschine neu –
-  ab dann rechnet Gemma, bevorzugt auf der **NPU**.
+1. **„Modell laden“** → Auswahl der drei Varianten → Download startet **in der App**, mit
+   Fortschrittsbalken in MB, „Abbrechen“ und einer Platzprüfung vorher.
+2. Danach liegt die Datei in `files/models/` (App-Speicher), die Suchmaschine startet neu
+   und der Index wird neu berechnet.
+3. Die Leiste verschwindet, in der Statuszeile steht z. B. `◆ EmbeddingGemma 2 · GPU`.
 
-> **Warum nicht direkt in der App herunterladen?** Die App hat bewusst **keine**
-> `INTERNET`-Berechtigung – das ist eine Zusage dieser App und in der APK prüfbar
-> (`aapt dump badging … | grep uses-permission`). Den Download macht deshalb der Browser;
-> die App liest nur die fertige Datei. Nach dem einmaligen Holen ist alles offline.
+Ist das Modell schon auf dem Gerät (z. B. per Dateimanager geladen), lässt es sich mit
+**„Datei wählen“** übernehmen.
 
-Das Modell lässt sich auch schon **beim Bauen** beilegen (`app/src/main/assets/models/`) –
-dann ist die Leiste sofort verschwunden. Für eigene Builds: siehe unten.
+> **Netzwerk:** Die App hat `INTERNET` **nur** für diesen Download (und optional für
+> OpenStreetMap-Kacheln). Beides passiert ausschließlich auf Antippen. Ohne Modell läuft die
+> Suche mit dem eingebauten Wortmodell (Abschnitt 4) – vollständig offline.
 
-## 2b. Modell beim Bauen beilegen (optional)
+## 3. Beschleuniger
 
-Die fertige `.task`-Datei von Google AI Edge herunterladen und in den Ordner
-`app/src/main/assets/models/` legen. Die App erkennt automatisch die erste passende Datei:
+`ai/GemmaEmbedder.kt` startet das Modell in dieser Reihenfolge und **prüft jede Stufe mit
+einem Testlauf**:
 
-| Dateiname (eine davon) | Modell |
-| --- | --- |
-| `gemma_embedding_npu.task` | EmbeddingGemma 300M, NPU-Variante (bevorzugt) |
-| `embedding_gemma.task` | EmbeddingGemma 300M, int4/int8 (ca. 200 MB) |
-| `embedding_gemma_300m.task` | wie oben, anderer Name |
-| `universal_sentence_encoder.tflite` | kleiner Ersatz (ca. 6 MB) |
+| Stufe | Wie | Hinweis |
+| --- | --- | --- |
+| **GPU** | `Delegate.GPU` (LiteRT) | schnellste Stufe, auf den meisten Geräten ab Android 8 verfügbar |
+| **CPU** | `Delegate.CPU` | immer möglich; das 270M-Modell bleibt auch hier flott |
+| *Ersatz* | eingebautes Wortmodell (`ai/LocalTextModel.kt`) | wenn kein Modell vorhanden ist |
 
-```bash
-mkdir -p app/src/main/assets/models
-# EmbeddingGemma 300M (MediaPipe-Variante), ca. 200 MB:
-curl -L -o app/src/main/assets/models/embedding_gemma.task \
-  https://storage.googleapis.com/mediapipe-models/text_embedder/embedding_gemma/int4int8/latest/embedding_gemma.task
+> **Zur NPU:** EmbeddingGemma 1 ließ sich über den `TextEmbedder` noch mit `Delegate.NPU`
+> ansprechen. EmbeddingGemma 2 läuft über LiteRT-LM, das in MediaPipe nur GPU und CPU
+> anbietet – die NPU wird dort (Stand 1.34) nicht adressiert. Sobald Google das freigibt,
+> kommt die Stufe in `GemmaEmbedder.create` einfach vor die GPU.
 
-# oder der kleine Ersatz (ca. 6 MB):
-curl -L -o app/src/main/assets/models/universal_sentence_encoder.tflite \
-  https://storage.googleapis.com/mediapipe-models/text_embedder/universal_sentence_encoder/float32/latest/universal_sentence_encoder.tflite
-```
+## 4. Was in den Foto-Vektor einfließt
 
-> Ohne Modell baut und läuft die App normal weiter – dann rechnet das eingebaute
-> Wortmodell (siehe Abschnitt 4).
-
-## 3. Was in den Foto-Vektor einfließt
-
-Damit die Suche ohne Bildanalyse (das würde Minuten pro Bibliothek kosten) richtig gut
-trifft, wird zu jedem Foto ein **Beschreibungstext** gebaut (`ai/SearchIndex.kt`):
+Damit die Suche ohne Bildanalyse treffsicher ist, wird zu jedem Foto ein
+**Beschreibungstext** gebaut (`ai/SearchIndex.kt`):
 
 * Dateiname und Ordner (z. B. „Screenshot“, „IMG 2043“)
 * eigene **Notizen und Tags** (XMP) – die stärksten Hinweise
-* **Ort** („Luzern“, „Schweiz“ – offline aus der Ortsliste, siehe unten)
+* **Ort** („Luzern“, „Schweiz“ – offline aus der Ortsliste)
 * **Zeit**: Jahr, Monat, Wochentag, Tageszeit („Nacht“, „Abend“, „Frühstück“)
 * Format (HEIC, RAW, SVG …), Video, Hochformat/Screenshot, Panorama
 * Kamera/Objektiv, Favoriten
 
 Der Suchtext wird mit demselben Modell eingebettet – dadurch findet „strandurlaub“ auch
 Bilder mit der Notiz „Sommer am Meer“. Zusätzlich läuft immer die klassische Suche
-(Dateiname/Ordner/Tags) mit, damit z. B. „IMG_2043“ sicher gefunden wird.
+(Dateiname/Ordner/Tags) mit. Der Index wird in `n3_search_index.v1` gespeichert und beim
+nächsten Start wiederverwendet; nach einem Modellwechsel wird er neu berechnet.
 
-Der Index wird nach dem ersten Aufbau in `n3_search_index.v1` (App-Speicher) abgelegt und
-beim nächsten Start wiederverwendet.
+> Mit der **Text+Bild-Variante** (440M) kann später zusätzlich der Bildinhalt selbst
+> eingebettet werden (`embedImage`) – der Aufbau dafür steht schon.
 
-## 4. Ohne Modell: das eingebaute Wortmodell
+## 5. Ohne Modell: das eingebaute Wortmodell
 
-`assets/ai/wortmodell.txt` (~11 kB, erzeugt von `tools/ki/genwortmodell.js`) enthält rund
-240 Wörter mit Bedeutungsvektoren („strand“ liegt bei „meer“, „urlaub“, „sonne“) sowie
+`assets/ai/wortmodell.txt` (~12 kB, erzeugt von `tools/ki/genwortmodell.js`) enthält rund
+245 Wörter mit Bedeutungsvektoren („strand“ liegt bei „meer“, „urlaub“, „sonne“) sowie
 Zeichen-3-Gramme für unbekannte Wörter und Tippfehler. Das ist kein Ersatz für ein echtes
-Embedding-Modell, aber es sorgt dafür, dass die Suche **auf jedem Gerät sofort** sinnvolle
-Treffer liefert – auch ohne 200 MB Download.
+Embedding-Modell, aber die Suche funktioniert **auf jedem Gerät sofort**.
 
-## 5. Datenschutz
+## 6. Datenschutz
 
-Alles bleibt auf dem Gerät: kein Netzwerk, kein Konto, keine Cloud. Die MediaPipe-Bibliothek
-arbeitet rein lokal; die Modelldatei liegt im App-Paket.
+Suche, Index und Embeddings bleiben auf dem Gerät. Es gibt keine Cloud, kein Konto, keine
+Kennung. Netzwerkzugriff nur beim ausdrücklichen Herunterladen des Modells (und optional
+für OpenStreetMap-Kacheln).

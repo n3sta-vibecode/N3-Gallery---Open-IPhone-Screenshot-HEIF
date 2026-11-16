@@ -94,6 +94,63 @@
             android:tint="#FFFFFFFF" />
     </LinearLayout>
 
+    <!--
+        Immer sichtbare Leiste am unteren Rand („nach oben streichen“).
+        Ohne sie war das geschlossene Blatt nicht greifbar: es hat Höhe 0 und die
+        Metadaten-Liste darunter schluckt jede Berührung – Hochstreichen tat nichts.
+    -->
+    <LinearLayout
+        android:id="@+id/sheetPull"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="18dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvPullTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/sheet_pull_title"
+                android:textColor="@color/n3_on_bg"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvPullSub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/sheet_pull_hint"
+                android:textColor="@color/n3_on_surface_variant"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvPullArrow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="︿"
+            android:textColor="@color/n3_accent"
+            android:textSize="20sp" />
+    </LinearLayout>
+
     <!-- Info-/EXIF-Blatt: Ziehen nach oben = alle Details, nach unten = schließen -->
     <LinearLayout
         android:id="@+id/sheet"

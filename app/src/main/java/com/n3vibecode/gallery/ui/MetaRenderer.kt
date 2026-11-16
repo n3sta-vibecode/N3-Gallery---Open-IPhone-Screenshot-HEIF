@@ -89,6 +89,11 @@ object MetaRenderer {
             setOnClickListener {
                 runCatching { context.startActivity(MapActivity.intentFor(context, point.first, point.second)) }
             }
+            // Gleiche Wahl wie in der großen Karte (offline oder OpenStreetMap)
+            useOsm = runCatching {
+                context.getSharedPreferences("n3_map", Context.MODE_PRIVATE)
+                    .getBoolean("osm", false)
+            }.getOrDefault(false)
             post { fitToMarkers(minDegrees = 6f) }
         }
         frame.addView(view)

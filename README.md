@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.33-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.33/N3-Gallery-1.33-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.33-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.33/N3-Gallery-1.33-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.33.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.33/N3Gallery-Projekt-1.33.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.34-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.34/N3-Gallery-1.34-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.34-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.34/N3-Gallery-1.34-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.34.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.34/N3Gallery-Projekt-1.34.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -35,7 +35,17 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.33 – Gemma-Modell direkt in der App, Karte in den Details, eine Suchleiste
+## 🆕 Version 1.34 – EmbeddingGemma 2, Download in der App, OpenStreetMap, Metadaten erreichbar
+
+* **EmbeddingGemma 2** (das Modell aus Google Edge Gallery, 740 M, multimodal) über
+  `tasks-retrieval` + LiteRT-LM – echte Modell-Dateien, nicht mehr der alte Text-Embedder.
+* **Download direkt in der App** mit Auswahl (Text 163 MB / Text+Bild 530 MB / alles 1,3 GB),
+  Fortschritt, Abbrechen und Platzprüfung. Kein Browser-Umweg mehr.
+* **OpenStreetMap** auf der Karte zuschaltbar (echte Straßen, Kacheln bleiben gespeichert).
+* **Metadaten wieder erreichbar:** dauerhafte Leiste unten „Metadaten, Karte & Notizen“ –
+  antippen oder nach oben streichen. Vorher war das geschlossene Blatt nicht greifbar.
+
+## Version 1.33 – Gemma-Modell direkt in der App, Karte in den Details, eine Suchleiste
 
 * **Gemma-Embedding 2 holen, ohne das Projekt zu bauen:** In der Bildersuche steht unter dem
   Suchfeld „Modell laden“ (öffnet die offizielle Google-Adresse im Browser) und „Datei
@@ -242,7 +252,7 @@ Das komplette **Android-Studio-Projekt** liegt im Ordner `N3Gallery/`
 | **Detailansicht** | Vollbild, Wischen zwischen Bildern, Info-Blatt hochziehen, Favorit, Teilen, Löschen, „EXIF kopieren“, Tippen blendet Bedienelemente aus |
 | **Metadaten** | Datei & Format, **Sensor & Aufnahme**, Kamera & Optik, **GPS**, **RAW/DNG-Details**, **HEIF/AVIF-Containertechnik**, Notizen/XMP + Rohdump **aller** EXIF-Felder |
 | **Notizen & Tags** | Werden als **echte EXIF/XMP-Metadaten in die Bilddatei geschrieben** (ImageDescription, UserComment, XMP dc:description/dc:subject) |
-| **Karte** | Alle Fotos mit GPS auf einer Karte – mit Ortsnamen („Luzern, Schweiz“), Zusammenfassung dicht beieinanderliegender Fotos, Zwei-Finger-Zoom. Landflächen (Natural Earth) und 46 000 Orte (GeoNames) liegen im App-Paket: **kein Kartendienst, kein Schlüssel, kein Internet** |
+| **Karte** | Alle Fotos mit GPS auf einer Karte – mit Ortsnamen („Luzern, Schweiz“), Zusammenfassung dicht beieinanderliegender Fotos, Zwei-Finger-Zoom. Standard ist die **gezeichnete Offline-Karte** (Natural Earth + 46 000 Orte im App-Paket); per Knopf lässt sich **OpenStreetMap** zuschalten (echte Straßen, Kacheln werden gemerkt). In den Metadaten steht die Karte ganz oben |
 | **Vorschau (langes Drücken)** | Zeigt das Foto **vollständig im Original-Seitenverhältnis** (iPhone-Screenshot hochkant, Panorama breit …), nichts beschnitten – mit Ort und Schnellaktionen (Favorit, Teilen, Bearbeiten, Details, Karte, Löschen) |
 | **Bildersuche** | Suche in eigenen Worten („strandurlaub“, „rechnung vom montag“) mit **Gemma-Embedding auf dem Gerät** – rechnet auf der **NPU**, sonst GPU, sonst CPU. Index wird gespeichert; ohne Modell-Datei springt ein eingebautes Wortmodell ein (siehe [README-KI.md](README-KI.md)) |
 
@@ -405,10 +415,20 @@ Geräte unproblematisch, für eine kommerzielle Veröffentlichung im Play Store 
 * `READ_EXTERNAL_STORAGE` (nur Android ≤ 12)
 * `ACCESS_MEDIA_LOCATION` (ungezensierte GPS-Daten)
 * `WRITE_EXTERNAL_STORAGE` (nur Android ≤ 10, fürs Metadaten-Schreiben)
-* **Kein** Internet, **kein** Netzwerkzugriff, **keine** Analyse-Bibliotheken
+* **Kein** Tracking, **keine** Analyse-Bibliotheken, **keine** Konten, keine Cloud
 
-Karte, Ortsnamen und das KI-Modell liegen im App-Paket und rechnen ausschließlich auf dem
-Gerät – auch die Bildersuche braucht kein Netz (siehe [README-KI.md](README-KI.md)).
+### Netzwerk: nur auf ausdrückliche Handlung
+
+Die App enthält `INTERNET` – aber ausschließlich für zwei Dinge, die **du** antippst:
+
+| Was | Wann | Ohne Handlung |
+| --- | --- | --- |
+| Suchmodell EmbeddingGemma 2 (163 MB / 530 MB / 1,3 GB) | Knopf „Modell laden“ in der Bildersuche | nichts – Suche nutzt das eingebaute Wortmodell |
+| OpenStreetMap-Kacheln | Knopf „OpenStreetMap“ auf der Karte | nichts – es erscheint die gezeichnete Offline-Karte |
+
+Beides ist standardmäßig **aus**. Es gibt keine Hintergrundverbindung, keine Kennung, kein
+Konto. Galerie, Metadaten, Karte (offline) und Suche funktionieren dauerhaft ohne Netz.
+Geladene OSM-Kacheln bleiben auf dem Gerät und erscheinen danach auch offline.
 
 ---
 

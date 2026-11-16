@@ -22,8 +22,8 @@ android {
         applicationId = "com.n3vibecode.gallery"
         minSdk = 26
         targetSdk = 35
-        versionCode = 34
-        versionName = "1.33"
+        versionCode = 35
+        versionName = "1.34"
         resourceConfigurations += listOf("de", "en")
         vectorDrawables.useSupportLibrary = true
 
@@ -128,11 +128,12 @@ dependencies {
     // weil Vektorgrafik).
     implementation("com.caverock:androidsvg-aar:1.4")
 
-    // Bildersuche mit Gemma-Embedding (Google AI Edge / MediaPipe Tasks).
-    // Rechnet über LiteRT auf NPU (falls vorhanden), sonst GPU, sonst CPU.
+    // Bildersuche mit **EmbeddingGemma 2** (Google AI Edge / MediaPipe Tasks).
+    // `tasks-retrieval` bringt den UniversalEmbedder mit (multimodal, LiteRT-LM) und
+    // zieht LiteRT-LM selbst mit. Rechnet auf GPU, sonst CPU – siehe ai/UniversalEmbedder.kt.
     // WICHTIG: Ohne diese Bibliothek baut die App trotzdem – die Suche nutzt dann
     // automatisch das eingebaute Wortmodell (siehe ai/AiEngine.kt).
-    implementation("com.google.mediapipe:tasks-text:0.10.29")
+    implementation("com.google.mediapipe:tasks-retrieval:latest.release")
 
     // Eingebauter HEIF/AVIF-Decoder (libheif + libde265 + libdav1d).
     // Ohne ihn kann Android nur "einfache" HEICs öffnen – gekachelte Apple-Container

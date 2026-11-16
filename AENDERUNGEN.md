@@ -1,5 +1,51 @@
 # N3 Gallery – was neu ist
 
+## 1.34 – EmbeddingGemma 2, Download in der App, OpenStreetMap, Metadaten erreichbar
+
+### 🧠 EmbeddingGemma 2 – das Modell aus Google Edge Gallery
+
+Die Bildersuche rechnet jetzt mit **EmbeddingGemma 2** (740 M Parameter, multimodal,
+Apache 2.0) – dem Modell, das Google am 6. Oktober 2026 veröffentlicht und in „Edge Gallery“
+für „Instant Media Search“ einsetzt. Technisch: `com.google.mediapipe:tasks-retrieval`
+(UniversalEmbedder) auf der LiteRT-LM-Laufzeit, Modelldateien im `.litertlm`-Format.
+
+Drei Varianten zur Auswahl, **Download direkt in der App** (mit Fortschritt, Abbrechen und
+Platzprüfung):
+
+| Variante | Größe | Inhalt |
+| --- | --- | --- |
+| Text (270M) | ca. 163 MB | nur Text-Embeddings |
+| Text + Bild (440M) | ca. 530 MB | empfohlen |
+| alles (740M) | ca. 1,3 GB | Text, Bild, Audio |
+
+Der Download läuft in der App (kein Browser-Umweg), die Datei liegt danach in
+`files/models/`. Gesucht wird vollständig auf dem Gerät.
+
+### 🗺️ OpenStreetMap auf der Karte
+
+Auf der Karte gibt es einen Umschalter: **gezeichnete Offline-Karte** (wie bisher, aus
+Natural Earth im App-Paket) oder **OpenStreetMap** mit echten Straßen und Ortsnamen.
+Geladene Kacheln bleiben im App-Speicher und erscheinen beim nächsten Mal ohne Netz.
+Nennung „© OpenStreetMap-Mitwirkende“ steht auf der Karte.
+
+### ↥ Metadaten wieder erreichbar
+
+Das Info-Blatt war im geschlossenen Zustand **nicht greifbar**: Es hatte Höhe 0, und die
+Metadaten-Liste darunter schluckte jede Berührung – Hochstreichen tat nichts. Jetzt gibt es
+eine **dauerhafte Leiste unten** („Metadaten, Karte & Notizen“): antippen öffnet, hochstreichen
+öffnet, und der Pfeil zeigt die Richtung.
+
+### 🗺️ Karte in den Metadaten
+
+Die Karte steht **ganz oben** in den Metadaten (eigenes Foto als roter Punkt, antippen =
+große Ansicht) – plus Karten-Knopf in der Detailansicht.
+
+### 🔒 Netzwerk nur auf ausdrückliche Handlung
+
+Die App hat jetzt `INTERNET` – ausschließlich für die zwei Dinge, die man selbst antippt
+(Modell-Download, OpenStreetMap-Kacheln). Beides ist standardmäßig aus; Galerie, Metadaten,
+Offline-Karte und die Suche mit Wortmodell brauchen kein Netz.
+
 ## 1.33 – Modell-Download, Karte in den Details, eine Suchleiste
 
 ### 🧠 Gemma-Embedding 2 direkt holen – ohne Projekt-Bau
