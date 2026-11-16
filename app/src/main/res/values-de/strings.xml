@@ -355,4 +355,9 @@
     <string name="ai_model_unavailable_title">Suchmodell läuft nicht – eingebautes Wortmodell wird benutzt</string>
     <string name="ai_model_unavailable_hint">Eine Modelldatei ist da, sie startet aber nicht. Bitte das Modell erneut laden – oder eine andere Variante wählen.</string>
     <string name="ai_model_diag">Details: %1$s</string>
+    <string name="ai_selftest">Modell testen …</string>
+    <string name="ai_selftest_started">Test läuft – das dauert einen Moment.</string>
+    <string name="ai_selftest_ok">OK · %1$s</string>
+    <string name="ai_selftest_failed">FEHLGESCHLAGEN · %1$s</string>
+    <string name="ai_selftest_nomodel">Keine vollständige Modelldatei gefunden.</string>
 </resources>

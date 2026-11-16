@@ -211,7 +211,45 @@ class SearchActivity : AppCompatActivity() {
     private fun onMenuItem(item: MenuItem): Boolean = when (item.itemId) {
         R.id.action_search_model -> { showModelDialog(); true }
         R.id.action_search_index -> { showIndexDialog(); true }
+        R.id.action_search_test -> { runSelfTest(); true }
         else -> false
+    }
+
+    /**
+     * Selbsttest: lädt das Modell neu, bettet einen Satz ein und meldet das Ergebnis.
+     * Damit lässt sich auf dem Gerät sagen, ob es am Modell, an der Bibliothek oder am
+     * Speicher liegt – ohne Log-Ausgabe.
+     */
+    private fun runSelfTest() {
+        if (ModelStore.incomplete(this).isNotEmpty()) {
+            // Unvollständige Datei zuerst nennen – sonst sucht man an der falschen Stelle
+            refreshModelBox(AiEngine.currentStatus())
+            Toast.makeText(this, R.string.ai_model_incomplete_title, Toast.LENGTH_LONG).show()
+            return
+        }
+        progress.visibility = View.VISIBLE
+        tvEngine.text = getString(R.string.ai_selftest_started)
+        Thread({
+            val (ok, info) = runCatching { AiEngine.selfTest(applicationContext) }
+                .getOrElse { false to (it.message ?: it.javaClass.simpleName) }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                progress.visibility = View.GONE
+                val st = AiEngine.currentStatus()
+                lastStatus = st
+                showEngineStatus(st)
+                refreshModelBox(st)
+                // Meldung im Dialog (kopierbar), nicht als kurzlebiger Toast
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.ai_selftest)
+                    .setMessage(
+                        if (ok) getString(R.string.ai_selftest_ok, info)
+                        else getString(R.string.ai_selftest_failed, info)
+                    )
+                    .setPositiveButton(R.string.ok, null)
+                    .show()
+            }
+        }, "n3-selftest").apply { isDaemon = true }.start()
     }
 
     /**

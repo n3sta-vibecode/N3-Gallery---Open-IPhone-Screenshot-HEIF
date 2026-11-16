@@ -52,6 +52,24 @@ Jetzt gilt:
 * Unvollständige Dateien werden nie geladen – die Suchseite sagt jetzt ausdrücklich:
   „Modelldatei unvollständig … bitte erneut laden (er läuft an dieser Stelle weiter)“.
 
+### 🧪 Jetzt wird getestet, nicht geraten
+
+* **Unit-Tests in CI** (`app/src/test/…`): Die Reflection-Suche wird gegen einen **Nachbau der
+  MediaPipe-Struktur** geprüft (abstrakter Builder, `AutoValue_…-Unterklasse`, `build()` in der
+  erzeugten Klasse). Genau daran ist 1.35 und 1.36 gescheitert – jetzt bricht der Bau ab, wenn
+  es wieder passiert. Dazu Tests für die Größenprüfung der Modelldateien (der 462-MB-Fall ist
+  ein Testfall) und für die Trefferbewertung der Suche.
+* **Nachweis im fertigen APK:** Der Build prüft im Dex, dass die LiteRT-LM-Klassen
+  (`ActivationDataType`, `EmbeddingEngineConfig`, `EmbeddingEngine`) und die Methoden
+  (`initialize`, `computeEmbedding`) wirklich enthalten sind. Fehlt etwas, bricht der Bau ab.
+* **Selbsttest in der App:** Menü **⋮ → „Modell testen …“** lädt das Modell neu, bettet einen
+  Satz ein und zeigt in einem Dialog zum Beispiel
+  `OK · EmbeddingGemma 2 · UniversalEmbedder · GPU · 768 Dimensionen`
+  oder `FEHLGESCHLAGEN · Klasse fehlt: …`. Damit ist beim nächsten Screenshot sofort klar, wo
+  es klemmt.
+* Die Unit-Tests haben gleich einen eigenen Fehler gefunden: Die MB-Anzeige schnitt ab statt zu
+  runden (369,75 → „369“). Behoben.
+
 ### 🧾 Fehler, die man lesen kann
 
 `NoClassDefFoundError` ist ein `Error`, kein `Exception` – er wurde nicht gefangen und kam als

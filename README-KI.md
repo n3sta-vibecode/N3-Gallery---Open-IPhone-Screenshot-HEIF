@@ -95,6 +95,9 @@ kurze Pause, damit Scrollen und Tastatur Vorrang haben; ist die App im Hintergru
 länger gewartet (Akku). Alle Modellaufrufe laufen nacheinander – die LiteRT-LM-Laufzeit ist
 nicht thread-sicher.
 
+**Selbsttest:** Menü **⋮ → „Modell testen …“** in der Bildersuche lädt das Modell neu und
+zeigt das Ergebnis im Klartext (Weg, Beschleuniger, Dimensionen – oder den genauen Fehler).
+
 **Wenn es nicht läuft**, sagt die App es: Statuszeile („läuft nicht: GPU: … · CPU: …“) und
 leeres Suchergebnis nennen den Grund aus `GemmaEmbedder.lastFailure` / `SearchIndex.lastError()`
 – kein stiller Rückfall auf das Wortmodell mehr.

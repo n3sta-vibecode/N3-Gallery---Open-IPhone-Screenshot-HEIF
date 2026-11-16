@@ -356,4 +356,9 @@
     <string name="ai_model_unavailable_title">Search model not running – built-in word model is used</string>
     <string name="ai_model_unavailable_hint">A model file is there, but it does not start. Please load the model again – or pick another variant.</string>
     <string name="ai_model_diag">Details: %1$s</string>
+    <string name="ai_selftest">Test model …</string>
+    <string name="ai_selftest_started">Test running – this takes a moment.</string>
+    <string name="ai_selftest_ok">OK · %1$s</string>
+    <string name="ai_selftest_failed">FAILED · %1$s</string>
+    <string name="ai_selftest_nomodel">No complete model file found.</string>
 </resources>

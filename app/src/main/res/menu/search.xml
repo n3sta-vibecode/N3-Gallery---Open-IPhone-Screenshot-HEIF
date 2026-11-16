@@ -16,6 +16,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/action_search_test"
+        android:title="@string/ai_selftest"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_search_index"
         android:title="@string/ai_index_status"
         app:showAsAction="never" />

@@ -66,6 +66,32 @@ object AiEngine {
 
     fun currentStatus(): Status = status
 
+    /**
+     * **Selbsttest des Modells** – für die Fehlersuche auf dem Gerät.
+     *
+     * Lädt die Engine neu, bettet einen Satz ein und gibt zurück, was passiert ist. Damit
+     * bekommt man eine Meldung wie „OK · UniversalEmbedder · GPU · 768 Dimensionen“ oder
+     * „FEHLGESCHLAGEN · Klasse fehlt: …“ – statt nur „läuft nicht“.
+     *
+     * Aufruf aus einem Hintergrund-Thread.
+     */
+    fun selfTest(ctx: Context): Pair<Boolean, String> {
+        val app = ctx.applicationContext
+        if (!ModelStore.hasModel(app)) {
+            return false to "Keine vollständige Modelldatei gefunden."
+        }
+        prepare(app, force = true)
+        val st = currentStatus()
+        val vec = embed("Ein Foto vom Strand bei Sonnenuntergang")
+        return if (vec != null && vec.isNotEmpty()) {
+            true to "${st.modelName} · ${st.detail} · ${st.accelerator.label} · ${vec.size} Dimensionen"
+        } else {
+            false to st.failure.ifBlank {
+                "Das Modell hat keinen Vektor geliefert (unbekannter Grund)."
+            }
+        }
+    }
+
     /** Grund, warum ein vorhandenes Modell nicht läuft (leer = kein Problem). */
     fun failureReason(): String = status.failure
 
