@@ -44,22 +44,32 @@ jobs:
 
       - name: AARs direkt laden und untersuchen
         shell: bash
+        continue-on-error: true
         run: |
           set -u
+          exec 2>&1
           OUT=/tmp/bericht.md
           echo "## LiteRT-LM im Paket" > "$OUT"
           D="https://dl.google.com/dl/android/maven2"
           rm -rf /tmp/x && mkdir -p /tmp/x && cd /tmp/x
 
           # Kombiniertes AAR von tasks-retrieval (enthält MediaPipe UniversalEmbedder)
-          curl -sSL -m 180 -o mp.aar \
-            "$D/com/google/mediapipe/tasks-retrieval/1.2.3/tasks-retrieval-1.2.3.aar" && \
-            mkdir -p mp && cd mp && unzip -q ../mp.aar && cd .. || echo "tasks-retrieval-laden fehlgeschlagen" >> "$OUT"
+          if curl -sSL -m 180 -o mp.aar \
+              "$D/com/google/mediapipe/tasks-retrieval/1.2.3/tasks-retrieval-1.2.3.aar"; then
+            mkdir -p mp && (cd mp && unzip -oq ../mp.aar) || echo "mp entpacken fehlgeschlagen" >> "$OUT"
+            echo "tasks-retrieval geladen: $(stat -c%s mp.aar) Bytes" >> "$OUT"
+          else
+            echo "tasks-retrieval-laden fehlgeschlagen" >> "$OUT"
+          fi
 
           # LiteRT-LM selbst (separates Artefakt)
-          curl -sSL -m 180 -o lm.aar \
-            "$D/com/google/ai/edge/litertlm/litertlm-android/0.17.0-alpha1/litertlm-android-0.17.0-alpha1.aar" && \
-            mkdir -p lm && cd lm && unzip -q ../lm.aar && cd .. || echo "litertlm-laden fehlgeschlagen" >> "$OUT"
+          if curl -sSL -m 180 -o lm.aar \
+            "$D/com/google/ai/edge/litertlm/litertlm-android/0.17.0-alpha1/litertlm-android-0.17.0-alpha1.aar"; then
+            mkdir -p lm && (cd lm && unzip -oq ../lm.aar) || echo "lm entpacken fehlgeschlagen" >> "$OUT"
+            echo "litertlm geladen: $(stat -c%s lm.aar) Bytes" >> "$OUT"
+          else
+            echo "litertlm-laden fehlgeschlagen" >> "$OUT"
+          fi
 
           ls -la /tmp/x >> "$OUT" 2>&1
           echo "" >> "$OUT"
