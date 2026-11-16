@@ -96,10 +96,10 @@ object ModelStore {
         ctx: Context,
         variant: Variant,
         onProgress: ((Long, Long) -> Unit)? = null,
-        onDone: ((File?) -> Unit)? = null
+        onDone: ((File?, String) -> Unit)? = null
     ) {
         if (downloading) {
-            onDone?.invoke(null)
+            onDone?.invoke(null, "Es läuft bereits ein Download.")
             return
         }
         downloading = true
@@ -129,12 +129,22 @@ object ModelStore {
                 }
                 if (code != 200) {
                     Log.w(TAG, "Download HTTP $code für ${variant.file}")
-                    onDone?.invoke(null)
+                    onDone?.invoke(
+                        null,
+                        if (code == 404) {
+                            "Die Datei gibt es unter dieser Adresse nicht (HTTP 404)."
+                        } else {
+                            "Der Server antwortet mit HTTP $code."
+                        }
+                    )
                     return
                 }
                 break
             }
-            val conn = connection ?: run { onDone?.invoke(null); return }
+            val conn = connection ?: run {
+                onDone?.invoke(null, "Keine Verbindung zum Server.")
+                return
+            }
             val total = conn.contentLengthLong
             tmp.delete()
             conn.inputStream.use { input ->
@@ -145,7 +155,7 @@ object ModelStore {
                     while (true) {
                         if (cancelled.get()) {
                             tmp.delete()
-                            onDone?.invoke(null)
+                            onDone?.invoke(null, "Abgebrochen.")
                             return
                         }
                         val n = input.read(buffer)
@@ -161,27 +171,41 @@ object ModelStore {
                 }
             }
             if (tmp.length() < 1024 * 1024) {
+                val got = tmp.length()
                 tmp.delete()
-                onDone?.invoke(null)
+                onDone?.invoke(
+                    null,
+                    "Die Datei ist zu klein ($got Bytes) – die Adresse liefert keine Modelldatei."
+                )
                 return
             }
             if (!tmp.renameTo(target)) {
                 tmp.delete()
-                onDone?.invoke(null)
+                onDone?.invoke(null, "Die Datei konnte nicht gespeichert werden.")
                 return
             }
             Log.i(TAG, "Modell geladen: ${target.name} (${target.length() / 1048576} MB)")
             onProgress?.invoke(target.length(), target.length())
-            onDone?.invoke(target)
+            onDone?.invoke(target, "")
         } catch (t: Throwable) {
-            Log.w(TAG, "Download fehlgeschlagen: ${t.message}")
+            Log.w(TAG, "Download fehlgeschlagen: ${t.message}", t)
             tmp.delete()
-            onDone?.invoke(null)
+            onDone?.invoke(null, describe(t))
         } finally {
             runCatching { connection?.disconnect() }
             downloading = false
             cancelRequested = false
         }
+    }
+
+    /** Fehler in einem Satz, den man versteht – statt „null“. */
+    private fun describe(t: Throwable): String = when (t) {
+        is java.net.UnknownHostException -> "Kein Internet oder der Name wurde nicht gefunden."
+        is java.net.SocketTimeoutException -> "Zeitüberschreitung – Verbindung zu langsam."
+        is java.net.ConnectException -> "Verbindung abgelehnt."
+        is javax.net.ssl.SSLException -> "Verschlüsselte Verbindung fehlgeschlagen."
+        is java.io.IOException -> "Netzwerkfehler: ${t.message ?: t.javaClass.simpleName}"
+        else -> t.message ?: t.javaClass.simpleName
     }
 
     /**

@@ -7,6 +7,8 @@ import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.Menu
+import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -81,15 +83,12 @@ class SearchActivity : AppCompatActivity() {
             val (done, total) = SearchIndex.progress()
             val building = SearchIndex.isRunning()
             progress.visibility = if (building) View.VISIBLE else View.GONE
-            if (building) {
-                tvEngine.text = if (total > 0) {
-                    getString(R.string.ai_indexing, done, total)
-                } else {
-                    getString(R.string.ai_loading)
-                }
-            } else {
-                lastStatus?.let { showEngineStatus(it) }
-            }
+            // Eine Quelle für die Statuszeile: Status **und** Fortschritt. Vorher schrieben
+            // Tick, Such-Ergebnis und Modellwechsel abwechselnd hinein – die Zeile sprang
+            // dadurch zwischen „läuft nicht …“ und einer leeren Fläche hin und her.
+            val st = AiEngine.currentStatus()
+            lastStatus = st
+            showEngineStatus(st, done, total, building)
             main.postDelayed(this, 700)
         }
     }
@@ -113,6 +112,9 @@ class SearchActivity : AppCompatActivity() {
 
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         toolbar.setNavigationOnClickListener { finish() }
+        // Überlaufmenü: Modell verwalten und Foto-Vorbereitung – immer erreichbar
+        toolbar.inflateMenu(R.menu.search)
+        toolbar.setOnMenuItemClickListener { item -> onMenuItem(item) }
 
         findViewById<View>(R.id.btnModelDownload).setOnClickListener { chooseModelAndDownload() }
         findViewById<View>(R.id.btnModelCancel).setOnClickListener { ModelStore.cancel() }
@@ -206,6 +208,84 @@ class SearchActivity : AppCompatActivity() {
         watchProgress()
     }
 
+    private fun onMenuItem(item: MenuItem): Boolean = when (item.itemId) {
+        R.id.action_search_model -> { showModelDialog(); true }
+        R.id.action_search_index -> { showIndexDialog(); true }
+        else -> false
+    }
+
+    /**
+     * Modell verwalten – unabhängig davon, ob gerade eins läuft: laden, ersetzen, entfernen.
+     */
+    private fun showModelDialog() {
+        val installed = ModelStore.models(this)
+        val st = AiEngine.currentStatus()
+        val lines = ArrayList<String>()
+        lines.add(
+            if (st.failure.isNotBlank() && st.modelInstalled) {
+                getString(R.string.ai_engine_failed, st.modelName, st.failure)
+            } else {
+                getString(R.string.ai_engine_status, "◆", st.modelName, st.accelerator.label)
+            }
+        )
+        if (installed.isNotEmpty()) {
+            lines.add("")
+            installed.forEach { f ->
+                lines.add("• ${f.name} · ${f.length() / 1048576} MB")
+            }
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.ai_model_manage_title)
+            .setMessage(lines.joinToString("\n"))
+            .setPositiveButton(R.string.ai_model_download) { _, _ -> chooseModelAndDownload() }
+            .setNegativeButton(R.string.ai_model_remove) { _, _ -> removeModels() }
+            .setNeutralButton(R.string.close, null)
+            .show()
+    }
+
+    private fun removeModels() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.ai_model_remove)
+            .setMessage(R.string.ai_model_remove_confirm)
+            .setPositiveButton(R.string.ai_model_remove) { _, _ ->
+                ModelStore.clear(this)
+                Toast.makeText(this, R.string.ai_index_stopped, Toast.LENGTH_SHORT).show()
+                reloadEngine()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    /** Foto-Vorbereitung: wie weit sie ist, anhalten, oder neu starten. */
+    private fun showIndexDialog() {
+        val (done, total) = SearchIndex.progress()
+        val building = SearchIndex.isRunning()
+        val problem = SearchIndex.lastError()
+        val message = when {
+            problem.isNotBlank() -> getString(R.string.ai_index_failed, problem)
+            building && total > 0 -> getString(R.string.ai_index_done, done, total)
+            building -> getString(R.string.ai_loading)
+            else -> getString(R.string.ai_index_done, done, total)
+        }
+        val b = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.ai_index_status)
+            .setMessage(message.trim())
+            .setNegativeButton(R.string.close, null)
+        if (building) {
+            b.setPositiveButton(R.string.ai_index_stop) { _, _ ->
+                SearchIndex.requestStop()
+                Toast.makeText(this, R.string.ai_index_stopped, Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            b.setPositiveButton(R.string.ai_index_status) { _, _ ->
+                SearchIndex.invalidate(applicationContext)
+                SearchIndex.warmUp(applicationContext)
+                Toast.makeText(this, R.string.ai_loading, Toast.LENGTH_SHORT).show()
+            }
+        }
+        b.show()
+    }
+
     private fun watchProgress() {
         main.removeCallbacks(progressTick)
         main.postDelayed(progressTick, 400)
@@ -239,11 +319,15 @@ class SearchActivity : AppCompatActivity() {
      * und den **Grund**, wenn eine Datei da ist, das Modell aber nicht startet.
      */
     private fun refreshModelBox(status: AiEngine.Status) {
+        // Immer sichtbar, solange kein EmbeddingGemma läuft – nur die Überschrift ist anders.
+        // Vorher verschwand die Leiste, sobald eine Datei da war: Wer eine kaputte oder falsche
+        // Datei erwischt hatte, konnte kein anderes Modell mehr laden.
+        modelBox.visibility = View.VISIBLE
         if (status.modelInstalled && status.failure.isBlank()) {
+            // Modell läuft → Leiste zu, aber über das Überlaufmenü erreichbar
             modelBox.visibility = View.GONE
             return
         }
-        modelBox.visibility = View.VISIBLE
         if (status.modelInstalled) {
             tvModelTitle.text = getString(R.string.ai_model_broken_title)
             tvModelHint.text = getString(R.string.ai_model_broken_hint, status.failure)
@@ -300,7 +384,7 @@ class SearchActivity : AppCompatActivity() {
                         }
                     }
                 },
-                onDone = { file ->
+                onDone = { file, reason ->
                     runOnUiThread {
                         if (isFinishing || isDestroyed) return@runOnUiThread
                         findViewById<View>(R.id.modelButtons).visibility = View.VISIBLE
@@ -308,8 +392,11 @@ class SearchActivity : AppCompatActivity() {
                         bar.isIndeterminate = false
                         bar.progress = 0
                         if (file == null) {
+                            // Grund nennen – vorher stand hier immer nur „konnte nicht gelesen werden“
                             Toast.makeText(
-                                this, R.string.ai_model_import_failed, Toast.LENGTH_LONG
+                                this,
+                                getString(R.string.ai_model_download_failed, reason.ifBlank { "?" }),
+                                Toast.LENGTH_LONG
                             ).show()
                         } else {
                             Toast.makeText(
@@ -386,7 +473,16 @@ class SearchActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------------ Statuszeile
 
-    private fun showEngineStatus(status: AiEngine.Status) {
+    /**
+     * Statuszeile – **immer vollständig**: wer rechnet, mit welchem Beschleuniger, und wie
+     * weit der Index ist. So bleibt sie zwischen zwei Durchläufen stehen statt zu flackern.
+     */
+    private fun showEngineStatus(
+        status: AiEngine.Status,
+        done: Int = SearchIndex.progress().first,
+        total: Int = SearchIndex.progress().second,
+        building: Boolean = SearchIndex.isRunning()
+    ) {
         lastStatus = status
         val (prefix, label) = when (status.accelerator) {
             AiEngine.Accelerator.NPU -> "⚡" to status.accelerator.label
@@ -394,13 +490,17 @@ class SearchActivity : AppCompatActivity() {
             AiEngine.Accelerator.CPU -> "●" to status.accelerator.label
             AiEngine.Accelerator.LOCAL -> "◦" to getString(R.string.ai_engine_local)
         }
-        val text = getString(R.string.ai_engine_status, prefix, status.modelName, label) +
+        val engine = getString(R.string.ai_engine_status, prefix, status.modelName, label) +
             if (status.detail.isNotBlank()) " · ${status.detail}" else ""
-        // Ist ein Modell da, startet aber nicht: Grund direkt daneben zeigen.
-        tvEngine.text = if (status.modelInstalled && status.failure.isNotBlank()) {
-            getString(R.string.ai_engine_failed, text, status.failure)
+        val base = if (status.modelInstalled && status.failure.isNotBlank()) {
+            getString(R.string.ai_engine_failed, engine, status.failure)
         } else {
-            text
+            engine
+        }
+        tvEngine.text = when {
+            building && total > 0 -> getString(R.string.ai_status_building, base, done, total)
+            building -> getString(R.string.ai_status_building_unknown, base)
+            else -> base
         }
     }
 

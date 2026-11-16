@@ -54,10 +54,18 @@ object SearchIndex {
     /** Ergebnis des letzten Aufbaus: leer = alles gut, sonst der Grund. */
     @Volatile private var lastProblem: String = ""
 
+    /** „Anhalten“ gedrückt? Der Aufbau speichert dann, was er hat, und hört auf. */
+    @Volatile private var stopRequested: Boolean = false
+
     /** Ein Suchbegriff, mit dem geprüft wird, ob das Modell überhaupt nutzbar ist. */
     private const val PROBE = "foto"
 
     fun progress(): Pair<Int, Int> = doneCount to totalCount
+
+    /** Vorbereitung anhalten – die bisher berechneten Fotos bleiben nutzbar. */
+    fun requestStop() {
+        stopRequested = true
+    }
     fun indexedCount(): Int = entries.size
     fun isBuilding(): Boolean = building.get()
     fun isRunning(): Boolean = runningCount.get() > 0
@@ -193,11 +201,17 @@ object SearchIndex {
             var done = 0
             var sinceSave = 0
             var fails = 0
+            stopRequested = false
             // Höflich zur Bedienung: nach jedem Foto kurz Luft lassen. Das Modell rechnet
             // ohnehin seriell (AiEngine.embedLock); die Pause sorgt dafür, dass Scrollen,
             // Tastatur und Bildaufbau dazwischenkommen können. Ist die App im Hintergrund,
             // wird länger gewartet (Akku) – beim Zurückkommen geht es sofort weiter.
             for (item in items) {
+                if (stopRequested) {
+                    Log.i(TAG, "Vorbereitung angehalten bei $done / $total")
+                    break
+                }
+                val started = System.currentTimeMillis()
                 if (!entries.containsKey(item.uri)) {
                     val v = embedItem(app, item)
                     if (v != null) {
@@ -209,7 +223,17 @@ object SearchIndex {
                 }
                 done++
                 doneCount = done
-                runCatching { Thread.sleep(if (AppVisibility.isVisible()) PACE_MS else PACE_BG_MS) }
+                // Pause **abhängig von der Rechenzeit**: Ein einzelnes Embedding auf der CPU
+                // dauert 30–150 ms – eine feste Pause obendrauf würde den Aufbau bei 23 000
+                // Fotos um Stunden verlängern. Ist die Rechnung schon langsam genug, wird
+                // nicht zusätzlich gewartet (das Gerät bekommt so oder so Luft).
+                val took = System.currentTimeMillis() - started
+                val pause = if (AppVisibility.isVisible()) {
+                    (PACE_MS - took).coerceIn(0, PACE_MS)
+                } else {
+                    (PACE_BG_MS - took).coerceAtLeast(0)
+                }
+                if (pause > 0) runCatching { Thread.sleep(pause) }
                 if (done % 40 == 0) {
                     if (sinceSave >= 300) {
                         saveToDisk(app)
@@ -219,7 +243,8 @@ object SearchIndex {
                 }
             }
             saveToDisk(app)
-            builtForScanMs = DataHub.lastScanMs
+            // Nach dem Anhalten NICHT als vollständig merken – beim nächsten Start weiterrechnen
+            if (!stopRequested) builtForScanMs = DataHub.lastScanMs
             doneCount = total
             if (fails > 0 && entries.isEmpty()) {
                 lastProblem = AiEngine.failureReason().ifBlank {

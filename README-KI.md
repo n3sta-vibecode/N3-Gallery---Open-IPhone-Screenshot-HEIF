@@ -38,6 +38,9 @@ ist:
    und der Index wird neu berechnet.
 3. Die Leiste verschwindet, in der Statuszeile steht z. B. `◆ EmbeddingGemma 2 · GPU`.
 
+Über **Modell …** (Überlaufmenü der Bildersuche) geht das jederzeit auch dann, wenn schon eine
+Datei im Ordner liegt: laden, Dateien ansehen, entfernen.
+
 Ist das Modell schon auf dem Gerät (z. B. per Dateimanager geladen), lässt es sich mit
 **„Datei wählen“** übernehmen.
 
@@ -58,7 +61,7 @@ einem Testlauf**:
 
 > **Zur NPU:** EmbeddingGemma 1 ließ sich über den `TextEmbedder` noch mit `Delegate.NPU`
 > ansprechen. EmbeddingGemma 2 läuft über LiteRT-LM, das in MediaPipe nur GPU und CPU
-> anbietet – die NPU wird dort (Stand 1.35) nicht adressiert. Sobald Google das freigibt,
+> anbietet – die NPU wird dort (Stand 1.36) nicht adressiert. Sobald Google das freigibt,
 > kommt die Stufe in `GemmaEmbedder.create` einfach vor die GPU.
 
 ## 4. Was in den Foto-Vektor einfließt

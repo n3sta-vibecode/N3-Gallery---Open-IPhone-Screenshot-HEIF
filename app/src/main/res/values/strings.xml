@@ -340,4 +340,15 @@
     <string name="search_empty_error">The photo index could not be built: %1$s</string>
     <string name="search_empty_indexing">The photos are still being prepared for the search – the progress bar above shows how far it is.</string>
     <string name="search_empty_no_model">No photo matches that yet. Tip: load EmbeddingGemma 2 above for search in your own words – it works with notes, tags, place and time.</string>
+    <string name="ai_status_building">%1$s · Fotos werden vorbereitet: %2$d / %3$d</string>
+    <string name="ai_status_building_unknown">%1$s · Fotos werden vorbereitet …</string>
+    <string name="ai_model_remove_confirm">Remove the model file from the app? Search then uses the built-in word model until you load a model again.</string>
+    <string name="ai_index_stop">Stop</string>
+    <string name="ai_index_stopped">Preparation stopped – search still works with the photos prepared so far.</string>
+    <string name="ai_index_done">Photos prepared: %1$d of %2$d</string>
+    <string name="ai_index_failed">Not possible: %1$s</string>
+    <string name="ai_model_manage">Model …</string>
+    <string name="ai_model_manage_title">EmbeddingGemma 2</string>
+    <string name="ai_index_status">Photo preparation …</string>
+    <string name="ai_model_download_failed">Download failed: %1$s</string>
 </resources>

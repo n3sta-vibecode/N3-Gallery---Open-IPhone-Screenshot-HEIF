@@ -396,18 +396,20 @@
      ------------------------------------------------------------------ */
   const LOG = [
     {
-      v: '1.35', de: 'Suche im Hintergrund, Modell in Benutzung', en: 'Background index, model actually used',
+      v: '1.36', de: 'Modell startet, Fortschritt, klare Fehler', en: 'Model starts, progress, clear errors',
       de_items: [
-        'Der Suchindex wird jetzt beim Start der App und nach jedem Neuscan im Hintergrund aufgebaut – mit Fortschritt in der Suchseite, statt bei „0 / n“ stehen zu bleiben.',
-        'EmbeddingGemma 2 wird wirklich benutzt: Die Reflection suchte die Builder-Methoden in der falschen Klasse, jeder Start scheiterte still und die Suche fiel auf das Wortmodell zurück. Ist ein Modell da, das nicht startet, steht der Grund jetzt in der Statuszeile.',
-        'Kein Einfrieren mehr: Die klassische Suche lief bei jedem Tastendruck auf dem Haupt-Thread und baute die Beschreibung jedes Fotos neu. Jetzt rechnet alles im Hintergrund, Texte werden zwischengespeichert, das Modell wird nur einmal geladen und alle Modellaufrufe laufen nacheinander.',
-        'Tastatur schließt beim Tippen auf die Treffer oder daneben – und beim Antippen von „Suchen“.'
+        'EmbeddingGemma 2 startet jetzt wirklich: Die Reflection verglich die konkrete Klasse des Arguments mit dem deklarierten Parametertyp – das kann nie passen. Jetzt entscheidet die Zuweisbarkeit.',
+        'Statuszeile aus einer Quelle: wer rechnet und wie viele Fotos schon vorbereitet sind – kein Springen mehr zwischen „läuft nicht“ und leer.',
+        'Neu im Überlaufmenü: „Modell …“ (laden, ansehen, entfernen – jederzeit) und „Foto-Vorbereitung …“ (Fortschritt, Anhalten, neu starten).',
+        'Download-Fehler nennen den Grund (kein Internet, HTTP 404, Datei zu klein) statt „konnte nicht gelesen werden“.',
+        'Umlaute im eingebauten Wortmodell werden als UTF-8 gelesen – „Frühstück“ war vorher „FrÃ¼hstÃ¼ck“ und damit unauffindbar.'
       ],
       en_items: [
-        'The search index is now built in the background at app start and after every rescan – with progress in the search screen instead of sitting at “0 / n”.',
-        'EmbeddingGemma 2 is actually used: the reflection looked for the builder methods in the wrong class, every start failed silently and search fell back to the word model. If a model is present but will not start, the reason now shows in the status line.',
-        'No more freezing: the classic search ran on the main thread on every keystroke, rebuilding the description of every photo. Everything now runs in the background, texts are cached, the model is loaded only once and all model calls are serialised.',
-        'The keyboard closes when you tap the results or beside them – and when you tap “Search”.'
+        'EmbeddingGemma 2 now actually starts: the reflection compared the concrete class of the argument with the declared parameter type, which can never match. Assignability now decides.',
+        'Status line from a single source: what is computing and how many photos are prepared – no more jumping between “not running” and blank.',
+        'New in the overflow menu: “Model …” (load, inspect, remove – at any time) and “Photo preparation …” (progress, stop, restart).',
+        'Download errors state the reason (no internet, HTTP 404, file too small) instead of “could not be read”.',
+        'Umlauts in the built-in word model are read as UTF-8 – “Frühstück” used to be “FrÃ¼hstÃ¼ck” and therefore unfindable.'
       ]
     },
     {
@@ -606,7 +608,7 @@
     'hero.h1a': 'Apple screenshots.',
     'hero.h1b': 'Finally on Android.',
     'hero.lead': 'N3 Gallery opens Apple’s tiled HEIC containers – including 10-bit, HDR and gain maps. Plus 35 RAW formats, AVIF, SVG and HEVC video. Entirely offline.',
-    'hero.note': 'Version 1.35 · 44 MB · open source',
+    'hero.note': 'Version 1.36 · 44 MB · open source',
     'hero.f1': 'No internet access',
     'hero.f2': 'No accounts',
     'hero.f3': 'No ads',
@@ -693,7 +695,7 @@
     'privacy.c2': 'No account, no sign-in, no cloud, no server.',
     'privacy.c3': 'No ads, no telemetry, no analytics SDK.',
     'privacy.c4': 'Notes, tags and favourites are additionally backed up outside the app – a reinstall costs nothing.',
-    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.35-release.apk | grep uses-permission</code>',
+    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.36-release.apk | grep uses-permission</code>',
     'install.kicker': 'Installation',
     'install.h2': 'Three steps onto the device.',
     'install.p': 'The app is not distributed through a store: the finished APK comes straight from the build and the signing key stays the same. That is why new versions can simply be laid over the installed one.',

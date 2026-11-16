@@ -1,6 +1,50 @@
 # N3 Gallery – was neu ist
 
-## 1.35 – Suche rechnet im Hintergrund, Modell wird wirklich benutzt, Tastatur schließt
+## 1.36 – Modell startet wirklich, Fortschritt sichtbar, bessere Fehlermeldungen
+
+1.35 hat die Ursachen benannt, aber einen Fehler selbst eingebaut – auf dem Gerät sichtbar als
+
+```
+GPU: setBaseOptions(AutoValue_BaseOptions) an Builder · CPU: setBaseOptions(…) an Builder
+```
+
+### 🔧 Was da schiefging (und jetzt behoben ist)
+
+Die Reflection hat die Methode über die **deklarierten** Parametertypen gesucht
+(`getDeclaredMethod("setBaseOptions", BaseOptions::class.java)`). Übergeben wurde aber ein
+`AutoValue_BaseOptions` – eine Unterklasse. Exakt gleich sind diese Typen nie, also wurde die
+Methode nicht gefunden. Jetzt werden alle Methoden mit dem Namen genommen und die
+**zugewiesenen** Parameter geprüft (`isAssignableFrom`), inklusive Boxing für `boolean`/`int`.
+
+Genau darauf ist auch 1.35 schon hereingefallen: Dort war es `build()`, das nicht im
+abstrakten Builder liegt. Beides ist jetzt derselbe, robuste Weg.
+
+### 📊 Fortschritt und Status
+
+* Die Statuszeile hatte **drei Schreiber** (Fortschritts-Tick, Suchergebnis, Modellwechsel) und
+  sprang dadurch zwischen „läuft nicht …“ und leer. Sie kommt jetzt aus einer Funktion:
+  wer rechnet · wie viele Fotos schon vorbereitet sind.
+* **Modell …** im Überlaufmenü: jederzeit ein anderes Modell laden, die Modelldateien sehen
+  und entfernen – auch wenn schon eine (falsche) Datei im Ordner lag. Vorher verschwand die
+  Modell-Leiste, sobald irgendeine Datei da war.
+* **Foto-Vorbereitung …** im selben Menü: Fortschritt, „Anhalten“ und neu starten.
+* Die Pause zwischen zwei Fotos richtet sich nach der Rechenzeit (mindestens 0 ms, höchstens
+  12 ms im Vordergrund). Eine feste Pause hätte den Aufbau bei 23 000 Fotos um Stunden
+  verlängert.
+
+### 🧾 Ehrliche Fehlermeldungen
+
+Der Download meldet jetzt den Grund („Kein Internet oder der Name wurde nicht gefunden.“,
+„Der Server antwortet mit HTTP 404.“, „Die Datei ist zu klein – die Adresse liefert keine
+Modelldatei.“) statt „Datei konnte nicht gelesen werden“. Das gilt auch für die Datei-Auswahl.
+
+### 🔤 Kleiner, aber ärgerlich: Umlaute im Wortmodell
+
+`assets/ai/wortmodell.txt` wurde ohne Zeichensatzangabe gelesen – Android nimmt dann Latin-1,
+„Frühstück“ wurde zu „FrÃ¼hstÃ¼ck“ und war nie auffindbar. Jetzt wird ausdrücklich UTF-8
+gelesen, alte doppelt kodierte Einträge werden beim Vergleich geradegezogen.
+
+## 1.36 – Suche rechnet im Hintergrund, Modell wird wirklich benutzt, Tastatur schließt
 
 Vier Beschwerden aus 1.34, alle mit derselben Wurzel: **Rechenarbeit lag auf dem Haupt-Thread
 oder wurde nie angestoßen.**
@@ -58,7 +102,7 @@ Kein stiller Rückfall mehr: Ist eine Modelldatei da, startet aber nicht, steht 
 der Statuszeile und im leeren Suchergebnis („Der Foto-Index ließ sich nicht aufbauen: …“).
 Ohne Modell steht dort, dass das eingebaute Wortmodell rechnet.
 
-## 1.35 – EmbeddingGemma 2, Download in der App, OpenStreetMap, Metadaten erreichbar
+## 1.36 – EmbeddingGemma 2, Download in der App, OpenStreetMap, Metadaten erreichbar
 
 ### 🧠 EmbeddingGemma 2 – das Modell aus Google Edge Gallery
 

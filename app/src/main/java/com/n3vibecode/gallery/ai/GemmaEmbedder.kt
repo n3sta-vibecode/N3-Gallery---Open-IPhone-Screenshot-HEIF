@@ -40,7 +40,9 @@ internal class GemmaEmbedder(
     override fun embed(text: String): FloatArray? = embedFn(text)
 
     override fun close() {
-        runCatching { modelHandle.javaClass.findMethod("close")?.invoke(modelHandle) }
+        runCatching {
+            findMethod(modelHandle.javaClass, "close", arrayOf<Any?>())?.invoke(modelHandle)
+        }
     }
 
     companion object {
@@ -150,17 +152,32 @@ internal class GemmaEmbedder(
         }
 
         /**
-         * Methode in der ganzen Klassenhierarchie suchen und – falls nötig – zugänglich machen.
+         * Methode in der ganzen Klassenhierarchie suchen – **mit passender Signatur**.
          *
-         * Nötig, weil die Builder von MediaPipe abstrakt sind: `build()` steckt in der
-         * generierten Klasse `AutoValue_…Builder`. `Class.getMethod` würde dort nichts finden.
+         * Zwei Dinge, die hier schiefgehen können und in 1.36 beide behoben sind:
+         *
+         *  1. `getMethod`/`getDeclaredMethod` vergleichen die **deklarierten** Parametertypen.
+         *     Unser Argument ist aber ein `AutoValue_BaseOptions`, während der Parameter
+         *     `BaseOptions` heißt – exakt gleich sind die Typen nie. Deshalb werden alle
+         *     Methoden mit dem Namen genommen und die **zugewiesenen** Parameter geprüft
+         *     (`isInstance`).
+         *  2. `build()` steckt nicht im abstrakten Builder, sondern in der erzeugten
+         *     `AutoValue_…Builder` – daher die Suche über die ganze Oberklassen-Kette.
          */
-        private fun Class<*>.findMethod(name: String, vararg params: Class<*>): java.lang.reflect.Method? {
-            var c: Class<*>? = this
+        private fun findMethod(target: Class<*>, name: String, args: Array<out Any?>): java.lang.reflect.Method? {
+            val wanted = args.map { it?.javaClass }
+            var c: Class<*>? = target
             while (c != null) {
-                runCatching {
-                    val m = c.getDeclaredMethod(name, *params)
-                    m.isAccessible = true
+                for (m in c.declaredMethods) {
+                    if (m.name != name) continue
+                    if (m.parameterTypes.size != wanted.size) continue
+                    val fits = m.parameterTypes.indices.all { i ->
+                        val declared = m.parameterTypes[i].let { if (it.isPrimitive) boxed(it) else it }
+                        val value = wanted[i]
+                        if (value == null) !declared.isPrimitive else declared.isAssignableFrom(value)
+                    }
+                    if (!fits) continue
+                    runCatching { m.isAccessible = true }
                     return m
                 }
                 c = c.superclass
@@ -168,15 +185,43 @@ internal class GemmaEmbedder(
             return null
         }
 
-        /** Ruft eine Methode auf, egal ob sie öffentlich ist oder in einer Oberklasse steckt. */
+        /** `int` → `Integer` usw. – Reflection liefert für primitive Parameter eigene Klassen. */
+        private fun boxed(c: Class<*>): Class<*> = when (c) {
+            java.lang.Boolean.TYPE -> java.lang.Boolean::class.java
+            java.lang.Byte.TYPE -> java.lang.Byte::class.java
+            java.lang.Character.TYPE -> java.lang.Character::class.java
+            java.lang.Short.TYPE -> java.lang.Short::class.java
+            java.lang.Integer.TYPE -> java.lang.Integer::class.java
+            java.lang.Long.TYPE -> java.lang.Long::class.java
+            java.lang.Float.TYPE -> java.lang.Float::class.java
+            java.lang.Double.TYPE -> java.lang.Double::class.java
+            else -> c
+        }
+
+        /**
+         * Ruft eine Methode auf: erst mit Argumenten, dann ohne (z. B. `build()` über
+         * `builder()`, das ja selbst keine Parameter hat).
+         */
         private fun Any.call(name: String, vararg args: Any?): Any? {
-            val types = args.map { it?.javaClass ?: Any::class.java }.toTypedArray()
-            val m = javaClass.findMethod(name, *types)
-                ?: javaClass.findMethod(name)      // ohne Parameter (z. B. build())
-                ?: throw NoSuchMethodException("$name(${types.joinToString { it.simpleName }}) an ${javaClass.simpleName}")
-            m.isAccessible = true
+            val m = findMethod(javaClass, name, args)
+                ?: throw NoSuchMethodException(
+                    "$name(${args.joinToString { it?.javaClass?.simpleName ?: "null" }}) an ${javaClass.simpleName}"
+                )
+            runCatching { m.isAccessible = true }
             return try {
                 m.invoke(this, *args)
+            } catch (e: java.lang.reflect.InvocationTargetException) {
+                throw e.cause ?: e
+            }
+        }
+
+        /** Statischer Aufruf, z. B. `BaseOptions.builder()`. */
+        private fun callStatic(target: Class<*>, name: String, vararg args: Any?): Any? {
+            val m = findMethod(target, name, args)
+                ?: throw NoSuchMethodException("$name an ${target.simpleName}")
+            runCatching { m.isAccessible = true }
+            return try {
+                m.invoke(null, *args)
             } catch (e: java.lang.reflect.InvocationTargetException) {
                 throw e.cause ?: e
             }
@@ -198,7 +243,7 @@ internal class GemmaEmbedder(
             )
 
             // BaseOptions.builder() → Modellpfad → Delegate → build()
-            val baseBuilder = baseOptionsClass.findMethod("builder")?.invoke(null)
+            val baseBuilder = callStatic(baseOptionsClass, "builder")
                 ?: throw IllegalStateException("BaseOptions.builder() fehlt")
             val path = when (source) {
                 is ModelSource.Asset -> source.path
@@ -209,7 +254,7 @@ internal class GemmaEmbedder(
             val baseOptions = baseBuilder.call("build") ?: throw IllegalStateException("BaseOptions build")
 
             val optionsClass = Class.forName(CLASS_OPTIONS)
-            val optBuilder = optionsClass.findMethod("builder")?.invoke(null)
+            val optBuilder = callStatic(optionsClass, "builder")
                 ?: throw IllegalStateException("UniversalEmbedderOptions.builder() fehlt")
             optBuilder.call("setBaseOptions", baseOptions)
             // Nur Text wird eingebettet: Text-Beschleuniger setzen (Vision/Audio bleiben Default).
@@ -218,13 +263,10 @@ internal class GemmaEmbedder(
             runCatching { optBuilder.call("setL2Normalize", true) }
             val options = optBuilder.call("build") ?: throw IllegalStateException("Options build")
 
-            val createMethod = engineClass.findMethod(
-                "createFromOptions", Context::class.java, optionsClass
-            ) ?: throw IllegalStateException("createFromOptions fehlt")
-            val engine = createMethod.invoke(null, context, options)
+            val engine = callStatic(engineClass, "createFromOptions", context, options)
                 ?: throw IllegalStateException("Embedder nicht erzeugt")
 
-            val embedMethod = engineClass.findMethod("embedText", String::class.java)
+            val embedMethod = findMethod(engineClass, "embedText", arrayOf<Any?>("x"))
                 ?: throw IllegalStateException("embedText fehlt")
             val embedFn: (String) -> FloatArray? = { text ->
                 val result = embedMethod.invoke(engine, text) ?: error("kein Ergebnis")

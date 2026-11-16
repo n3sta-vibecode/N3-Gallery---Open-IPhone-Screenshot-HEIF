@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.35-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.35/N3-Gallery-1.35-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.35-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.35/N3-Gallery-1.35-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.35.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.35/N3Gallery-Projekt-1.35.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.36-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.36/N3-Gallery-1.36-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.36-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.36/N3-Gallery-1.36-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.36.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.36/N3Gallery-Projekt-1.36.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -35,10 +35,10 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.35 – Suche im Hintergrund, Modell wirklich in Benutzung, Tastatur schließt
+## 🆕 Version 1.36 – Modell startet, Fortschritt sichtbar, klare Fehlermeldungen
 
-* **EmbeddingGemma 2** (das Modell aus Google Edge Gallery, 740 M, multimodal) über
-  `tasks-retrieval` + LiteRT-LM – echte Modell-Dateien, nicht mehr der alte Text-Embedder.
+* **EmbeddingGemma 2 kommt jetzt wirklich hoch** – der Reflection-Fehler aus 1.35 ist behoben
+  (Parameter-Zuweisbarkeit statt exakter Typgleichheit). Über `tasks-retrieval` + LiteRT-LM.
 * **Download direkt in der App** mit Auswahl (Text 163 MB / Text+Bild 530 MB / alles 1,3 GB),
   Fortschritt, Abbrechen und Platzprüfung. Kein Browser-Umweg mehr.
 * **OpenStreetMap** auf der Karte zuschaltbar (echte Straßen, Kacheln bleiben gespeichert).

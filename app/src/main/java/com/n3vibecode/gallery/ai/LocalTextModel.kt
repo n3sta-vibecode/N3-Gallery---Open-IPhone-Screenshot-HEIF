@@ -128,6 +128,9 @@ internal class LocalTextModel(context: Context) : AiEngine.EmbedderBackend {
     private fun fold(text: String): String =
         text.lowercase()
             .replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
+            // Doppelt kodierte Umlaute aus älteren Dateien („FrÃ¼hstÃ¼ck“) geradeziehen
+            .replace("Ã¤", "ae").replace("Ã¶", "oe").replace("Ã¼", "ue")
+            .replace("ÃŸ", "ss").replace("Ã©", "e")
 
     private fun tokenize(text: String): List<String> =
         fold(text)
@@ -152,7 +155,12 @@ internal class LocalTextModel(context: Context) : AiEngine.EmbedderBackend {
         val vecs = ArrayList<FloatArray>(600)
         var dim = 0
         val lines = runCatching {
-            ctx.assets.open("ai/wortmodell.txt").bufferedReader().readLines()
+            // Ausdrücklich UTF-8: Die Datei enthält Umlaute („Frühstück“). Ohne Angabe nimmt
+            // Android die Latin-1-Codepage des Systems – dann steht dort „FrÃ¼hstÃ¼ck“ und
+            // das Wort wird nie gefunden.
+            ctx.assets.open("ai/wortmodell.txt")
+                .bufferedReader(Charsets.UTF_8)
+                .readLines()
         }.getOrDefault(emptyList())
 
         for (raw in lines) {

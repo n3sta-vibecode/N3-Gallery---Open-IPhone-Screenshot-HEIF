@@ -339,4 +339,15 @@
     <string name="search_empty_error">Der Foto-Index ließ sich nicht aufbauen: %1$s</string>
     <string name="search_empty_indexing">Die Fotos werden noch für die Suche vorbereitet – der Fortschrittsbalken oben zeigt, wie weit.</string>
     <string name="search_empty_no_model">Dazu passt noch kein Foto. Tipp: Oben EmbeddingGemma 2 laden – damit sucht die App in eigenen Worten, auch über Notizen, Tags, Ort und Zeit.</string>
+    <string name="ai_status_building">%1$s · Fotos werden vorbereitet: %2$d / %3$d</string>
+    <string name="ai_status_building_unknown">%1$s · Fotos werden vorbereitet …</string>
+    <string name="ai_model_remove_confirm">Modelldatei aus der App entfernen? Danach sucht die App wieder mit dem eingebauten Wortmodell, bis du ein Modell lädst.</string>
+    <string name="ai_index_stop">Anhalten</string>
+    <string name="ai_index_stopped">Vorbereitung angehalten – die Suche funktioniert mit den bisher vorbereiteten Fotos weiter.</string>
+    <string name="ai_index_done">Fotos vorbereitet: %1$d von %2$d</string>
+    <string name="ai_index_failed">Nicht möglich: %1$s</string>
+    <string name="ai_model_manage">Modell …</string>
+    <string name="ai_model_manage_title">EmbeddingGemma 2</string>
+    <string name="ai_index_status">Foto-Vorbereitung …</string>
+    <string name="ai_model_download_failed">Download fehlgeschlagen: %1$s</string>
 </resources>
