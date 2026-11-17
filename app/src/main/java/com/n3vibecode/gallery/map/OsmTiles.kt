@@ -43,10 +43,39 @@ object OsmTiles {
     /** Kachelgröße in Pixeln (OSM-Standard). */
     const val TILE = 256
 
-    private const val UA = "N3Gallery/1.34 (Android; Offline-Galerie) – Kartenansicht auf Wunsch"
+    private const val UA = "N3Gallery/1.40 (Android; Offline-Galerie mit optionaler Karte)"
+
+    /**
+     * Kachel-Server. `tile.openstreetmap.org` ist der Hauptserver und drosselt streng
+     * (HTTP 429); die beiden anderen sind offizielle, für Apps gedachte Auslieferungen
+     * derselben Daten. Ausgewählt wird je Kachel – so verteilt sich die Last.
+     */
+    private val SPIGEL = listOf(
+        "tile.openstreetmap.org",
+        "a.tile.openstreetmap.fr",
+        "tile.openstreetmap.de"
+    )
 
     private val memory = ConcurrentHashMap<String, Bitmap>()
     private val missing = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Letzter Fehler beim Laden – für die Anzeige auf der Karte.
+     *
+     * Vorher wurde ein Fehlschlag nur ins Log geschrieben (`Log.d`). Auf dem Gerät sah man
+     * dann eine leere helle Fläche ohne jede Erklärung – genau der Eindruck „Karte lädt
+     * nicht“. Jetzt steht der Grund auf der Karte.
+     */
+    @Volatile
+    var lastError: String = ""
+        private set
+
+    /** Wurde seit dem Start überhaupt eine Kachel geladen? (für „offline noch nichts da“) */
+    private val loadedOnce = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    fun hasAnyLoaded(): Boolean = loadedOnce.get()
+
+    fun resetError() { lastError = "" }
 
     /** Höchstens 4 parallele Anfragen – so verlangt es die OSM-Nutzungsregel. */
     private val pool = Executors.newFixedThreadPool(4) { r ->
@@ -118,7 +147,9 @@ object OsmTiles {
             try {
                 val file = File(cacheDir(app), "$z-$x-$y.png")
                 if (file.exists()) return@execute
-                val url = URL("https://tile.openstreetmap.org/$z/$x/$y.png")
+                // Spiegel von OSM: der Hauptserver drosselt; die Community-Spiegel sind
+                // ausdrücklich für Karten in Apps gedacht und liefern dieselben Kacheln.
+                val url = URL(tileUrl(z, x, y))
                 val conn = (url.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 8000
                     readTimeout = 8000
@@ -130,19 +161,33 @@ object OsmTiles {
                     if (code != 200) {
                         // 404 = außerhalb der Welt; nicht immer wieder fragen
                         if (code == 404) missing.add(key)
+                        if (code == 403 || code == 429) {
+                            // Drosselung: kurz warten, dann darf es erneut versucht werden
+                            lastError = "OSM antwortet mit $code (zu viele Anfragen) – bitte kurz warten"
+                        } else {
+                            lastError = "OSM-Kachel: HTTP $code"
+                        }
                         return@execute
                     }
                     val bytes = conn.inputStream.use { it.readBytes() }
                     if (bytes.size < 100) return@execute
+                    // Nur echte PNG-Daten übernehmen (sonst zeichnet die Karte Müll)
+                    if (!isPng(bytes)) {
+                        lastError = "OSM lieferte kein PNG"
+                        return@execute
+                    }
                     val tmp = File(cacheDir(app), "$z-$x-$y.png.tmp")
                     tmp.writeBytes(bytes)
                     if (!tmp.renameTo(file)) tmp.delete()
+                    lastError = ""
+                    loadedOnce.set(true)
                     onLoaded?.invoke()
                 } finally {
                     runCatching { conn.disconnect() }
                 }
             } catch (t: Throwable) {
                 Log.d(TAG, "OSM-Kachel $key: ${t.message}")
+                lastError = "Keine Verbindung zu OpenStreetMap (${t.javaClass.simpleName})"
             } finally {
                 pending.decrementAndGet()
             }
@@ -150,6 +195,17 @@ object OsmTiles {
     }
 
     fun isLoading(): Boolean = pending.get() > 0
+
+    /** Kachel-Adresse. Mehrere Spiegel – fällt einer aus, geht es beim nächsten weiter. */
+    fun tileUrl(z: Int, x: Int, y: Int): String {
+        val host = SPIGEL[(x + y) % SPIGEL.size]
+        return "https://$host/$z/$x/$y.png"
+    }
+
+    /** PNG-Kennung prüfen – schützt vor Fehlerseiten im Kachel-Ordner. */
+    fun isPng(bytes: ByteArray): Boolean =
+        bytes.size > 64 && bytes[0] == 0x89.toByte() && bytes[1] == 'P'.code.toByte() &&
+            bytes[2] == 'N'.code.toByte() && bytes[3] == 'G'.code.toByte()
 
     /** Wie viele Kacheln liegen schon auf dem Gerät (für „offline verfügbar“)? */
     fun cachedCount(ctx: Context): Int =

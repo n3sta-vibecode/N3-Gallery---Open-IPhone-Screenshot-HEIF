@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
+import com.n3vibecode.gallery.image.HeifGeo
 import com.n3vibecode.gallery.image.HeifInspector
 import com.n3vibecode.gallery.util.Fmt
 import java.text.SimpleDateFormat
@@ -91,7 +92,27 @@ object ExifRepository {
          * Deshalb wird zusätzlich XMP (`exif:GPSLatitude`/`GPSLongitude`) und – bei HEIF –
          * der rohe Container nach ISO-6709-Koordinaten durchsucht.
          */
-        val rawPoint = originalLatLong(ctx, item) ?: xmpLatLong(exif) ?: heifIso6709(ctx, item)
+        // **Wichtigster neuer Weg (1.40):** EXIF direkt aus dem HEIF-Container lesen.
+        // `ExifInterface` liefert für viele iPhone-Dateien stillschweigend nichts – dort
+        // stecken Kamera, Objektiv und GPS aber im `Exif`-Item. Siehe [HeifGeo].
+        val heifGeo: HeifGeo.Geo? =
+            if (item.isHeif || item.isAvif) {
+                runCatching {
+                    HeifGeo.read(
+                        opener = {
+                            runCatching { ctx.contentResolver.openInputStream(Uri.parse(item.uri)) }.getOrNull()
+                        },
+                        fileSize = item.size
+                    )
+                }.getOrNull()
+            } else {
+                null
+            }
+
+        val rawPoint = originalLatLong(ctx, item)
+            ?: heifGeo?.takeIf { it.hasGps }?.let { doubleArrayOf(it.latitude!!, it.longitude!!) }
+            ?: xmpLatLong(exif)
+            ?: heifIso6709(ctx, item)
 
         // ------------------------------ HEIF/AVIF-Container lesen
 
@@ -230,6 +251,22 @@ object ExifRepository {
             tag(rows, "Make", "Hersteller")
             tag(rows, "Model", "Modell")
             tag(rows, "LensModel", "Objektiv")
+            // Aus dem HEIF-Container gelesen, falls ExifInterface nichts geliefert hat
+            heifGeo?.let { g ->
+                fun add(label: String, value: String?) {
+                    if (value.isNullOrBlank()) return
+                    if (rows.any { it.label == label }) return
+                    rows += MetaRow(label, value)
+                }
+                add("Hersteller", g.make)
+                add("Modell", g.model)
+                add("Objektiv", g.lens)
+                add("Brennweite (35 mm)", g.focal35?.let { "$it mm" })
+                add("Blende", g.fNumber?.let { String.format(Locale.GERMAN, "f/%.2f", it) })
+                add("Belichtungszeit", g.exposureTime)
+                add("ISO", g.iso?.toString())
+                add("Aufnahmezeitpunkt (EXIF)", g.taken?.let { exifDate(it) })
+            }
             tag(rows, "LensMake", "Objektiv-Hersteller")
             tag(rows, "LensSpecification", "Objektiv-Spezifikation") { lensSpec(it) }
             tag(rows, "LensSerialNumber", "Objektiv-Seriennummer")
@@ -330,6 +367,7 @@ object ExifRepository {
         if (e != null) {
             val rows = mutableListOf<MetaRow>()
             val fromExif = runCatching { e.latLong }.getOrNull()
+                ?: heifGeo?.takeIf { it.hasGps }?.let { doubleArrayOf(it.latitude!!, it.longitude!!) }
             // Reihenfolge: unredigierte Datei (Android 10+) → EXIF → XMP/HEIF
             val latLong: DoubleArray? = rawPoint ?: fromExif
             if (latLong != null && (latLong[0] != 0.0 || latLong[1] != 0.0)) {
@@ -404,7 +442,7 @@ object ExifRepository {
                 if (!dtOriginal.isNullOrBlank()) exifDate(dtOriginal) + (offset?.let { " ($it)" } ?: "")
                 else Fmt.dateTime(item.time) + " (Dateisystem)"
             )
-            rows += MetaRow("Aufnahme-Sensor", sensorSummary(e, item))
+            rows += MetaRow("Aufnahme-Sensor", sensorSummary(e, item, heifGeo))
             rows += MetaRow(
                 "Aufnahmeort",
                 mapPoint?.let { (lat, lon) ->
@@ -865,28 +903,40 @@ object ExifRepository {
      * wenn die Quelle sie schreibt (iPhone-Screenshots und viele Messenger-Bilder tun das
      * nicht – dann steht das da, statt eine leere Zeile zu zeigen).
      */
-    fun sensorSummary(e: ExifInterface?, item: MediaItem): String {
-        val parts = ArrayList<String>(4)
-        if (e != null) {
-            val make = rawTag(e, ExifInterface.TAG_MAKE).orEmpty()
-            val model = rawTag(e, ExifInterface.TAG_MODEL).orEmpty()
-            val camera = when {
-                make.isBlank() && model.isBlank() -> ""
-                model.startsWith(make, true) || make.isBlank() -> model
-                else -> "$make $model"
-            }
-            if (camera.isNotBlank()) parts.add(camera.trim())
-            val lens = rawTag(e, ExifInterface.TAG_LENS_MODEL)
-            if (!lens.isNullOrBlank() && !lens.contains("null", true)) parts.add(lens)
-            sensingMethodName(safeInt(e, ExifInterface.TAG_SENSING_METHOD))?.let { parts.add(it) }
-            rawTag(e, ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM)?.let { parts.add("$it mm (KB)") }
-            rawTag(e, ExifInterface.TAG_F_NUMBER)?.toDoubleOrNull()
-                ?.let { parts.add(String.format(Locale.GERMAN, "f/%.1f", it)) }
-            rawTag(e, ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)?.let { parts.add("ISO $it") }
+    fun sensorSummary(
+        e: ExifInterface?,
+        item: MediaItem,
+        geo: com.n3vibecode.gallery.image.HeifGeo.Geo? = null
+    ): String {
+        val parts = ArrayList<String>(6)
+        // Kamera nennen – EXIF zuerst, sonst der HEIF-Container
+        val make = (e?.let { rawTag(it, ExifInterface.TAG_MAKE) } ?: geo?.make).orEmpty()
+        val model = (e?.let { rawTag(it, ExifInterface.TAG_MODEL) } ?: geo?.model).orEmpty()
+        val camera = when {
+            make.isBlank() && model.isBlank() -> ""
+            model.startsWith(make, ignoreCase = true) || make.isBlank() -> model
+            else -> "$make $model"
         }
+        if (camera.isNotBlank()) parts.add(camera.trim())
+
+        val lens = e?.let { rawTag(it, ExifInterface.TAG_LENS_MODEL) } ?: geo?.lens
+        if (!lens.isNullOrBlank() && !lens.contains("null", true)) parts.add(lens)
+
+        e?.let { sensingMethodName(safeInt(it, ExifInterface.TAG_SENSING_METHOD)) }?.let { parts.add(it) }
+
+        // Sensor-Kennzahlen: erst EXIF, dann HEIF
+        val focal35 = e?.let { rawTag(it, ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM) }
+            ?: geo?.focal35?.toString()
+        if (!focal35.isNullOrBlank()) parts.add("$focal35 mm (KB)")
+
+        val fnum = e?.let { rawTag(it, ExifInterface.TAG_F_NUMBER) }?.toDoubleOrNull() ?: geo?.fNumber
+        if (fnum != null) parts.add(String.format(Locale.GERMAN, "f/%.1f", fnum))
+
+        val iso = e?.let { rawTag(it, ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY) } ?: geo?.iso?.toString()
+        if (!iso.isNullOrBlank()) parts.add("ISO $iso")
+
         if (parts.isEmpty()) {
-            // Kein EXIF: wenigstens sagen, woher das Bild kommt
-            return if (item.isHeif) "Kein Kamera-EXIF (HEIF ohne Aufnahmedaten)"
+            return if (item.isHeif) "Kein Kamera-EXIF in dieser HEIF-Datei lesbar"
             else "Kein Kamera-EXIF in der Datei"
         }
         return parts.joinToString(" · ")

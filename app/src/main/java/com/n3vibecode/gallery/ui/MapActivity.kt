@@ -58,6 +58,7 @@ class MapActivity : AppCompatActivity() {
         tvEmptyTitle = findViewById(R.id.tvEmptyTitle)
         tvEmptySub = findViewById(R.id.tvEmptySub)
 
+        osmNote = findViewById(R.id.tvOsmNote)
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         toolbar.setNavigationOnClickListener { finish() }
 
@@ -115,9 +116,52 @@ class MapActivity : AppCompatActivity() {
         }, "n3-map-load").apply { priority = Thread.NORM_PRIORITY - 1; isDaemon = true }.start()
 
         toolbar.subtitle = getString(R.string.map_subtitle)
+        watchOsm()
+    }
+
+    /**
+     * Prüft regelmäßig, ob die OSM-Kacheln ankommen, und sagt es, wenn nicht.
+     *
+     * Der Nutzer hat „Karte lädt nicht“ gemeldet – ohne diese Anzeige blieb nur eine leere
+     * helle Fläche, ohne Grund und ohne Handlungsmöglichkeit. Jetzt steht dort entweder
+     * „lädt …“, ein konkreter Fehler (HTTP-Code, keine Verbindung) oder der Hinweis, dass
+     * die App offline zeichnet.
+     */
+    private fun watchOsm() {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val tick = object : Runnable {
+            override fun run() {
+                if (isFinishing || isDestroyed) return
+                if (!mapView.useOsm) {
+                    osmNote.visibility = View.GONE
+                } else {
+                    val err = com.n3vibecode.gallery.map.OsmTiles.lastError
+                    val loading = com.n3vibecode.gallery.map.OsmTiles.isLoading()
+                    when {
+                        err.isNotBlank() -> {
+                            osmNote.visibility = View.VISIBLE
+                            osmNote.text = err
+                        }
+                        loading && !com.n3vibecode.gallery.map.OsmTiles.hasAnyLoaded() -> {
+                            osmNote.visibility = View.VISIBLE
+                            osmNote.text = getString(R.string.map_osm_loading)
+                        }
+                        !com.n3vibecode.gallery.map.OsmTiles.hasAnyLoaded() -> {
+                            osmNote.visibility = View.VISIBLE
+                            osmNote.text = getString(R.string.map_osm_offline_hint)
+                        }
+                        else -> osmNote.visibility = View.GONE
+                    }
+                }
+                handler.postDelayed(this, 1200)
+            }
+        }
+        handler.postDelayed(tick, 800)
     }
 
     /** Zielposition, wenn die Karte aus den Metadaten eines Fotos geöffnet wurde. */
+    private lateinit var osmNote: android.widget.TextView
+
     private var focusLat = Double.NaN
     private var focusLon = Double.NaN
 

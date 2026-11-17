@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.39-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.39/N3-Gallery-1.39-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.39-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.39/N3-Gallery-1.39-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.39.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.39/N3Gallery-Projekt-1.39.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.40-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.40/N3-Gallery-1.40-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.40-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.40/N3-Gallery-1.40-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.40.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.40/N3Gallery-Projekt-1.40.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -35,7 +35,21 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.39 – Koordinaten wirklich lesen, Suche rangieren, ruhiges Wischen
+## 🆕 Version 1.40 – iPhone-GPS und Sensor direkt aus dem HEIF gelesen
+
+* **Ursache gefunden:** Bei vielen iPhone-Fotos liefert `ExifInterface` **nichts** – Apple legt
+  Kamera, Objektiv, ISO, Blende und **GPS** im `Exif`-Item des HEIF-Containers ab. Die App
+  liest diese Boxen jetzt selbst (`HeifGeo`): `iinf` → Item, `iloc` → Position, dann TIFF mit
+  IFD0, Exif-IFD und GPS-IFD. Damit kommen Koordinaten und Aufnahme-Sensor an – auch wenn
+  Android die Datei „redigiert“ herausgibt.
+* **Karte:** zeigt jetzt „lädt …“, den konkreten Fehler (HTTP-Code/keine Verbindung) oder
+  „zeichnet offline“ – statt einer leeren hellen Fläche. Drei OSM-Server als Ausweichweg,
+  PNG-Prüfung gegen Fehlerseiten im Kachel-Ordner.
+* **Geprüft statt geraten:** `tools/heif/heif_geo_probe.py --self-test` baut echte
+  Apple-Container im Speicher und vergleicht die gelesenen Werte; derselbe Test läuft in CI,
+  dazu Unit-Tests mit echten Bytes (`HeifGeoTest`).
+
+## 🔧 Version 1.39 – Koordinaten wirklich lesen, Suche rangieren, ruhiges Wischen
 
 * **GPS-Koordinaten** kommen jetzt an: unredigierte Datei (`ACCESS_MEDIA_LOCATION` +
   `setRequireOriginal`), XMP (`exif:GPSLatitude`) und ISO 6709 im HEIF-Container. Fehlt die

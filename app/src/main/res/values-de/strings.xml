@@ -388,4 +388,10 @@
     <string name="location_hint_title">Foto-Standorte anzeigen</string>
     <string name="location_hint_text">Android verbirgt GPS-Daten vor anderen Apps. Erlaube „Fotos und Videos: Ort“, damit die App die echten Koordinaten lesen darf.</string>
     <string name="location_hint_action">Erlauben</string>
+    <string name="map_osm_loading">Karte lädt Kacheln von OpenStreetMap …</string>
+    <string name="map_osm_offline_hint">Noch keine Kacheln. Kommt nichts an, bitte Internetverbindung prüfen – die Karte zeichnet solange offline.</string>
+    <string name="map_osm_unavailable">OpenStreetMap nicht erreichbar. Offline-Karte wird gezeigt.</string>
+    <string name="map_online_only">OpenStreetMap braucht Internet.</string>
+    <string name="sensor_from_heif">aus HEIF-Container gelesen</string>
+    <string name="geo_read_from_heif">Ort &amp; Kamera direkt aus dem HEIF-Container gelesen</string>
 </resources>

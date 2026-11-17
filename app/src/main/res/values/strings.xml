@@ -389,4 +389,10 @@
     <string name="location_hint_title">Show photo locations</string>
     <string name="location_hint_text">Android hides GPS data from other apps by default. Allow “Photos and videos: location” so the app can read the real coordinates.</string>
     <string name="location_hint_action">Allow</string>
+    <string name="map_osm_loading">Loading map tiles from OpenStreetMap …</string>
+    <string name="map_osm_offline_hint">No tiles yet. If nothing appears, check the internet connection — the map draws offline in the meantime.</string>
+    <string name="map_osm_unavailable">OpenStreetMap not reachable. Offline map is shown.</string>
+    <string name="map_online_only">OpenStreetMap needs internet.</string>
+    <string name="sensor_from_heif">read from HEIF container</string>
+    <string name="geo_read_from_heif">Location &amp; camera data read directly from the HEIF container</string>
 </resources>

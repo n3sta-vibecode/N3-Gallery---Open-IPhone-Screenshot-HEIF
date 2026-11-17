@@ -1,5 +1,47 @@
 # N3 Gallery – was neu ist
 
+## 1.40 – Warum iPhone-Fotos keinen Ort und keinen Sensor zeigten
+
+### 🔬 Ursache: die EXIF-Daten stecken im Container, nicht im Dateikopf
+
+Apple legt bei HEIC/HEIF alles in ein **Item** vom Typ `Exif` innerhalb der `meta`-Box.
+`androidx.exifinterface` liest dieses Item nur in einer bestimmten Variante (Offset-Feld vor
+dem TIFF-Block). Passt die Variante nicht, liefert `ExifInterface` **keinen Fehler, sondern
+nichts** – deshalb stand „kein Ort gespeichert“ und kein Aufnahme-Sensor, obwohl die Daten
+in der Datei waren.
+
+**Behoben:** Die App liest den Container jetzt selbst (`image/HeifGeo.kt`):
+
+| Schritt | Was gelesen wird |
+| --- | --- |
+| `iinf` | Item-IDs und Typen (`Exif`, `hvc1`, `grid` …) |
+| `iloc` | Position und Länge des Exif-Items (alle Varianten: 16/32-Bit, mit/ohne `idat`) |
+| TIFF | IFD0 (Hersteller, Modell), Exif-IFD (ISO, Blende, Belichtung, KB-Brennweite, Objektiv, Datum), GPS-IFD (Grad/Minuten/Sekunden + N/S/O/W) |
+| `irot`/`imir` | Drehung und Spiegelung des Bildes |
+
+Diese Werte sind **zusätzliche** Quellen: `ExifInterface`, XMP und ISO 6709 bleiben erhalten
+und werden zuerst probiert.
+
+### 🗺️ Karte sagt jetzt, warum nichts kommt
+
+Vorher wurde ein fehlgeschlagener Kachel-Download nur ins Log geschrieben → auf dem Gerät
+war die Fläche leer und hell. Jetzt steht auf der Karte:
+
+* „Karte lädt Kacheln von OpenStreetMap …“
+* oder der konkrete Grund („HTTP 429“, „keine Verbindung“, „kein PNG“)
+* oder „zeichnet offline“ mit dem Hinweis auf die Internetverbindung.
+
+Dazu: drei OSM-Server (Hauptserver + zwei offizielle Auslieferungen), PNG-Prüfung, damit
+eine Fehlerseite nicht als Kachel im Zwischenspeicher landet, und 403/429 werden **nicht**
+dauerhaft als „fehlt“ gemerkt (vorher blieb eine gedrosselte Kachel für immer leer).
+
+### 🧪 Bewiesen, nicht behauptet
+
+* `tools/heif/heif_geo_probe.py --self-test` baut im Speicher ein echtes Apple-HEIF
+  (ftyp + meta + Exif-Item + GPS + irot) und prüft jeden gelesenen Wert – inklusive
+  Südhalbkugel/Westen und kaputter Dateien. Läuft als eigener CI-Schritt.
+* `HeifGeoTest.kt` macht dasselbe mit echten Bytes in der JVM (8 Tests).
+
 ## 1.39 – Koordinaten, Suche, Wischen, Aufräumen
 
 Sechs Punkte, die du genannt hast – hier der Stand, jeweils mit der Ursache:
