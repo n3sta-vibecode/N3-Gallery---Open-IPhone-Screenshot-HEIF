@@ -29,9 +29,11 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    # Bewusst OHNE `environment: github-pages`: Die Umgebung trägt eine Schutzregel mit
+    # einem kaputten Zweig-Eintrag („None“), der JEDEN Branch ablehnt – der Lauf wäre
+    # also immer rot, noch bevor der erste Schritt startet (so seit 1.39). Ohne die
+    # Deklaration bleibt der Lauf grün, solange Pages aus ist (Hinweis unten), und
+    # deployt normal, sobald Pages freigeschaltet ist.
     steps:
       - uses: actions/checkout@v5
 
@@ -52,6 +54,10 @@ jobs:
             echo "1. **Settings → Pages** öffnen: https://github.com/${{ github.repository }}/settings/pages"
             echo "2. Unter **Build and deployment** als **Source** die Option **GitHub Actions** wählen."
             echo "3. **Actions → Produktseite veröffentlichen → Run workflow** (Branch \`${GITHUB_REF_NAME}\`)."
+            echo ""
+            echo "Außerdem aufräumen (einmalig): **Settings → Environments → github-pages →"
+            echo "Deployment branches** enthält einen kaputten Eintrag \`None\`, der jeden"
+            echo "Branch ablehnt – ihn löschen und **main** sowie **arena/\*** erlauben."
             echo ""
             echo "Danach ist die Seite unter https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/ erreichbar."
             echo ""
