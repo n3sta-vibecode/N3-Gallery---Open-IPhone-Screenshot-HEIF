@@ -8,6 +8,7 @@ import android.content.IntentSender
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageButton
 import android.widget.LinearLayout
@@ -39,13 +40,21 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Vollbild-Ansicht mit Wischen, Zoom-Info-Blatt und allen Metadaten.
+ * Vollbild-Ansicht mit Wischen – aufgebaut wie die Foto-Apps von Samsung / Google / Apple:
+ *
+ *  • **Knöpfe unten** (Details, Bearbeiten, Teilen, Favorit, Löschen) – nicht mehr oben,
+ *    weil man sie mit dem Daumen erreicht, während man das Foto hält.
+ *  • **Hochwischen irgendwo im Foto** öffnet unten das Blatt „Wichtigste Angaben“:
+ *    kleine Karte, Datum, Ort, Kamera, Auflösung, Format – und das Notizfeld.
+ *    „Alle Metadaten“ führt zur Vollbild-Seite mit allen über 150 Feldern.
+ *
  * Notizen/Tags werden hier als echte EXIF/XMP-Daten in die Datei geschrieben.
  */
 class DetailActivity : AppCompatActivity() {
 
     private lateinit var pager: ViewPager2
     private lateinit var topBar: LinearLayout
+    private lateinit var bottomBar: LinearLayout
     private lateinit var sheet: LinearLayout
     private lateinit var behavior: BottomSheetBehavior<LinearLayout>
     private lateinit var metaContainer: LinearLayout
@@ -53,9 +62,7 @@ class DetailActivity : AppCompatActivity() {
     private lateinit var tvSheetTitle: TextView
     private lateinit var tvSheetSub: TextView
     private lateinit var btnFav: ImageButton
-    private lateinit var btnNote: MaterialButton
-    private lateinit var scroll: androidx.core.widget.NestedScrollView
-    private lateinit var sheetHint: TextView
+    private lateinit var tvNote: TextView
 
     private var current: MediaItem? = null
 
@@ -106,63 +113,31 @@ class DetailActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_detail)
 
-        // 1.39: Bildansicht wirklich bildschirmfüllend – auch die obere Systemleiste aus.
-        // Sie war der Grund, warum das Foto oben und unten „eingequetscht“ wirkte und beim
-        // Wischen die Höhe sprang, sobald die Leisten ein-/ausblendeten.
+        // Bildansicht wirklich bildschirmfüllend – auch die obere Systemleiste aus.
+        // Solange das Metadaten-Blatt offen ist, gehören die Leisten wieder dazu (applySheetState).
         runCatching { SystemBars.hideAll(this) }
-        // Aber: solange Metadaten offen sind, gehören die Leisten wieder dazu (man scrollt
-        // Text, keine Bilder) – siehe applySheetState().
 
         pager = findViewById(R.id.pager)
         topBar = findViewById(R.id.topBar)
+        bottomBar = findViewById(R.id.bottomBar)
         sheet = findViewById(R.id.sheet)
         metaContainer = findViewById(R.id.metaContainer)
         tvCounter = findViewById(R.id.tvCounter)
         tvSheetTitle = findViewById(R.id.tvSheetTitle)
         tvSheetSub = findViewById(R.id.tvSheetSub)
         btnFav = findViewById(R.id.btnFav)
-        btnNote = findViewById(R.id.btnNote)
-
-        scroll = findViewById(R.id.scroll)
-        sheetHint = findViewById(R.id.tvSheetHint)
+        tvNote = findViewById(R.id.tvNote)
 
         // Unteren Systemabstand (Gesten-/Navigationsleiste) ergänzen, damit der letzte
-        // EXIF-Eintrag niemals hinter der Navigationsleiste verschwindet.
-        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(scroll) { v, insets ->
+        // Eintrag des Blattes niemals hinter der Navigationsleiste verschwindet.
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(sheet) { v, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, bars.bottom + MetaRenderer.dp(v.context, 28))
+            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, bars.bottom)
             insets
         }
 
-        // Es gibt bewusst NUR zwei Zustände: ganz zu oder ganz offen.
-        // Ein „halb“ angepeektes Blatt war die Ursache dafür, dass die Detail-Liste
-        // Wischgesten verschluckt hat (Scrollbereich größer als der sichtbare Ausschnitt).
-        // Immer sichtbare Leiste unten: antippen = auf, hochstreichen = auf.
-        val pull = findViewById<View>(R.id.sheetPull)
-        val pullArrow = findViewById<TextView>(R.id.tvPullArrow)
-        pull.setOnClickListener { behavior.state = BottomSheetBehavior.STATE_EXPANDED }
-        pull.setOnTouchListener(object : View.OnTouchListener {
-            private var startY = 0f
-            override fun onTouch(v: View, e: android.view.MotionEvent): Boolean {
-                when (e.actionMasked) {
-                    android.view.MotionEvent.ACTION_DOWN -> {
-                        startY = e.rawY
-                        return true
-                    }
-                    android.view.MotionEvent.ACTION_UP -> {
-                        // Schon ein kleines Hochwischen öffnet (wie „hochscrollen“ erwartet)
-                        if (startY - e.rawY > 12 * resources.displayMetrics.density) {
-                            behavior.state = BottomSheetBehavior.STATE_EXPANDED
-                        } else {
-                            v.performClick()
-                        }
-                        return true
-                    }
-                }
-                return false
-            }
-        })
-
+        // Es gibt bewusst NUR zwei Zustände: ganz zu oder ganz offen (Inhalt-hoch).
+        // Ein „halb“ angepeektes Blatt war früher die Ursache für verschluckte Wischgesten.
         behavior = BottomSheetBehavior.from(sheet)
         behavior.isHideable = true
         behavior.isDraggable = true
@@ -178,24 +153,15 @@ class DetailActivity : AppCompatActivity() {
         })
         applySheetState(BottomSheetBehavior.STATE_HIDDEN)
 
-        // „Wichtigste Angaben“ – ohne Scrollen, ohne Blatt: das Wichtigste in einem Dialog.
-        // Der Knopf sitzt in der immer sichtbaren Leiste unten, also auch dann erreichbar,
-        // wenn das Metadaten-Blatt geschlossen ist.
-        findViewById<View>(R.id.btnKeyFacts).setOnClickListener { showKeyFacts() }
-
-        // Kopfzeile antippen = auf-/zuklappen
+        // Kopfzeile antippen = zu
         findViewById<View>(R.id.sheetHeader).setOnClickListener {
-            behavior.state = if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
-                BottomSheetBehavior.STATE_HIDDEN
-            } else {
-                BottomSheetBehavior.STATE_EXPANDED
-            }
+            behavior.state = BottomSheetBehavior.STATE_HIDDEN
         }
         // ✕ schließt das Blatt
         findViewById<ImageButton>(R.id.btnSheetClose).setOnClickListener {
             behavior.state = BottomSheetBehavior.STATE_HIDDEN
         }
-        // Griff nach unten wischen = schließen (die Liste selbst scrollt dabei frei)
+        // Griff nach unten wischen = schließen
         val handle = findViewById<View>(R.id.sheetHandle)
         if (handle != null) {
             val density = resources.displayMetrics.density
@@ -253,9 +219,6 @@ class DetailActivity : AppCompatActivity() {
                     .also { pages[position] = it }
         }
         // Nachbarfotos schon im Voraus laden – Wischen zeigt sofort das nächste Bild.
-        // 1.39: Vorher blieb das Vollbild-Dekodieren des Nachbarn aus, bis man ihn antippte.
-        // Dann stand beim Wischen erst die 1024-px-Vorschau und wurde sichtbar ersetzt –
-        // genau das war das „Ruckartige“ beim Bilderwechsel.
         pager.offscreenPageLimit = 1
         pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
@@ -276,10 +239,9 @@ class DetailActivity : AppCompatActivity() {
         })
 
         val start = intent.getIntExtra(EXTRA_POSITION, 0).coerceIn(0, list.size - 1)
-        // **Hochwischen irgendwo im Bild öffnet die Metadaten (1.41).**
+        // **Hochwischen irgendwo im Bild öffnet die wichtigsten Metadaten (unten).**
         //
-        // Vorher ging das nur über die schmale Leiste unten oder den Griff. Jetzt gilt:
-        // eine senkrechte Wischbewegung (mehr als 40 dp nach oben, deutlich senkrechter als
+        // Eine senkrechte Wischbewegung (mehr als 40 dp nach oben, deutlich senkrechter als
         // waagerecht) öffnet das Blatt. Waagerechtes Wischen bleibt beim Bildwechsel, damit
         // „durch die Fotos blättern“ unverändert funktioniert.
         installSwipeUpForMeta()
@@ -294,32 +256,37 @@ class DetailActivity : AppCompatActivity() {
             pager.postDelayed({ if (!isFinishing) showKeyFacts() }, 220)
         }
 
+        // ---------------------------------------------------------------- Knöpfe
+        // Oben: nur zurück, Name und Zähler.
         findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
-        // ℹ️  = Vollbild-Metadaten-Seite (immer vollständig scrollbar, kein Bottom-Sheet)
-        // Langdruck = klassisches Info-Blatt
-        findViewById<ImageButton>(R.id.btnInfo).setOnClickListener {
-            startActivity(InfoActivity.intentFor(this, pager.currentItem, current?.uri))
-        }
+
+        // Unten (wie Samsung Gallery / Apple Fotos): Details, Bearbeiten, Teilen, Favorit, Löschen
+        findViewById<View>(R.id.btnSheetInfo).setOnClickListener { openSheet() }
+        findViewById<ImageButton>(R.id.btnEdit).setOnClickListener { openEditor() }
         findViewById<ImageButton>(R.id.btnShare).setOnClickListener { shareCurrent() }
         btnFav.setOnClickListener { toggleFavorite() }
-        btnNote.setOnClickListener { openNoteDialog() }
-        // Foto bearbeiten: zuschneiden, zeichnen, Textfelder einfügen
-        findViewById<ImageButton>(R.id.btnEdit).setOnClickListener { openEditor() }
-        findViewById<MaterialButton>(R.id.btnPhotoEdit).setOnClickListener { openEditor() }
+        findViewById<ImageButton>(R.id.btnTrash).setOnClickListener { confirmDelete() }
+
+        // Im Blatt: Notizfeld (antippen = Notiz & Tags bearbeiten), alle Metadaten,
+        // Karte und EXIF kopieren.
+        findViewById<View>(R.id.noteCard).setOnClickListener { openNoteDialog() }
+        findViewById<View>(R.id.btnTags).setOnClickListener { openNoteDialog() }
         // Vollbild-Metadaten-Seite (kein Bottom-Sheet) – dort ist garantiert alles scrollbar
         findViewById<MaterialButton>(R.id.btnMetaPage).setOnClickListener {
             startActivity(InfoActivity.intentFor(this, pager.currentItem, current?.uri))
         }
-        // Langdruck auf ℹ️ = klassisches Info-Blatt (nach oben/unten ziehbar)
-        findViewById<View>(R.id.btnInfo).setOnLongClickListener {
-            toggleSheet()
-            true
-        }
         // Karte direkt: aktuelles Foto groß auf der Karte (ohne Umweg über „Details“)
         findViewById<MaterialButton>(R.id.btnMap).setOnClickListener { openMapForCurrent() }
         findViewById<MaterialButton>(R.id.btnCopy).setOnClickListener { copyMetadata() }
-        findViewById<MaterialButton>(R.id.btnDelete).setOnClickListener { confirmDelete() }
-        findViewById<ImageButton>(R.id.btnTrash).setOnClickListener { confirmDelete() }
+        // 1.42 – 2. Modell (Personen): Fotos mit denselben Personen finden. Die Suche-Seite
+        // öffnet im Personen-Modus und bettet die Fotos mit dem Bild-Modell ein (NPU).
+        findViewById<MaterialButton>(R.id.btnPersons).setOnClickListener {
+            val item = current ?: return@setOnClickListener
+            startActivity(
+                Intent(this, SearchActivity::class.java)
+                    .putExtra(SearchActivity.EXTRA_SIMILAR_TO, item.uri)
+            )
+        }
     }
 
     // ------------------------------------------------------------------ Anzeige
@@ -340,15 +307,30 @@ class DetailActivity : AppCompatActivity() {
             append("   ")
             append(position + 1).append(" / ").append(ViewState.viewList.size)
         }
-        findViewById<TextView>(R.id.tvPullSub)?.text =
-            item.name + " · " + getString(R.string.sheet_pull_hint)
+        // 1.42: Untertitel ohne Dateiformat – beim Durchschauen steht das Format nicht
+        // mehr im Weg (es steht bei Bedarf in den Metadaten unten).
         tvSheetTitle.text = item.name
-        tvSheetSub.text = item.shortInfo() + " · " + Fmt.dateTime(item.time)
+        tvSheetSub.text = Fmt.dateTime(item.time)
         btnFav.setImageResource(
             if (MetaStore.isFavorite(item.uri)) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
         )
+        updateNoteField(item)
         MetaRenderer.render(this, metaContainer)
         loadMeta(item)
+    }
+
+    /** Notizfeld im Blatt: eigener Text oder Hinweis „Notiz hinzufügen“. */
+    private fun updateNoteField(item: MediaItem) {
+        val note = MetaStore.note(item.uri)
+        if (note.isBlank()) {
+            tvNote.text = getString(R.string.note_add_hint)
+            tvNote.setTextColor(androidx.core.content.ContextCompat
+                .getColor(this, R.color.n3_on_surface_variant))
+        } else {
+            tvNote.text = note
+            tvNote.setTextColor(androidx.core.content.ContextCompat
+                .getColor(this, R.color.n3_on_bg))
+        }
     }
 
     /**
@@ -368,29 +350,40 @@ class DetailActivity : AppCompatActivity() {
             val meta = withContext(Dispatchers.IO) { ExifRepository.load(applicationContext, item) }
             if (current?.uri == item.uri) {
                 currentMeta = meta
-                MetaRenderer.render(this@DetailActivity, metaContainer, meta)
+                renderSheetMeta(meta)
             }
         }
     }
 
     /**
-     * Wichtig für die Bedienung: Nur im voll aufgezogenen Zustand darf die Detail-Liste
-     * selbst scrollen. Sonst ist der Scrollbereich höher als der sichtbare Ausschnitt und
-     * Wischgesten „verschlucken“ sich – das Blatt lässt sich dann nicht mehr sauber ziehen.
-     * In allen anderen Zuständen wandern Gesten direkt an das Blatt (auf-/zuklappen/schließen).
+     * Das Blatt unten füllen: kleine Karte, dann die wichtigsten Angaben.
+     * (Das große Metadaten-Blatt von früher ist bewusst weg – die Kern-Angaben
+     * gehören nach unten, alles Weitere steht auf der Metadaten-Seite.)
      */
+    private fun renderSheetMeta(meta: MediaMeta) {
+        metaContainer.removeAllViews()
+        // 1) Karte mit dem Ort des Fotos (antippen = groß)
+        MetaRenderer.addMapCard(this, metaContainer, meta)
+        // 2) Die wichtigsten Angaben wie in der Samsung-Galerie:
+        //    Auflösung, Megapixel, Format, Datum & Uhrzeit, Sensor, Ort
+        val rows = meta.keyFacts
+        val inflater = LayoutInflater.from(this)
+        rows.forEach { row ->
+            val rowView = inflater.inflate(R.layout.item_meta_row, metaContainer, false)
+            rowView.findViewById<TextView>(R.id.tvLabel).text = Labels.tr(this, row.label)
+            rowView.findViewById<TextView>(R.id.tvValue).text = Labels.tr(this, row.value)
+            metaContainer.addView(rowView)
+        }
+    }
+
     /**
-     * Die **wichtigsten Angaben** zu einem Foto – direkt erreichbar über die Leiste unten
-     * und über das Info-Menü. Absichtlich kurz: Datum, Ort, Kamera, Format, Auflösung,
-     * Dateigröße, eigene Notiz und Tags. Alles Weitere steht im großen Blatt.
+     * Die **wichtigsten Angaben** zu einem Foto – erreichbar über das ⋮-Menü.
+     * Im Foto selbst öffnet das Hochwischen das Blatt unten (dasselbe, schöner).
      */
     private fun showKeyFacts() {
         val item = current ?: return
-        // Die sechs Kern-Angaben kommen fertig aus der Metadaten-Auswertung
-        // (Auflösung in Pixel und MP, Format, Ort, Datum/Uhrzeit, Aufnahme-Sensor).
         val rows = currentMeta?.keyFacts.orEmpty().toMutableList()
         if (rows.isEmpty()) {
-            // Noch nicht geladen: wenigstens das, was ohne EXIF sicher bekannt ist
             if (item.width > 0 && item.height > 0) {
                 rows.add(com.n3vibecode.gallery.data.MetaRow(
                     getString(R.string.fact_resolution_px), "${item.width} × ${item.height}"
@@ -420,56 +413,48 @@ class DetailActivity : AppCompatActivity() {
                 clip?.setPrimaryClip(ClipData.newPlainText(getString(R.string.key_facts), text))
                 Toast.makeText(this, R.string.key_facts_copied, Toast.LENGTH_SHORT).show()
             }
-            .setNegativeButton(R.string.sheet_pull_title) { _, _ ->
-                behavior.state = BottomSheetBehavior.STATE_EXPANDED
-            }
+            .setNegativeButton(R.string.sheet_open) { _, _ -> openSheet() }
             .show()
     }
 
+    /**
+     * Blatt offen: Knopfleiste unten weicht dem Blatt, Uhr und Akku kommen zurück
+     * (man liest Text). Blatt zu: alles versteckt, Foto bildschirmfüllend.
+     */
     private fun applySheetState(newState: Int) {
-        // Wichtig (1.38): Ein geschlossenes BottomSheet hat zwar Höhe 0 bzw. liegt unter dem
-        // Rand, fängt aber in manchen Zuständen trotzdem Berührungen ab. Genau deshalb ließ
-        // sich „irgendwo nach oben scrollen“ nicht zuverlässig treffen. Jetzt ist das Blatt
-        // nur sichtbar, wenn es offen ist – sonst geht jede Berührung an das Foto/den Pager.
+        // Wichtig: Ein geschlossenes BottomSheet fängt trotz Höhe 0 in manchen Zuständen
+        // Berührungen ab. Deshalb ist das Blatt nur sichtbar, wenn es offen ist.
         val open = newState == BottomSheetBehavior.STATE_EXPANDED ||
             newState == BottomSheetBehavior.STATE_COLLAPSED ||
             newState == BottomSheetBehavior.STATE_HALF_EXPANDED
+
         findViewById<View>(R.id.sheet)?.visibility = if (open) View.VISIBLE else View.GONE
 
-        when (newState) {
-            BottomSheetBehavior.STATE_EXPANDED -> {
-                // Offen: Liste darf frei scrollen. Das Blatt selbst ist dann NICHT mehr ziehbar,
-                // sonst kämpfen Scroll- und Ziehgeste gegeneinander (=> ruckelt / hängt).
-                // Geschlossen wird über ✕, Zurück, den Griff nach unten oder Tippen auf die Kopfzeile.
-                scroll.setOnTouchListener(null)
-                scroll.isNestedScrollingEnabled = true
-                behavior.isDraggable = false
-                sheetHint.visibility = View.VISIBLE
-                topBar.visibility = View.GONE
-                // Offen: die Leiste unten verschwindet (das Blatt füllt den Bildschirm)
-                findViewById<View>(R.id.sheetPull)?.visibility = View.GONE
-                // Beim Lesen von Metadaten sollen Uhr und Akku sichtbar sein
-                runCatching { SystemBars.showAll(this) }
-            }
-            else -> {
-                // Zu (HIDDEN oder Übergang): Liste gesperrt, Blatt lässt sich hochziehen.
-                lockSheetScroll()
-                behavior.isDraggable = true
-                sheetHint.visibility = View.GONE
-                topBar.visibility = View.VISIBLE
-                findViewById<View>(R.id.sheetPull)?.visibility = View.VISIBLE
-                // Zurück zum bildschirmfüllenden Foto
-                runCatching { SystemBars.hideAll(this) }
-            }
+        if (open) {
+            bottomBar.visibility = View.GONE
+            runCatching { SystemBars.showAll(this) }
+        } else {
+            if (barsVisible) bottomBar.visibility = View.VISIBLE
+            runCatching { SystemBars.hideAll(this) }
         }
     }
 
-    private fun lockSheetScroll() {
-        scroll.isNestedScrollingEnabled = false
-        scroll.scrollTo(0, 0)
-        // Gesten nicht von der Liste schlucken lassen – das Blatt soll sie bekommen
-        scroll.setOnTouchListener { _, _ -> true }
+    /**
+     * Blatt öffnen. Wichtig: Die Sichtbarkeit **vor** dem Zustand setzen – ein
+     * `GONE`-Blatt hat keine Maße und würde sonst leer oder gar nicht aufklappen.
+     */
+    private fun openSheet() {
+        sheet.visibility = View.VISIBLE
+        behavior.state = BottomSheetBehavior.STATE_EXPANDED
     }
+
+    /** Für die Foto-Seite: Hochwischen öffnet das Blatt (nicht doppelt, falls es schon offen ist). */
+    fun openSheetFromPage() {
+        if (behavior.state != BottomSheetBehavior.STATE_EXPANDED) openSheet()
+    }
+
+    /** Sind die Leisten (oben/unten) gerade sichtbar? Antippen des Fotos dreht das um. */
+    private var barsVisible = true
 
     /** Zoom im Bild: Wischen zwischen Fotos abschalten, solange gezoomt wird. */
     fun setPagerInputEnabled(enabled: Boolean) {
@@ -477,19 +462,13 @@ class DetailActivity : AppCompatActivity() {
     }
 
     fun toggleBars() {
-        if (behavior.state == BottomSheetBehavior.STATE_HIDDEN) {
-            topBar.visibility = if (topBar.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-        } else {
+        if (behavior.state != BottomSheetBehavior.STATE_HIDDEN) {
             behavior.state = BottomSheetBehavior.STATE_HIDDEN
+            return
         }
-    }
-
-    private fun toggleSheet() {
-        behavior.state = if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
-            BottomSheetBehavior.STATE_HIDDEN
-        } else {
-            BottomSheetBehavior.STATE_EXPANDED
-        }
+        barsVisible = !barsVisible
+        topBar.visibility = if (barsVisible) View.VISIBLE else View.GONE
+        bottomBar.visibility = if (barsVisible) View.VISIBLE else View.GONE
     }
 
     override fun onBackPressed() {
@@ -543,6 +522,7 @@ class DetailActivity : AppCompatActivity() {
             MetaStore.setNote(item.uri, note)
             MetaStore.setTags(item.uri, tags)
             Toast.makeText(this, R.string.saved_internal, Toast.LENGTH_SHORT).show()
+            updateNoteField(item)
             loadMeta(item)
             return
         }
@@ -559,6 +539,7 @@ class DetailActivity : AppCompatActivity() {
                     Toast.makeText(this@DetailActivity, R.string.saved_to_file, Toast.LENGTH_SHORT).show()
                     // Vorschau neu zeichnen (Metadaten kommen aus der Datei)
                     com.n3vibecode.gallery.image.ImageLoader.clear()
+                    updateNoteField(item)
                     loadMeta(item)
                     (this@DetailActivity).recreatePager()
                 }
@@ -594,7 +575,7 @@ class DetailActivity : AppCompatActivity() {
     /**
      * Wischgeste nach oben irgendwo auf dem Foto → Metadaten.
      *
-     * Der Zuhörer sitzt am **Wurzel-Layout**, also über allem (Bild, Kopfzeile, Leiste).
+     * Der Zuhörer sitzt am **Wurzel-Layout**, also über allem (Bild, Kopfzeile, Knopfleiste).
      * Er gibt jede Berührung sofort weiter (`false`), damit Wischen zwischen Fotos, Zoomen
      * und Antippen unverändert bleiben; erst wenn die Bewegung klar senkrecht nach oben geht,
      * gilt sie als „hochscrollen“.
@@ -628,7 +609,7 @@ class DetailActivity : AppCompatActivity() {
                     val upward = dy < -slop
                     val mostlyVertical = kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.4f
                     if (upward && mostlyVertical && quick && behavior.state != BottomSheetBehavior.STATE_EXPANDED) {
-                        behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                        openSheet()
                         true
                     } else {
                         false

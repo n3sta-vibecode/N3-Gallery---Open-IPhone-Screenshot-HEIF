@@ -1,5 +1,74 @@
 # N3 Gallery – was neu ist
 
+## 1.42 – Knöpfe unten, Notizfeld, NPU-Modelle pro Chipsatz, stufenloses Zoomen
+
+### 📱 Fotoansicht wie Samsung Gallery / Google Fotos / Apple Fotos
+
+* Die Knöpfe stehen jetzt **unten** (Details · Bearbeiten · Teilen · Favorit · Löschen) –
+  dort, wo der Daumen ist. Oben bleiben nur Zurück, Dateiname und Zähler.
+* **Hochwischen irgendwo im Foto** öffnet unten ein Blatt mit den **wichtigsten
+  Metadaten** (Karte, Datum, Ort, Kamera, Auflösung …) und einem **Notizfeld** –
+  antippen bearbeitet Notiz + Tags, auf Wunsch direkt in der Datei (EXIF/XMP).
+* „Alle Metadaten“, Karte, Kopieren, Notiz und **Personen** liegen als Knopfzeile im Blatt.
+
+### 🗺️ „Die Karte lädt nicht“ – drei Ursachen behoben
+
+1. **Meer-Kacheln wurden weggeworfen:** Die Sperrbild-Erkennung hielt kleine, farbarme
+   Ozean-Kacheln fälschlich für „Access blocked“-Bilder. Jetzt zählt die Struktur
+   (dunkler Text auf hellem Grund) – Wasser und Wald bleiben.
+2. **OpenStreetMap ist jetzt Standard.** Vorher startete die Karte als grob gezeichnete
+   Offline-Karte, was wie „lädt nicht“ aussah. Wer offline bleiben will, schaltet unten
+   links auf „Offline-Karte“ um.
+3. **Keine Anfrage-Flut mehr:** Gesperrte/fehlgeschlagene Kacheln bekommen eine Schonfrist
+   (30–60 s), statt bei jedem Neuzeichnen sofort wieder angefragt zu werden.
+
+### ⚡ Gemma Embedding 2 auf der NPU – der eigentliche Fehler
+
+Zwei Dinge machten „läuft auf NPU“ bisher unmöglich:
+
+* **`Backend.NPU` wurde nie richtig gebaut:** Der Reflection-Weg nahm den Konstruktor mit
+  den meisten Parametern und setzte alles auf `null` – dieser Konstruktor verlangt aber ein
+  `int`, kein `null`. Die NPU konnte also **nie** starten. Jetzt wird
+  `Backend.NPU(nativeLibraryDir)` mit dem Bibliotheks-Ordner der App gebaut.
+* **Die Modell-Datei passte nicht zur NPU:** Google veröffentlicht die Modelle in zwei
+  Fassungen – die normale Datei rechnet auf CPU/GPU, die Dateien mit Anhang
+  (`…_Qualcomm_SM8750.litertlm`) sind **für die NPU dieses Chipsatzes vorkompiliert**.
+  Die App lädt jetzt automatisch die NPU-Fassung des eigenen Geräts
+  (Galaxy S25 Ultra = SM8750; auch SM8550/8650/8850, Tensor G5/G6, MT6991/6993).
+* **Die NPU-Bibliotheken fehlten im APK:** `litertlm-android` allein kann die NPU nicht
+  starten. Neu dabei: `litert-npu-runtime-qualcomm` (Google) + `qnn-runtime` (Qualcomm) –
+  zusammen die Dispatch- und QNN-Laufzeit für den Hexagon-DSP (+~60 MB APK).
+* **Download-Sicherheit:** Jede Datei wird nach dem Laden gegen **Größe und SHA-256**
+  geprüft (Werte von Hugging Face). Stimmt die Prüfsumme, wird die Datei verworfen und der
+  Grund genannt – keine halben Dateien mehr, die dann „nicht starten“.
+
+### 👤 Zweites Modell – Personen-Klassifizierung
+
+* **Neu:** das multimodale Modell (EmbeddingGemma 2 **Text+Bild 440M** oder 740M) bettet
+  **Fotos** ein – Knopf „Personen“ im Metadaten-Blatt zeigt die Fotos mit denselben
+  Personen/demselben Motiv. Die Bild-Vektoren werden einmal gebaut und in
+  `files/persons.idx` gespeichert; das Text-Modell (270M) rechnet weiter für die Suche.
+* Beide Modelle rechnen **auf der NPU** – weiterhin ohne stillen Rückfall.
+* Die Such-Präfixe aus der Google-Doku sind jetzt gesetzt
+  (`task: search result | text:` beim Index, `task: search query | text:` bei der Suche).
+
+### 🔍 Raster: stufenlos und flüssig
+
+* Zoomen ist **kontinuierlich**: Zwischen den Spaltenzahlen wird das Raster sichtbar um
+  den Fingerpunkt skaliert; beim Loslassen läuft es sanft auf die passende Größe zurück.
+* Bis **200 Spalten** statt 32 – „so viele Fotos auf einem Bild, wie man will“.
+* Beim Zoomen werden keine Kacheln mehr neu gebunden und keine Einstellungen geschrieben;
+  die Vorbereitung der Vorschaubilder läuft entzerrt 400 ms nach dem letzten Wechsel.
+
+### 🧹 Kleines
+
+* **Genau eine Lupe** im Suchfeld (vorher links und rechts je ein Such-Symbol).
+* **Dateiformat steht nicht mehr auf den Kacheln** (RAW/HEIC/AVIF/SVG) und auch nicht
+  mehr im Foto-Wischblatt – nur die Videolänge bleibt, wie bei Samsung/Google/Apple.
+* **HEIC heißt nicht mehr automatisch „Apple“:** Nur Dateien, die wirklich nach Apple
+  aussehen (Name/Endung), bekommen das Apple-Label und den Apple-Hinweis.
+* App-Name im Launcher hatte einen fehlenden Leerraum („N3 Gallery- Open…“).
+
 ## 1.41 – Sperrbilder, NPU, Samsung-Kopf, alle Metadaten
 
 ### 🚫 „Access blocked“ auf der Karte – Ursache und Lösung

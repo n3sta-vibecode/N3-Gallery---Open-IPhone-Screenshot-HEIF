@@ -33,7 +33,7 @@ data class MediaItem(
     val isVector: Boolean get() = Formats.isVector(ext)
     val isVideoFile: Boolean get() = kind == MediaKind.VIDEO
     val time: Long get() = if (takenAt > 0) takenAt else modifiedAt
-    val family: String get() = Formats.family(ext, mime)
+    val family: String get() = Formats.family(name, ext, mime)
     val isWriteLocked: Boolean get() = isRaw
     fun uriObj(): Uri = Uri.parse(uri)
 

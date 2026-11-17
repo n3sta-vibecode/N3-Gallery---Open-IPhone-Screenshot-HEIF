@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Default = English. German lives in values-de/strings.xml. -->
-    <string name="app_name">N3 Gallery- Open HEIF iPhone Screenshots</string>
+    <string name="app_name">N3 Gallery – Open HEIF iPhone Screenshots</string>
     <!-- Short form for the app bar, dialogs and footers -->
     <string name="brand_name">N3 Gallery</string>
     <string name="brand_short_en">N3 Gallery - Open HEIF iPhone Screenshots</string>
@@ -154,6 +154,22 @@
     <string name="welcome_ok">Let\'s go</string>
     <string name="meta_page_title">Metadata</string>
     <string name="note_edit">Note &amp; tags</string>
+    <!-- 1.42: Foto-Detailansicht wie in Samsung/Google/Apple Fotos – Knöpfe unten,
+         wichtigste Metadaten &amp; Notiz per Wisch nach oben. -->
+    <string name="action_details">Info</string>
+    <string name="action_edit_short">Edit</string>
+    <string name="favorite_short">Favorite</string>
+    <string name="note_add_hint">Add a note…</string>
+    <string name="sheet_open">Show all metadata</string>
+    <string name="exif_copy">Copy</string>
+    <!-- 1.42: Second model – person classification (image embeddings, NPU). -->
+    <string name="persons_title">People</string>
+    <string name="persons_preparing">Preparing people view…</string>
+    <string name="persons_building">Embedding photos: %1$d / %2$d</string>
+    <string name="persons_no_model">For people, the \"Text + Image (440M)\" or \"Everything (740M)\" model is needed – download it via the search page (⋮ → Manage model).</string>
+    <string name="persons_empty">No similar photos found yet.</string>
+    <string name="persons_status">%1$d similar photos · %2$d embedded</string>
+    <string name="persons_stopped">Stopped.</string>
     <string name="copy_exif">Copy EXIF</string>
     <string name="share_text">Share as text</string>
     <string name="open_meta_page">Open metadata page (fully scrollable)</string>

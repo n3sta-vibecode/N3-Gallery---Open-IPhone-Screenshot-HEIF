@@ -34,6 +34,16 @@ class ZoomGridRecyclerView @JvmOverloads constructor(
     /** Ende der Geste (z. B. Einblendung ausblenden). */
     var onPinchEnd: (() -> Unit)? = null
 
+    /**
+     * 1.42: Punkt zwischen den Fingern (Bildschirmkoordinaten) der letzten Skalierung –
+     * für das stufenlose Zoomen: Die sichtbare Skalierung dreht sich um genau diesen
+     * Punkt, damit die Kacheln unter den Fingern bleiben.
+     */
+    @Volatile var lastFocusX = 0f
+        private set
+    @Volatile var lastFocusY = 0f
+        private set
+
     private var gestureActive = false
 
     private val scaleDetector = ScaleGestureDetector(
@@ -49,6 +59,8 @@ class ZoomGridRecyclerView @JvmOverloads constructor(
             }
 
             override fun onScale(detector: ScaleGestureDetector): Boolean {
+                lastFocusX = detector.focusX
+                lastFocusY = detector.focusY
                 onPinchScale?.invoke(detector.scaleFactor)
                 return true
             }

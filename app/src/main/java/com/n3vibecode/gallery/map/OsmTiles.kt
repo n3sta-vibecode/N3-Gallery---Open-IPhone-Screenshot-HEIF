@@ -17,16 +17,16 @@ import kotlin.math.ln
 import kotlin.math.roundToInt
 
 /**
- * **OpenStreetMap-Kacheln** für die Karte – optional zuschaltbar.
+ * **OpenStreetMap-Kacheln** für die Karte.
  *
- * Warum optional? Diese App ist bewusst offline: Landflächen und Ortsnamen liegen im
- * App-Paket. OpenStreetMap liefert aber echte Straßen und Ortsbezeichnungen, und das geht
- * nur über das Netz. Deshalb gilt:
+ * Diese App ist bewusst offline: Landflächen und Ortsnamen liegen im App-Paket. OpenStreetMap
+ * liefert aber echte Straßen und Ortsbezeichnungen, und das geht nur über das Netz. Deshalb:
  *
- *  • **Standard: aus.** Die Karte zeichnet wie bisher die Landflächen aus dem App-Paket.
- *  • **Auf Wunsch: an.** Ein Knopf auf der Karte schaltet OSM zu; die App lädt dann Kacheln
- *    im Hintergrund, merkt sie auf dem Gerät (Ordner `cache/osm`) und zeigt sie beim nächsten
- *    Mal sofort – ohne erneutes Laden.
+ *  • **Standard: an (1.42).** Vorher startete die Karte als grob gezeichnete Offline-Karte –
+ *    auf dem Gerät sah das aus wie „die Karte lädt nicht“. Jetzt beginnt sie mit
+ *    OpenStreetMap; schon geladene Kacheln kommen sofort aus dem Gerät (Ordner `cache/osm`).
+ *  • **Auf Wunsch: aus.** Ein Knopf auf der Karte schaltet auf die gezeichnete Offline-Karte
+ *    um – ganz ohne Netz.
  *
  * Regeln des OSM-Projekts (Tile Usage Policy) werden eingehalten: Kennung im User-Agent,
  * höchstens 4 gleichzeitige Anfragen, Kacheln werden zwischengespeichert statt neu geladen.
@@ -56,7 +56,7 @@ object OsmTiles {
      * und der User-Agent die App nennt – beides macht diese Klasse). Er ist jetzt der
      * **einzige** Weg; die gesperrten Server werden nicht mehr gefragt.
      */
-    private const val UA = "N3Gallery/1.41 (Android; Offline-Fotogalerie)"
+    private const val UA = "N3Gallery/1.42 (Android; Offline-Fotogalerie)"
 
     /**
      * Kachel-Server: **nur** die für Apps freigegebene Auslieferung.
@@ -97,28 +97,43 @@ object OsmTiles {
     /**
      * Erkennt das „Access blocked“-Bild der OSM-Sperre.
      *
-     * Das Bild ist ein PNG mit **sehr wenigen Farben** (Gelb, Schwarz, Weiß) und viel
-     * leerer Fläche – eine echte Kartenkachel hat hunderte Farbtöne und mindestens einige
-     * tausend Byte. Geprüft wird deshalb: dekodierbar, klein in den Bytes, und beim
-     * Herunterskalieren nur eine Handvoll Farbtöne.
+     * 1.42 – wichtig geworden, weil die alte Erkennung **Meer-Kacheln fälschlich wegwarf**:
+     * Eine reine Ozean-Kachel ist klein (< 3 kB) und hat nur ganz wenige Farbtöne – genau
+     * wie das Sperrbild. Folge: Über Wasser gab es nie Kacheln und die Karte sah aus, als
+     * „lädt sie nicht“.
+     *
+     * Jetzt zählt die **Struktur**: Ein Sperrbild ist heller Hintergrund mit dunklem Text
+     * (viel Helles UND ein deutlicher Anteil sehr dunkler Pixel). Eine Meer- oder
+     * Wald-Kachel hat fast keine tiefschwarzen Pixel. Geprüft wird auf 32 × 32
+     * herunterskaliert – das ist billig und reicht.
      */
     fun isBlockNotice(bytes: ByteArray): Boolean {
         if (bytes.size > 6000) return false
         val bmp = runCatching {
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         }.getOrNull() ?: return false
-        // Sperrbild ist exakt 256×256 wie eine Kachel – entscheidend ist der Inhalt
-        val small = runCatching { Bitmap.createScaledBitmap(bmp, 16, 16, false) }.getOrNull() ?: bmp
-        val colors = HashSet<Int>(32)
+        val small = runCatching { Bitmap.createScaledBitmap(bmp, 32, 32, false) }.getOrNull() ?: bmp
+        var dark = 0
+        var light = 0
+        var total = 0
         for (y in 0 until small.height) {
             for (x in 0 until small.width) {
                 val c = small.getPixel(x, y)
-                // auf 32 Stufen je Kanal runden, sonst zählt JPEG-Rauschen mit
-                colors.add(((c shr 16 and 0xFF) / 32 shl 10) or ((c shr 8 and 0xFF) / 32 shl 5) or (c and 0xFF) / 32)
-                if (colors.size > 24) return false
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                val lum = (r + g + b) / 3
+                total++
+                if (lum < 60) dark++
+                if (lum > 200) light++
             }
         }
-        return true
+        if (total == 0) return false
+        // Text-Bild: nennenswert schwarz UND überwiegend hell – eine Meer-/Land-Kachel
+        // erfüllt „dunkle Pixel“ praktisch nie in diesem Umfang.
+        val darkRatio = dark.toFloat() / total
+        val lightRatio = light.toFloat() / total
+        return darkRatio in 0.02f..0.45f && lightRatio > 0.4f
     }
 
     /** Höchstens 4 parallele Anfragen – so verlangt es die OSM-Nutzungsregel. */
@@ -179,11 +194,22 @@ object OsmTiles {
     /**
      * Kachel laden, falls nicht vorhanden. [onLoaded] kommt im Hintergrund-Thread.
      * Doppelanfragen für dieselbe Kachel werden zusammengefasst.
+     *
+     * 1.42: Fehlgeschlagene Kacheln bekommen eine **Schonfrist** (Backoff). Vorher wurde
+     * eine gesperrte/fehlgeschlagene Kachel bei jedem Neuzeichnen sofort wieder angefragt –
+     * das häufte sich zu einer Endlosschleife von Anfragen, die den Server belastet und
+     * den Eindruck „lädt ewig“ verstärkt hat.
      */
     fun request(ctx: Context, z: Int, x: Int, y: Int, onLoaded: (() -> Unit)? = null) {
         if (z < MIN_Z || z > MAX_Z) return
         val key = "$z/$x/$y"
         if (memory.containsKey(key) || missing.contains(key)) return
+        // Schonfrist nach einem Fehlversuch abgelaufen?
+        val blockedUntil = retryNotBefore[key]
+        if (blockedUntil != null) {
+            if (System.currentTimeMillis() < blockedUntil) return
+            retryNotBefore.remove(key)
+        }
         if (File(cacheDir(ctx), "$z-$x-$y.png").exists()) return
         val app = ctx.applicationContext
         pending.incrementAndGet()
@@ -191,8 +217,6 @@ object OsmTiles {
             try {
                 val file = File(cacheDir(app), "$z-$x-$y.png")
                 if (file.exists()) return@execute
-                // Spiegel von OSM: der Hauptserver drosselt; die Community-Spiegel sind
-                // ausdrücklich für Karten in Apps gedacht und liefern dieselben Kacheln.
                 val url = URL(tileUrl(z, x, y))
                 val conn = (url.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 8000
@@ -206,9 +230,11 @@ object OsmTiles {
                         // 404 = außerhalb der Welt; nicht immer wieder fragen
                         if (code == 404) missing.add(key)
                         if (code == 403 || code == 429) {
-                            // Drosselung: kurz warten, dann darf es erneut versucht werden
+                            // Drosselung: 30 Sekunden warten, dann darf es erneut versucht werden
+                            retryNotBefore[key] = System.currentTimeMillis() + 30_000L
                             lastError = "OSM antwortet mit $code (zu viele Anfragen) – bitte kurz warten"
                         } else {
+                            retryNotBefore[key] = System.currentTimeMillis() + 15_000L
                             lastError = "OSM-Kachel: HTTP $code"
                         }
                         return@execute
@@ -222,8 +248,9 @@ object OsmTiles {
                     }
                     // Sperrbilder sind echte PNGs mit Text – sie werden am Inhalt erkannt
                     // und NICHT gespeichert (sonst bleibt das „Access blocked“-Raster).
-                    if (bytes.size < 3000 && isBlockNotice(bytes)) {
+                    if (isBlockNotice(bytes)) {
                         blockedKacheln.incrementAndGet()
+                        retryNotBefore[key] = System.currentTimeMillis() + 60_000L
                         lastError = "Dieser Karten-Server ist für Apps gesperrt"
                         return@execute
                     }
@@ -238,12 +265,16 @@ object OsmTiles {
                 }
             } catch (t: Throwable) {
                 Log.d(TAG, "OSM-Kachel $key: ${t.message}")
+                retryNotBefore[key] = System.currentTimeMillis() + 15_000L
                 lastError = "Keine Verbindung zu OpenStreetMap (${t.javaClass.simpleName})"
             } finally {
                 pending.decrementAndGet()
             }
         }
     }
+
+    /** Wann eine fehlgeschlagene Kachel wieder angefragt werden darf (Unix-ms). */
+    private val retryNotBefore = ConcurrentHashMap<String, Long>()
 
     fun isLoading(): Boolean = pending.get() > 0
 

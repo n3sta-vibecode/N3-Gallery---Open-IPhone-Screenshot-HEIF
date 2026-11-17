@@ -22,7 +22,8 @@
             app:navigationIcon="@drawable/ic_arrow_back"
             app:title="@string/search_title" />
 
-        <!-- Ein einziges Suchfeld – die Suche startet schon beim Tippen. -->
+        <!-- Ein einziges Suchfeld mit genau EINER Lupe – die Suche startet schon beim Tippen.
+             (1.42: Vorher saß links und rechts je ein Such-Symbol im Feld.) -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/queryBox"
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -37,8 +38,7 @@
             app:boxCornerRadiusTopEnd="26dp"
             app:boxCornerRadiusTopStart="26dp"
             app:endIconDrawable="@drawable/ic_search"
-            app:endIconMode="custom"
-            app:startIconDrawable="@drawable/ic_search_ai">
+            app:endIconMode="custom">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/queryEdit"

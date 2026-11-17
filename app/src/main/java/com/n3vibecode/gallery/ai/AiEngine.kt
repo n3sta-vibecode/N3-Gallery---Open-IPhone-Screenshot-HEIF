@@ -117,11 +117,14 @@ object AiEngine {
             val app = ctx.applicationContext
 
             if (force) {
-                // Neu geladenes Modell soll sofort greifen – ohne dass gerade gerechnet wird
+                // Neu geladenes Modell soll sofort greifen – ohne dass gerade gerechnet wird.
+                // (1.42: auch die Personen-Engine – sie könnte das neue Modell sein.)
                 embedLock.lock()
                 try {
                     runCatching { backend?.close() }
                     backend = null
+                    runCatching { personsBackend?.close() }
+                    personsBackend = null
                 } finally {
                     embedLock.unlock()
                 }
@@ -189,11 +192,137 @@ object AiEngine {
         }
     }
 
+    /**
+     * Vektor für einen **Index-Eintrag** (Fotosuche) – 1.42.
+     *
+     * EmbeddingGemma 2 ist auf Aufgabenbeschreibungen trainiert: Vor den eigentlichen Text
+     * gehört der Hinweis, **was** eingebettet wird (Doku „LiteRT-LM embedding models“):
+     *
+     * ```
+     * task: search result | text: <Inhalt>   ← beim Aufbau des Index
+     * task: search query   | text: <Anfrage> ← bei der Suche
+     * ```
+     *
+     * Ohne den Vorspann findet das Modell deutlich weniger passende Treffer. Das eingebaute
+     * Wortmodell (Fallback) bekommt den Zusatz **nicht** – es bettet nackte Wörter ein.
+     */
+    fun embedIndex(text: String): FloatArray? =
+        embedWithPrefix(text, "task: search result | text: ")
+
+    /** Vektor für eine **Suchanfrage** – gleiche Regel wie bei [embedIndex]. */
+    fun embedQuery(text: String): FloatArray? =
+        embedWithPrefix(text, "task: search query | text: ")
+
+    private fun embedWithPrefix(text: String, prefix: String): FloatArray? {
+        val t = text.trim()
+        if (t.isBlank()) return null
+        return if (status.accelerator != Accelerator.LOCAL) embed(prefix + t) else embed(t)
+    }
+
     /** Ist die Suche bereit? */
     fun ready(): Boolean = backend != null
 
     /** Rechnet gerade das eingebaute Wortmodell (kein EmbeddingGemma)? */
     fun usingFallback(): Boolean = status.accelerator == Accelerator.LOCAL
+
+    // ------------------------------------------------------------------ 2. Modell: Personen (1.42)
+
+    /**
+     * **Zweites Modell – Personen-Klassifizierung.**
+     *
+     * Das ist eine **eigene Engine** für das multimodale Modell (EmbeddingGemma 2
+     * Text+Bild 440M oder 740M): Sie bettet **Fotos** in Vektoren ein (InputData.Image),
+     * während das Such-Modell Text einbettet. Beide rechnen auf der **NPU** – die
+     * NPU-Fassung des jeweiligen Chipsatzes wird von [ModelStore] bevorzugt.
+     *
+     * Fehlt das Modell (noch nicht heruntergeladen), ist `personsBackend == null` und
+     * [personsFailure] sagt, warum. Die Suche läuft unabhängig davon weiter.
+     */
+    @Volatile private var personsBackend: GemmaEmbedder? = null
+    @Volatile private var personsFailure: String = ""
+    @Volatile private var personsPreparing = false
+
+    /** Grund, warum das Personen-Modell nicht läuft (leer = läuft oder noch nie versucht). */
+    fun personsFailureReason(): String = personsFailure
+
+    /** Ist ein Modell mit Bild-Einbettung auf dem Gerät (auch wenn die Engine noch nicht lief)? */
+    fun hasPersonsModel(ctx: Context): Boolean =
+        runCatching { ModelStore.hasVisionModel(ctx.applicationContext) }.getOrDefault(false)
+
+    /**
+     * Personen-Modell laden (Hintergrund-Thread). Mehrfache Aufrufe während des Ladens
+     * werden zusammengefasst. [onReady] bekommt (läuft, Grund) auf dem Thread des Aufrufers.
+     */
+    fun preparePersons(ctx: Context, onReady: ((Boolean, String) -> Unit)? = null) {
+        val app = ctx.applicationContext
+        synchronized(this) {
+            if (personsBackend != null) {
+                onReady?.invoke(true, "")
+                return
+            }
+            if (personsPreparing) {
+                onReady?.invoke(false, "wird geladen")
+                return
+            }
+            personsPreparing = true
+        }
+        Thread({
+            try {
+                val built = runCatching { GemmaEmbedder.createForPersons(app) }.getOrNull()
+                if (built != null) {
+                    // Nicht zwei Engines gleichzeitig starten lassen: NPU-Initialisierungen
+                    // müssen nacheinander passieren – embedLock hält das auseinander.
+                    embedLock.lock()
+                    try {
+                        runCatching { personsBackend?.close() }
+                        personsBackend = built
+                        personsFailure = ""
+                    } finally {
+                        embedLock.unlock()
+                    }
+                    Log.i("N3Ai", "Personen-Modell bereit: ${GemmaEmbedder.lastRoute}")
+                    onReady?.invoke(true, "")
+                } else {
+                    personsFailure = GemmaEmbedder.lastFailure.ifBlank { "Modell fehlt" }
+                    Log.i("N3Ai", "Personen-Modell nicht verfügbar: $personsFailure")
+                    onReady?.invoke(false, personsFailure)
+                }
+            } finally {
+                personsPreparing = false
+            }
+        }, "n3-persons-model").start()
+    }
+
+    /**
+     * Bild einbetten (JPEG/PNG-Bytes) – für die Personen-Klassifizierung.
+     * Serialisiert über dasselbe Schloss wie die Textsuche: Die NPU rechnet nacheinander.
+     */
+    fun embedImage(bytes: ByteArray): FloatArray? {
+        val b = personsBackend ?: return null
+        embedLock.lock()
+        return try {
+            b.embedImage(bytes)
+        } catch (t: Throwable) {
+            Log.w("N3Ai", "Bild-Einbetten fehlgeschlagen: ${t.message}")
+            null
+        } finally {
+            embedLock.unlock()
+        }
+    }
+
+    /** Läuft das Personen-Modell (Engine gestartet)? */
+    fun personsReady(): Boolean = personsBackend != null
+
+    /** Personen-Engine verwerfen (z. B. nach dem Löschen der Modelldateien). */
+    fun closePersons() {
+        embedLock.lock()
+        try {
+            runCatching { personsBackend?.close() }
+            personsBackend = null
+        } finally {
+            embedLock.unlock()
+        }
+    }
 
     fun close() {
         embedLock.lock()

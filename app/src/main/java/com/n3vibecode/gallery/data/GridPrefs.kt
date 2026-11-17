@@ -8,8 +8,12 @@ import android.content.Context
  */
 object GridPrefs {
 
+    // 1.42: „so viele Fotos auf einem Bild wie man will“. Vorher endete das Zoomen bei
+    // 32 Spalten. Jetzt geht es bis 200 (auf einem Handy sind das Kacheln von ~5 px –
+    // praktisch das gesamte Fotoarchiv auf einem Bildschirm) und das Zoomen fühlt sich
+    // stufenlos an, weil zwischen den Spaltenwechseln kontinuierlich skaliert wird.
     const val MIN = 2
-    const val MAX = 32
+    const val MAX = 200
     const val DEFAULT = 4
 
     /** Gruppierung der Zeitleiste. */

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Deutsche Fassung. Standard (Englisch) steht in values/strings.xml. -->
-    <string name="app_name">N3 Gallery- Open HEIF iPhone Screenshots</string>
+    <string name="app_name">N3 Gallery – Open HEIF iPhone Screenshots</string>
     <string name="brand_name">N3 Gallery</string>
     <string name="brand_short_en">N3 Gallery - Open HEIF iPhone Screenshots</string>
     <string name="app_subtitle">App by N3 Vibecode</string>
@@ -153,6 +153,22 @@
     <string name="welcome_ok">Los geht’s</string>
     <string name="meta_page_title">Metadaten</string>
     <string name="note_edit">Notiz &amp; Tags</string>
+    <!-- 1.42: Foto-Detailansicht wie in Samsung/Google/Apple Fotos – Knöpfe unten,
+         wichtigste Metadaten &amp; Notiz per Wisch nach oben. -->
+    <string name="action_details">Info</string>
+    <string name="action_edit_short">Bearbeiten</string>
+    <string name="favorite_short">Favorit</string>
+    <string name="note_add_hint">Notiz hinzufügen…</string>
+    <string name="sheet_open">Alle Metadaten anzeigen</string>
+    <string name="exif_copy">Kopieren</string>
+    <!-- 1.42: Zweites Modell – Personen-Klassifizierung (Bild-Einbettungen, NPU). -->
+    <string name="persons_title">Personen</string>
+    <string name="persons_preparing">Personen-Ansicht wird vorbereitet …</string>
+    <string name="persons_building">Fotos werden eingebettet: %1$d / %2$d</string>
+    <string name="persons_no_model">Für Personen wird das Modell „Text + Bild (440M)“ oder „Alles (740M)“ benötigt – über die Suchseite laden (⋮ → Modell verwalten).</string>
+    <string name="persons_empty">Noch keine ähnlichen Fotos gefunden.</string>
+    <string name="persons_status">%1$d ähnliche Fotos · %2$d eingebettet</string>
+    <string name="persons_stopped">Gestoppt.</string>
     <string name="copy_exif">EXIF kopieren</string>
     <string name="share_text">Als Text teilen</string>
     <string name="open_meta_page">Metadaten-Seite öffnen (voll scrollbar)</string>

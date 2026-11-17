@@ -25,7 +25,6 @@ class MediaPageFragment : Fragment() {
     private var image: android.widget.ImageView? = null
     private var progress: ProgressBar? = null
     private var message: TextView? = null
-    private var hint: TextView? = null
     private var maxPx = 0
     private var fullRequested = false
 
@@ -65,11 +64,12 @@ class MediaPageFragment : Fragment() {
         val image = view.findViewById<ZoomImageView>(R.id.image)
         val progress = view.findViewById<ProgressBar>(R.id.progress)
         val message = view.findViewById<TextView>(R.id.tvMessage)
-        val hint = view.findViewById<TextView>(R.id.tvHint)
+        // 1.42: Das Format-Badge („HEIF/HEIC …“, „RAW …“) ist weg – beim Durchschauen
+        // mehrerer Fotos soll das Dateiformat nicht mehr auf dem Bild stehen. Technische
+        // Hinweise stehen bei Bedarf in den Metadaten unten.
         this.image = image
         this.progress = progress
         this.message = message
-        this.hint = hint
 
         val media = item
         if (media == null) {
@@ -78,9 +78,6 @@ class MediaPageFragment : Fragment() {
             message.text = getString(R.string.unsupported_preview)
             return
         }
-
-        hint.text = Decoder.hintFor(media)
-        hint.visibility = if (hint.text.isNullOrBlank()) View.GONE else View.VISIBLE
 
         // Einfacher Tipp = Leisten ein-/ausblenden · Doppeltipp/Zwei Finger = zoomen
         image.onSingleTap = { (activity as? DetailActivity)?.toggleBars() }
@@ -92,6 +89,10 @@ class MediaPageFragment : Fragment() {
         // führt zurück zur Übersicht mit allen Fotos.
         image.onZoomOutToGrid = { (activity as? DetailActivity)?.finish() }
         image.onSwipeDownBack = { (activity as? DetailActivity)?.finish() }
+        // 1.42: Hochwischen irgendwo im Foto öffnet die wichtigsten Metadaten (Blatt
+        // unten mit Notizfeld). Die Geste sitzt hier im Bild, weil das Bild die
+        // Berührung verarbeitet – eine Wurzel-Methode bekäme sie nie zu sehen.
+        image.onSwipeUp = { (activity as? DetailActivity)?.openSheetFromPage() }
         val zoomHint = view.findViewById<TextView>(R.id.tvZoomHint)
         if (!zoomHintShown) {
             zoomHintShown = true
@@ -139,7 +140,6 @@ class MediaPageFragment : Fragment() {
         if (fullRequested || !isAdded) return
         val progress = this.progress ?: return
         val message = this.message ?: return
-        val hint = this.hint ?: return
         fullRequested = true
         ImageLoader.loadFullDetailed(requireContext(), media, maxPx) { bmp: Bitmap?, path ->
             if (!isAdded) return@loadFullDetailed
@@ -148,10 +148,6 @@ class MediaPageFragment : Fragment() {
                 fullShown = true
                 image.setImageBitmap(bmp)
                 message.visibility = View.GONE
-                Decoder.hintForPath(path)?.let {
-                    hint.text = it
-                    hint.visibility = View.VISIBLE
-                }
                 return@loadFullDetailed
             }
             // Zweiter Versuch: JPEG-Eintrag aus einem HEIF-Container holen (z. B. JPEG-kodiertes HEIF)
@@ -169,8 +165,6 @@ class MediaPageFragment : Fragment() {
                 if (extracted != null) {
                     image.setImageBitmap(extracted)
                     message.visibility = View.GONE
-                    hint.visibility = View.VISIBLE
-                    hint.text = getString(R.string.jpeg_from_heif)
                     return@loadFullDetailed
                 }
             }
@@ -178,8 +172,6 @@ class MediaPageFragment : Fragment() {
             message.text = buildString {
                 append(getString(R.string.unsupported_preview))
                 append("\n\n")
-                append(media.format)
-                append(" · ")
                 append(media.shortInfo())
                 val detail = diagnose(media)
                 if (detail.isNotEmpty()) {
@@ -215,7 +207,6 @@ class MediaPageFragment : Fragment() {
         image = null
         progress = null
         message = null
-        hint = null
         super.onDestroyView()
     }
 

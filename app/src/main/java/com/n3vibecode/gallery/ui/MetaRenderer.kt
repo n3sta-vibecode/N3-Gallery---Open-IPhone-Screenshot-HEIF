@@ -61,8 +61,10 @@ object MetaRenderer {
      * Vorher musste man erst eine Zeile „Auf Karte zeigen“ suchen (und dafür nach unten
      * scrollen). Jetzt steht die Karte mit allen Fotos, der eigene Punkt ist rot markiert;
      * antippen öffnet sie groß. Ohne Position im Foto entfällt der Block.
+     *
+     * 1.42: auch für das neue Blatt „Wichtigste Angaben“ in der Detailansicht benutzt.
      */
-    private fun addMapCard(context: Context, container: LinearLayout, meta: MediaMeta) {
+    internal fun addMapCard(context: Context, container: LinearLayout, meta: MediaMeta) {
         val point = meta.mapPoint
         if (point == null) {
             // „Karte bei jedem Foto“: Ist im Foto kein Ort gespeichert, steht hier trotzdem ein
@@ -96,11 +98,11 @@ object MetaRenderer {
             setOnClickListener {
                 runCatching { context.startActivity(MapActivity.intentFor(context, point.first, point.second)) }
             }
-            // Gleiche Wahl wie in der großen Karte (offline oder OpenStreetMap)
+            // Gleiche Wahl wie in der großen Karte (OpenStreetMap ist Standard, 1.42)
             useOsm = runCatching {
                 context.getSharedPreferences("n3_map", Context.MODE_PRIVATE)
-                    .getBoolean("osm", false)
-            }.getOrDefault(false)
+                    .getBoolean("osm", true)
+            }.getOrDefault(true)
             post { fitToMarkers(minDegrees = 6f) }
         }
         frame.addView(view)

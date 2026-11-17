@@ -77,9 +77,12 @@ object Formats {
     }
 
     /** Gruppen für den Tab „Formate“ – Apple-/Google-ähnliche Sortierung. */
-    fun family(ext: String, mime: String): String = when {
+    fun family(name: String, ext: String, mime: String): String = when {
         isRaw(ext) -> "RAW (Kamera-Rohdaten)"
-        isHeif(ext) -> "HEIC / HEIF (Apple & Android)"
+        // 1.42: neutral benannt – HEIC gibt es nicht nur von Apple (Samsung, Huawei …
+        // fotografieren ebenfalls HEIC). Nur wenn die Datei wirklich nach Apple aussieht,
+        // steht „Apple“ daneben (siehe looksApple).
+        isHeif(ext) -> if (looksApple(name, ext)) "HEIC / HEIF (Apple)" else "HEIC / HEIF"
         isAvif(ext) -> "AVIF"
         isVector(ext) -> "SVG (Vektorgrafik)"
         ext == "jpg" || ext == "jpeg" || ext == "jpe" || ext == "jfif" -> "JPEG"

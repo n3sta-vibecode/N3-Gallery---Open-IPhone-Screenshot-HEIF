@@ -274,7 +274,8 @@ object SearchIndex {
         runCatching { File(ctx.filesDir, "$FILE.stamp").delete() }
     }
 
-    private fun embedItem(ctx: Context, item: MediaItem): FloatArray? = AiEngine.embed(describeCached(ctx, item))
+    // 1.42: Index-Einträge bekommen den Präfix „task: search result“ (siehe AiEngine.embedIndex)
+    private fun embedItem(ctx: Context, item: MediaItem): FloatArray? = AiEngine.embedIndex(describeCached(ctx, item))
 
     /**
      * Beschreibungstexte im Speicher halten.
@@ -406,7 +407,8 @@ object SearchIndex {
     fun search(query: String, limit: Int = 0): List<MediaItem> {
         if (query.isBlank()) return emptyList()
         if (entries.isEmpty()) return emptyList()
-        val q = AiEngine.embed(query) ?: return emptyList()
+        // 1.42: Anfragen bekommen den Präfix „task: search query“ (siehe AiEngine.embedQuery)
+        val q = AiEngine.embedQuery(query) ?: return emptyList()
         val scores = ArrayList<Triple<MediaItem, Float, String>>(entries.size)
         val byUri = DataHub.byUri()
         var maxScore = 0f

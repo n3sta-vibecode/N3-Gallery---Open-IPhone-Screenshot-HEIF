@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.41-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.41/N3-Gallery-1.41-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.41-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.41/N3-Gallery-1.41-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.41.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.41/N3Gallery-Projekt-1.41.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.42-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.42/N3-Gallery-1.42-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.42-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.42/N3-Gallery-1.42-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.42.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.42/N3Gallery-Projekt-1.42.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -34,6 +34,27 @@ Welcher Schlüssel verwendet wird, wie man selbst APKs signiert und wie man eine
 privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.md](SIGNIEREN.md)**.
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
+
+## 🆕 Version 1.42 – Knöpfe unten wie Samsung, Notizfeld, NPU-Modelle pro Chipsatz
+
+* **Fotoansicht neu:** Knopfleiste **unten** (Details · Bearbeiten · Teilen · Favorit ·
+  Löschen), **Hochwischen irgendwo im Foto** öffnet die wichtigsten Metadaten als Blatt –
+  mit **Notizfeld** (Notiz + Tags, auf Wunsch direkt in die Datei geschrieben) und kleiner
+  Karte.
+* **Karte lädt wieder:** Meer-Kacheln wurden fälschlich als Sperrbilder erkannt und
+  weggeworfen; OpenStreetMap ist jetzt Standard (offline umschaltbar); gesperrte Kacheln
+  bekommen eine Schonfrist statt einer Anfrage-Flut.
+* **Gemma Embedding 2 läuft auf der NPU:** `Backend.NPU` wurde korrekt gebaut (vorher
+  scheiterte der Aufbau immer), die App lädt automatisch die **NPU-Fassung des eigenen
+  Chipsatzes** (z. B. `…_Qualcomm_SM8750.litertlm` für das Galaxy S25 Ultra) und prüft den
+  Download gegen **SHA-256**. Neu im APK: `litert-npu-runtime-qualcomm` + `qnn-runtime`
+  (Qualcomm-NPU-Laufzeit, +~60 MB).
+* **Zweites Modell – Personen:** das multimodale Modell (Text+Bild 440M/740M) bettet Fotos
+  ein; Knopf „Personen“ zeigt Fotos mit denselben Personen. Beide Modelle auf der NPU.
+* **Raster stufenlos:** kontinuierliches Zoomen um den Fingerpunkt, bis **200 Spalten**,
+  ohne Neubinden der Kacheln – sehr flüssig.
+* **Kleines:** genau eine Lupe im Suchfeld; Dateiformat steht nicht mehr auf Kacheln und
+  im Blatt; HEIC heißt nur noch „Apple“, wenn die Datei wirklich von Apple ist.
 
 ## 🆕 Version 1.41 – Karte ohne Sperrbilder, nur NPU, Metadaten wie in der Samsung-Galerie
 

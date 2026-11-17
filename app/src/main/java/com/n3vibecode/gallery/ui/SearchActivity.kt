@@ -28,6 +28,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.n3vibecode.gallery.R
 import com.n3vibecode.gallery.ai.AiEngine
 import com.n3vibecode.gallery.ai.ModelStore
+import com.n3vibecode.gallery.ai.PersonIndex
 import com.n3vibecode.gallery.ai.SearchIndex
 import com.n3vibecode.gallery.data.DataHub
 import com.n3vibecode.gallery.data.GridPrefs
@@ -74,12 +75,34 @@ class SearchActivity : AppCompatActivity() {
     private var searchToken = 0
     private var lastStatus: AiEngine.Status? = null
 
+    /**
+     * 1.42 – **Personen-Modus**: Wird die Seite mit einem Foto-Verweis geöffnet
+     * (EXTRA_SIMILAR_TO), zeigt sie die Fotos mit denselben Personen/demselben Motiv
+     * statt einer Textsuche. Siehe [PersonIndex].
+     */
+    private var personsUri: String? = null
+
     private val rerun = Runnable { search() }
 
     /** Fortschritt des Index-Aufbaus in der Statuszeile (nur solange wirklich gebaut wird). */
     private val progressTick: Runnable = object : Runnable {
         override fun run() {
             if (isFinishing || isDestroyed) return
+            // 1.42: Im Personen-Modus gehört die Zeile zum Bild-Index (2. Modell)
+            if (personsUri != null) {
+                val (pDone, pTotal) = PersonIndex.progress()
+                val pBuilding = PersonIndex.isRunning()
+                progress.visibility = if (pBuilding) View.VISIBLE else View.GONE
+                if (pBuilding) {
+                    tvEngine.text = if (pTotal > 0) {
+                        getString(R.string.persons_building, pDone, pTotal)
+                    } else {
+                        getString(R.string.persons_preparing)
+                    }
+                }
+                main.postDelayed(this, 700)
+                return
+            }
             val (done, total) = SearchIndex.progress()
             val building = SearchIndex.isRunning()
             progress.visibility = if (building) View.VISIBLE else View.GONE
@@ -187,6 +210,17 @@ class SearchActivity : AppCompatActivity() {
 
         buildSuggestions()
 
+        // 1.42: Personen-Modus? Dann keine Textsuche, sondern ähnliche Fotos zeigen.
+        personsUri = intent.getStringExtra(EXTRA_SIMILAR_TO)
+        if (personsUri != null) {
+            toolbar.title = getString(R.string.persons_title)
+            findViewById<View>(R.id.queryBox).visibility = View.GONE
+            suggestions.visibility = View.GONE
+            startPersonsSearch(personsUri!!)
+            watchProgress()
+            return
+        }
+
         // Suchmaschine vorbereiten und – falls nötig – den Index bauen. Alles im Hintergrund;
         // die Seite ist sofort bedienbar und zeigt den Fortschritt in der Statuszeile.
         progress.visibility = View.VISIBLE
@@ -206,6 +240,45 @@ class SearchActivity : AppCompatActivity() {
             }
         }, "n3-search-prepare").apply { isDaemon = true }.start()
         watchProgress()
+    }
+
+    /**
+     * Personen-Ähnlichkeit: Index aufbauen (mit Fortschritt) und dann die Treffer zeigen.
+     * Fehlt das Bild-Modell, erklärt die Modell-Leiste, welches zu laden ist (440M/740M).
+     */
+    private fun startPersonsSearch(uri: String) {
+        progress.visibility = View.VISIBLE
+        tvEngine.text = getString(R.string.persons_preparing)
+        PersonIndex.ensureBuilt(applicationContext) { ok, reason ->
+            if (isFinishing || isDestroyed) return@ensureBuilt
+            if (!ok) {
+                progress.visibility = View.GONE
+                results = emptyList()
+                adapter.submitItems(emptyList())
+                emptyBox.visibility = View.VISIBLE
+                tvEmptyTitle.text = getString(R.string.persons_title)
+                tvEmptySub.text = reason.ifBlank { getString(R.string.persons_no_model) }
+                return@ensureBuilt
+            }
+            Thread({
+                val list = runCatching { PersonIndex.similar(applicationContext, uri) }
+                    .getOrDefault(emptyList())
+                main.post {
+                    if (isFinishing || isDestroyed) return@post
+                    progress.visibility = View.GONE
+                    results = list
+                    adapter.submitItems(list)
+                    if (list.isEmpty()) {
+                        emptyBox.visibility = View.VISIBLE
+                        tvEmptyTitle.text = getString(R.string.persons_title)
+                        tvEmptySub.text = getString(R.string.persons_empty)
+                    } else {
+                        emptyBox.visibility = View.GONE
+                    }
+                    tvEngine.text = getString(R.string.persons_status, list.size, PersonIndex.size())
+                }
+            }, "n3-persons-search").apply { isDaemon = true }.start()
+        }
     }
 
     private fun onMenuItem(item: MenuItem): Boolean = when (item.itemId) {
@@ -273,7 +346,7 @@ class SearchActivity : AppCompatActivity() {
                 lines.add("• ${f.name} · ${f.length() / 1048576} MB")
             }
             half.forEach { f ->
-                val known = ModelStore.Variant.entries.firstOrNull { it.file == f.name }
+                val known = ModelStore.variants().firstOrNull { it.file == f.name }
                 lines.add("• ${f.name} · ${f.length() / 1048576} von ${known?.expectedMb ?: "?"} MB (unvollständig)")
             }
         }
@@ -375,7 +448,7 @@ class SearchActivity : AppCompatActivity() {
         when {
             // Wichtigster Fall auf dem Gerät: 740M-Datei mit 462 MB statt 1,3 GB
             half != null -> {
-                val known = ModelStore.Variant.entries.firstOrNull { it.file == half.name }
+                val known = ModelStore.variants().firstOrNull { it.file == half.name }
                 tvModelTitle.text = getString(R.string.ai_model_incomplete_title)
                 tvModelHint.text = if (known != null) {
                     getString(
@@ -405,9 +478,18 @@ class SearchActivity : AppCompatActivity() {
 
     /** Auswahl: welches EmbeddingGemma-2-Modell geladen werden soll. */
     private fun chooseModelAndDownload() {
-        val variants = ModelStore.Variant.entries
-        val labels = variants.map { v -> "${v.label}\n${v.note} · ca. ${v.expectedMb} MB" }
-            .toTypedArray()
+        // 1.42: Die Liste zeigt automatisch die **NPU-Fassung dieses Geräts** (z. B.
+        // „…_Qualcomm_SM8750“ auf dem Galaxy S25 Ultra) – nur damit rechnet die NPU.
+        val variants = ModelStore.variants()
+        val soc = ModelStore.socTag()
+        val labels = variants.map { v ->
+            val npu = if (v.isNpu) {
+                " · NPU (${ModelStore.socLabel(v.soc)})"
+            } else if (soc.isNotEmpty()) {
+                " · CPU/GPU (keine NPU-Fassung veröffentlicht)"
+            } else ""
+            "${v.label}\n${v.note} · ca. ${v.expectedMb} MB$npu"
+        }.toTypedArray()
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.ai_model_choose)
             .setItems(labels) { _, which -> startDownload(variants[which]) }
@@ -532,7 +614,9 @@ class SearchActivity : AppCompatActivity() {
                 showEngineStatus(st)
                 refreshModelBox(st)
                 if (!SearchIndex.isRunning()) progress.visibility = View.GONE
-                search()
+                // 1.42: Im Personen-Modus neu einbetten (neues Modell = neuer Vektorraum)
+                val uri = personsUri
+                if (uri != null) startPersonsSearch(uri) else search()
             }
         }, "n3-engine-reload").apply { isDaemon = true }.start()
     }
@@ -683,7 +767,10 @@ class SearchActivity : AppCompatActivity() {
             )
         }
 
-    private companion object {
-        const val REQ_PICK_MODEL = 4711
+    companion object {
+        private const val REQ_PICK_MODEL = 4711
+
+        /** Foto-Verweis für den Personen-Modus („ähnliche Fotos“). */
+        const val EXTRA_SIMILAR_TO = "similar_to"
     }
 }

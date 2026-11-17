@@ -38,10 +38,18 @@ internal class GemmaEmbedder(
     override val accelerator: AiEngine.Accelerator,
     override val modelName: String,
     override val detail: String,
-    private val embedFn: (String) -> FloatArray?
+    private val embedFn: (String) -> FloatArray?,
+    /** 1.42: Bild-Einbettung (nur die multimodalen Modelle 440M/740M). */
+    private val imageFn: ((ByteArray) -> FloatArray?)? = null
 ) : AiEngine.EmbedderBackend {
 
     override fun embed(text: String): FloatArray? = embedFn(text)
+
+    /** Kann dieses Modell Bilder einbetten (Voraussetzung für die Personen-Klassifizierung)? */
+    val canEmbedImages: Boolean get() = imageFn != null
+
+    /** Bild (JPEG/PNG-Bytes) einbetten – für die Personen-Klassifizierung. */
+    fun embedImage(bytes: ByteArray): FloatArray? = imageFn?.invoke(bytes)
 
     override fun close() {
         runCatching {
@@ -97,6 +105,10 @@ internal class GemmaEmbedder(
         fun create(ctx: Context): GemmaEmbedder? {
             lastFailure = ""
             lastRoute = ""
+            // 1.42 – früher wurde hier das erste beliebige Modell genommen (auch ein reines
+            // Text-Modell, obwohl die Dateien der Suche alle Text-Einbettung brauchen).
+            // Gesucht ist jetzt die NPU-Fassung dieses Geräts; die fällt automatisch auf die
+            // normale Datei zurück, wenn es keine gibt.
             val source: ModelSource = ModelStore.best(ctx)?.let { ModelSource.File(it) }
                 ?: findBundledModel(ctx)?.let { ModelSource.Asset(it) }
                 ?: run {
@@ -193,6 +205,68 @@ internal class GemmaEmbedder(
         }
 
         /**
+         * **2. Modell – Personen-Klassifizierung (1.42).**
+         *
+         * Baut eine eigene Engine für das multimodale Modell (Text+Bild 440M oder 740M) –
+         * bevorzugt die **NPU-Fassung dieses Chipsatzes** (z. B. `_Qualcomm_SM8750` für das
+         * Galaxy S25 Ultra). Geprüft wird mit einem echten **Testbild**, denn hier zählt die
+         * Bild-Einbettung: Ein Text-Modell (270M) wäre für Personen unbrauchbar.
+         *
+         * Nur NPU (kein stiller Rückfall) – dieselbe Regel wie bei der Suche.
+         */
+        fun createForPersons(ctx: Context): GemmaEmbedder? {
+            lastFailure = ""
+            lastRoute = ""
+            val file = ModelStore.bestVision(ctx) ?: run {
+                lastFailure = "kein Modell mit Bild-Einbettung im Gerät (Text+Bild 440M oder 740M laden)"
+                Log.i(TAG, "Personen-Klassifizierung: kein Bild-Modell vorhanden")
+                return null
+            }
+            val source = ModelSource.File(file)
+
+            val reasons = ArrayList<String>(4)
+            if (classOrNull(CLASS_EMBEDDING_ENGINE) != null) {
+                val result = runCatching { buildEngineDirect(ctx, source, "NPU") }
+                val built = result.getOrNull()
+                if (built != null) {
+                    val (problem, dims) = probeVision(built)
+                    if (problem == null) {
+                        lastRoute = "LiteRT-LM NPU · Bild"
+                        Log.i(TAG, "Personen-Modell läuft auf der NPU ($dims Dimensionen): ${file.name}")
+                        return built
+                    }
+                    reasons.add("NPU: $problem")
+                    runCatching { built.close() }
+                } else {
+                    reasons.add("NPU: ${human(result.exceptionOrNull())}")
+                }
+            } else {
+                reasons.add("LiteRT-LM fehlt im Build")
+            }
+            lastFailure = reasons.joinToString(" · ").ifBlank { "NPU nicht verfügbar" }
+            Log.w(TAG, "Personen-Modell läuft nicht: $lastFailure")
+            return null
+        }
+
+        /** Testlauf für die Bild-Einbettung: (Grund oder `null`, Dimensionen). */
+        private fun probeVision(built: GemmaEmbedder): Pair<String?, Int> = try {
+            val v = built.embedImage(tinyTestImage())
+            if (v != null && v.isNotEmpty()) null to v.size else "Testbild lieferte keinen Vektor" to 0
+        } catch (t: Throwable) {
+            human(t) to 0
+        }
+
+        /** Kleines Testbild (PNG-Bytes), um die Bild-Einbettung ohne Foto zu prüfen. */
+        private fun tinyTestImage(): ByteArray {
+            val bmp = android.graphics.Bitmap.createBitmap(24, 24, android.graphics.Bitmap.Config.ARGB_8888)
+            bmp.eraseColor(android.graphics.Color.rgb(90, 130, 200))
+            val out = java.io.ByteArrayOutputStream()
+            bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+            bmp.recycle()
+            return out.toByteArray()
+        }
+
+        /**
          * Kurzer Testlauf: (Grund oder `null`, Dimensionen). Erst wenn hier ein echter Vektor
          * herauskommt, gilt das Modell als benutzbar.
          */
@@ -285,25 +359,8 @@ internal class GemmaEmbedder(
         ): GemmaEmbedder {
             val engineClass = Class.forName(CLASS_EMBEDDING_ENGINE)
             val configClass = Class.forName(CLASS_EMBEDDING_CONFIG)
-            val backendClass = Class.forName(CLASS_BACKEND)
-            val inputDataClass = Class.forName(CLASS_INPUT_DATA)
 
-            // Backend.CPU / -GPU / -NPU sind Kotlin-Datenklassen (Backend.CPU(threadCount)).
-            // Genommen wird der Konstruktor mit den meisten Parametern, fehlende Werte bleiben
-            // auf ihren Standardwerten (Boxing: Integer statt int).
-            val backend = runCatching {
-                val cls = Class.forName("$CLASS_BACKEND\$$backendName")
-                val ctor = cls.declaredConstructors.maxByOrNull { it.parameterTypes.size }
-                    ?: cls.getDeclaredConstructor()
-                ctor.isAccessible = true
-                // Alle Parameter bleiben auf ihren Standardwerten (null = Kotlin-Default).
-                // Wichtig: Array<Any?>, sonst leitet Kotlin Array<Nothing?> ab und der
-                // Compiler lehnt das ab ("not supported on the JVM").
-                val args = arrayOfNulls<Any?>(ctor.parameterTypes.size)
-                ctor.newInstance(*args)
-            }.getOrElse {
-                error("Backend.$backendName nicht verfügbar")
-            }
+            val backend = buildBackend(ctx, backendName)
 
             val path = when (source) {
                 is ModelSource.Asset -> source.path
@@ -344,8 +401,59 @@ internal class GemmaEmbedder(
                 val vec = fieldOf(response, "embedding") ?: invoke(response, "getEmbedding")
                 (vec as? FloatArray)?.takeIf { it.isNotEmpty() } ?: error("Embedding ist leer")
             }
+
+            // 1.42 – Bild-Einbettung für die multimodalen Modelle (Text+Bild 440M / 740M):
+            // InputData.Image(bytes) geht durch dieselbe computeEmbedding-Methode. Das ist
+            // die Grundlage der Personen-Klassifizierung (2. Modell).
+            val imageFn: ((ByteArray) -> FloatArray?)? = { bytes ->
+                val input = runCatching {
+                    Class.forName("$CLASS_INPUT_DATA\$Image")
+                        .getDeclaredConstructor(ByteArray::class.java)
+                        .also { it.isAccessible = true }
+                        .newInstance(bytes)
+                }.getOrElse { error("InputData.Image fehlt") }
+                val response = compute.invoke(engine, listOf(input)) ?: error("kein Ergebnis")
+                val vec = fieldOf(response, "embedding") ?: invoke(response, "getEmbedding")
+                (vec as? FloatArray)?.takeIf { it.isNotEmpty() } ?: error("Bild-Embedding ist leer")
+            }
+
             val acc = if (backendName == "NPU") AiEngine.Accelerator.NPU else AiEngine.Accelerator.CPU
-            return GemmaEmbedder(engine, acc, "EmbeddingGemma 2", "LiteRT-LM · $backendName", fn)
+            return GemmaEmbedder(engine, acc, "EmbeddingGemma 2", "LiteRT-LM · $backendName", fn, imageFn)
+        }
+
+        /**
+         * `Backend.CPU()`, `Backend.GPU()` oder `Backend.NPU(nativeLibraryDir)` bauen.
+         *
+         * **Der Fehler bis 1.41:** `Backend.NPU` wurde über den Konstruktor mit den MEISTEN
+         * Parametern gebaut und alle Werte auf `null` belassen. Der parameterlose Weg (alle
+         * Standardwerte) wurde gar nicht erst versucht, und der gewählte Konstruktor verlangt
+         * ein `int` (Default-Maske), das kein `null` sein darf. Folge: `Backend.NPU` ließ
+         * sich **nie** bauen – die NPU konnte also gar nicht erst starten, egal ob
+         * Bibliotheken und Modell gepasst hätten.
+         *
+         * Jetzt gilt (entsprechend der LiteRT-LM-Dokumentation):
+         *  • **NPU** wird mit dem Bibliotheks-Ordner der App gebaut
+         *    (`Context.applicationInfo.nativeLibraryDir`) – dort liegen die mitgelieferten
+         *    NPU-Bibliotheken (Qualcomm-Dispatch + QNN-Laufzeit, siehe build.gradle.kts).
+         *  • **CPU/GPU** nehmen den parameterlosen Konstruktor (alles auf Standardwerten).
+         */
+        private fun buildBackend(ctx: Context, backendName: String): Any {
+            val cls = Class.forName("$CLASS_BACKEND\$$backendName")
+            if (backendName == "NPU") {
+                val nativeDir = ctx.applicationInfo.nativeLibraryDir
+                runCatching {
+                    val ctor = cls.getDeclaredConstructor(String::class.java)
+                    ctor.isAccessible = true
+                    return ctor.newInstance(nativeDir)
+                }
+                // Fallback: parameterlos (Standardwert "") – die Laufzeit sucht dann selbst.
+            }
+            runCatching {
+                val ctor = cls.getDeclaredConstructor()
+                ctor.isAccessible = true
+                return ctor.newInstance()
+            }
+            error("Backend.$backendName nicht verfügbar")
         }
 
         // ------------------------------------------------------------------ Reflection
@@ -362,9 +470,14 @@ internal class GemmaEmbedder(
          */
         fun hasNpu(): Boolean {
             if (classOrNull("$CLASS_BACKEND\$NPU") == null) return false
-            val device = android.os.Build.HARDWARE.orEmpty().lowercase() + " " +
+            // SOC_MANUFACTURER/SOC_MODEL gibt es erst ab Android 12 (API 31) – die Felder
+            // sind keine Konstanten, ihr Fehlen würde auf älteren Geräten brechen.
+            val soc = if (android.os.Build.VERSION.SDK_INT >= 31) {
                 android.os.Build.SOC_MANUFACTURER.orEmpty().lowercase() + " " +
-                android.os.Build.SOC_MODEL.orEmpty().lowercase() + " " +
+                    android.os.Build.SOC_MODEL.orEmpty().lowercase() + " "
+            } else ""
+            val device = soc +
+                android.os.Build.HARDWARE.orEmpty().lowercase() + " " +
                 android.os.Build.MANUFACTURER.orEmpty().lowercase() + " " +
                 android.os.Build.MODEL.orEmpty().lowercase()
             val known = listOf(

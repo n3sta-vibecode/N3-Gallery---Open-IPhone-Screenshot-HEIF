@@ -70,10 +70,14 @@ class MapActivity : AppCompatActivity() {
             insets
         }
 
-        // Kartenstil: gezeichnete Karte (offline) oder OpenStreetMap (lädt Kacheln)
+        // Kartenstil: gezeichnete Karte (offline) oder OpenStreetMap (lädt Kacheln).
+        // 1.42: OpenStreetMap ist jetzt **Standard** – vorher war die Karte nur die
+        // grob gezeichnete Offline-Karte, was wie „die Karte lädt nicht“ aussah.
+        // Wer offline bleiben will, schaltet unten links auf „Offline-Karte“ um;
+        // geladene Kacheln bleiben gespeichert.
         val btnProvider = findViewById<com.google.android.material.button.MaterialButton>(R.id.btnProvider)
         val prefs = getSharedPreferences("n3_map", MODE_PRIVATE)
-        mapView.useOsm = prefs.getBoolean("osm", false)
+        mapView.useOsm = prefs.getBoolean("osm", true)
         mapView.onProviderChanged = { osm ->
             btnProvider.text = getString(if (osm) R.string.map_osm_off else R.string.map_osm_on)
         }
