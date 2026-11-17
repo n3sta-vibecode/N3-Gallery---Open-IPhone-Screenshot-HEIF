@@ -10,6 +10,22 @@ Suchtext ──► EmbeddingGemma 2 (MediaPipe Tasks Retrieval / LiteRT-LM) ─�
 Foto-Beschreibung ──► EmbeddingGemma 2                                            ─┘
 ```
 
+### Was davon LiteRT-LM ist – und was nicht
+
+Klare Antwort, damit es keine Missverständnisse gibt:
+
+| Teil | Wer rechnet | LiteRT-LM beteiligt? |
+| --- | --- | --- |
+| Wortsuche (Name, Ordner, Tags, Notiz) | eingebautes Wortmodell in Kotlin | **nein** – reine Textsuche, kein ML |
+| Bilder-/Ähnlichkeitssuche **mit** Modell | `EmbeddingEngine` (LiteRT-LM, NPU/CPU) **oder** `UniversalEmbedder` (MediaPipe) | **ja**, beides setzt auf LiteRT-LM auf |
+| Bilddekodierung (HEIC/HEIF) | Android `ImageDecoder` / libheif | nein (anderes Thema) |
+| Metadaten (GPS, Sensor) | eigener HEIF-/EXIF-Leser | nein |
+
+LiteRT-LM ist also **die Laufzeit des Suchmodells**, nicht die Bild- oder Metadaten-Engine.
+`litertlm-android:0.19.1` liegt fest im APK (CI prüft Version **und** Klassen im Dex). Ob die
+Laufzeit wirklich rechnet, steht in der App: Bildersuche öffnen → Statuszeile, oder
+⋮ → „Modell testen …“.
+
 ## 1. Welches Modell?
 
 [**EmbeddingGemma 2**](https://blog.google/innovation-and-ai/technology/developers-tools/embeddinggemma-2/):
