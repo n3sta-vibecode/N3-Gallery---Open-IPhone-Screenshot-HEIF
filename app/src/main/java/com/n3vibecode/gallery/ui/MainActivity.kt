@@ -8,8 +8,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
-import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -35,6 +33,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tabLayout: com.google.android.material.tabs.TabLayout
+    private lateinit var bottomNav: com.google.android.material.bottomnavigation.BottomNavigationView
     private lateinit var pager: androidx.viewpager2.widget.ViewPager2
     private lateinit var progress: com.google.android.material.progressindicator.LinearProgressIndicator
     private lateinit var searchBar: com.google.android.material.search.SearchBar
@@ -53,18 +52,27 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        toolbar = findViewById(R.id.toolbar)
-        // Voller App-Name in der Kopfzeile (zwei Zeilen, damit nichts abgeschnitten wird)
+        // 1.39: obere Systemleisten (Uhr, Akku) aus – die Galerie beginnt oben mit dem Titel.
+        runCatching { SystemBars.hideTop(this) }
+        // Der Inhalt braucht trotzdem Abstand zur Statusleiste, sonst klebt der Titel
+        // unter der Kamera-Aussparung.
         runCatching {
-            for (i in 0 until toolbar.childCount) {
-                val v = toolbar.getChildAt(i)
-                if (v is android.widget.TextView) {
-                    v.isSingleLine = false
-                    v.maxLines = 2
-                    v.textSize = 14f
+            val appBar = findViewById<android.view.View>(R.id.appBar)
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(appBar) { v, insets ->
+                val top = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top
+                val bottom = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom
+                v.setPadding(v.paddingLeft, top + dp(4), v.paddingRight, v.paddingBottom)
+                // Die untere Leiste bekommt den Systemabstand unten, sonst liegt sie darunter
+                findViewById<android.view.View>(R.id.bottomNav)?.let { nav ->
+                    nav.setPadding(nav.paddingLeft, nav.paddingTop, nav.paddingRight, bottom)
                 }
+                insets
             }
         }
+
+        toolbar = findViewById(R.id.toolbar)
+        // 1.38: Kopfzeile wie in einer normalen Foto-App – großer Titel „Bilder“, darunter
+        // die eine Suchleiste, rechts Karte und ⋮. Kein Quetschen mehr auf 14 sp. 
         searchBar = findViewById(R.id.searchBar)
         tabLayout = findViewById(R.id.tabLayout)
         pager = findViewById(R.id.viewPager)
@@ -72,7 +80,30 @@ class MainActivity : AppCompatActivity() {
 
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                R.id.action_search -> { openSearch(); true }
+                R.id.action_map -> {
+                    // Gesamte Bibliothek auf der Karte zeigen
+                    ViewState.viewList = DataHub.all
+                    startActivity(android.content.Intent(this, MapActivity::class.java))
+                    true
+                }
+                R.id.action_key_facts -> {
+                    // Die sechs wichtigsten Angaben des ersten Fotos direkt aus dem Menü
+                    // (im Foto selbst gibt es zusätzlich den Knopf in der Leiste unten).
+                    val first = DataHub.all.firstOrNull()
+                    if (first == null) {
+                        android.widget.Toast.makeText(
+                            this, R.string.empty, android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        ViewState.viewList = DataHub.all
+                        startActivity(
+                            android.content.Intent(this, DetailActivity::class.java)
+                                .putExtra(DetailActivity.EXTRA_POSITION, 0)
+                                .putExtra(DetailActivity.EXTRA_KEY_FACTS, true)
+                        )
+                    }
+                    true
+                }
                 R.id.action_refresh -> { reload(); true }
                 R.id.action_grid -> { openGridSizeDialog(); true }
                 R.id.action_language -> { openLanguageDialog(); true }
@@ -94,10 +125,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        searchBar.setOnClickListener { openSearch() }
+        // Eine einzige Suchleiste: tippen öffnet die Bildersuche, in der zugleich die
+        // klassische Suche (Dateiname, Ordner, Tags) mitläuft – keine zweite Lupe daneben.
+        searchBar.setOnClickListener { openSearchAi() }
+        // Ein einziges Ziel: die Bildersuche. Kein zweiter Suchweg, keine zweite Lupe.
+        searchBar.setOnLongClickListener { openSearchAi(); true }
 
-        // Dauerhafte Werbe-Leiste: iPhone-Screenshots / HEIC – tippen öffnet die Info
-        findViewById<android.view.View>(R.id.promoBar).setOnClickListener { showAboutDialog() }
 
         val titles = listOf(
             getString(R.string.tab_timeline),
@@ -130,34 +163,98 @@ class MainActivity : AppCompatActivity() {
         TabLayoutMediator(tabLayout, pager) { tab, position -> tab.text = titles[position] }.attach()
         applyPageVisibility(pager.currentItem)
 
+        // 1.38: gewechselt wird unten (Bilder / Alben / Formate / Sammlungen / Menü).
+        // „Menü“ ist kein Tab, sondern öffnet die ⋮-Liste – wie in Google Photos.
+        bottomNav = findViewById(R.id.bottomNav)
+        bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_photos -> { pager.setCurrentItem(0, false); true }
+                R.id.nav_albums -> { pager.setCurrentItem(3, false); true }
+                R.id.nav_formats -> { pager.setCurrentItem(2, false); true }
+                R.id.nav_tags -> { pager.setCurrentItem(1, false); true }
+                R.id.nav_menu -> { toolbar.showOverflowMenu(); true }
+                else -> false
+            }
+        }
+        pager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                val id = when (position) {
+                    1 -> R.id.nav_tags
+                    2 -> R.id.nav_formats
+                    3 -> R.id.nav_albums
+                    else -> R.id.nav_photos
+                }
+                if (bottomNav.selectedItemId != id) bottomNav.selectedItemId = id
+            }
+        })
+
         ensurePermissionsThenLoad()
 
-        if (intent?.action == Intent.ACTION_VIEW) handleViewIntent(intent)
+        forwardSharedIntent(intent)
 
         maybeShowWelcome()
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        handleViewIntent(intent)
+
+    /**
+     * Fragt die Ort-Berechtigung nach, wenn sie fehlt – aber **nur einmal** und nur, wenn
+     * noch nicht alle Fotos geladen sind. So bleibt die App bedienbar und der Nutzer weiß,
+     * warum bei manchen Fotos kein Ort steht.
+     */
+    private fun askForLocationIfNeeded() {
+        if (Build.VERSION.SDK_INT < 29) return
+        val perm = Manifest.permission.ACCESS_MEDIA_LOCATION
+        if (ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED) return
+        val prefs = getSharedPreferences("n3_perms", MODE_PRIVATE)
+        if (prefs.getBoolean("asked_location", false)) return
+        prefs.edit().putBoolean("asked_location", true).apply()
+        runCatching { locationLauncher.launch(perm) }
     }
+
+    private val locationLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            DataHub.requestRescan()
+            reload()
+        }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun ensurePermissionsThenLoad() {
         val needed = requiredPermissions().filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        if (needed.isEmpty()) reload() else permissionLauncher.launch(needed.toTypedArray())
+        if (needed.isEmpty()) {
+            reload()
+            askForLocationIfNeeded()
+        } else {
+            permissionLauncher.launch(needed.toTypedArray())
+        }
     }
 
+    /**
+     * Seit Android 10 liefert der Medienindex Fotos **ohne** GPS-Position. Die echten
+     * Koordinaten gibt es nur mit `ACCESS_MEDIA_LOCATION` (`setRequireOriginal`).
+     * Ohne diese Berechtigung stand bei vielen Fotos „kein Ort gespeichert“ –
+     * obwohl einer in der Datei ist.
+     */
     private fun requiredPermissions(): List<String> = when {
         Build.VERSION.SDK_INT >= 34 -> listOf(
             Manifest.permission.READ_MEDIA_IMAGES,
             Manifest.permission.READ_MEDIA_VIDEO,
-            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+            Manifest.permission.ACCESS_MEDIA_LOCATION
         )
         Build.VERSION.SDK_INT >= 33 -> listOf(
             Manifest.permission.READ_MEDIA_IMAGES,
-            Manifest.permission.READ_MEDIA_VIDEO
+            Manifest.permission.READ_MEDIA_VIDEO,
+            Manifest.permission.ACCESS_MEDIA_LOCATION
+        )
+        Build.VERSION.SDK_INT >= 29 -> listOf(
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.ACCESS_MEDIA_LOCATION
         )
         else -> listOf(
             Manifest.permission.READ_EXTERNAL_STORAGE,
@@ -173,10 +270,52 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Fotos aus anderen Apps: „Teilen“ und „Öffnen mit“ landen hier (Intent-Filter im
+     * Manifest) und werden an die Übernahme-Ansicht weitergereicht. Wichtig ist
+     * `onNewIntent`, weil die App meist schon läuft – sonst ginge ein zweites geteiltes
+     * Foto verloren.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        forwardSharedIntent(intent)
+    }
+
+    private fun forwardSharedIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action ?: return
+        if (action == Intent.ACTION_VIEW && intent.data != null) {
+            // „Öffnen mit“: das Bild direkt groß zeigen (bisheriges Verhalten)
+            handleViewIntent(intent)
+            return
+        }
+        if (action == Intent.ACTION_SEND || action == Intent.ACTION_SEND_MULTIPLE) {
+            val next = Intent(this, ShareInActivity::class.java).apply {
+                this.action = action
+                intent.data?.let { data = it }
+                intent.clipData?.let { clipData = it }
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let {
+                    putExtra(Intent.EXTRA_STREAM, it)
+                }
+                @Suppress("DEPRECATION")
+                intent.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let {
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, it)
+                }
+            }
+            startActivity(next)
+        }
+    }
+
     override fun onStart() {
         super.onStart()
         // Nach dem Speichern im Editor (oder anderen Änderungen) Liste neu einlesen
         DataHub.rescanHandler = { reload() }
+        // Suchindex im Hintergrund aufbauen/prüfen – die App „analysiert“ die Fotos damit
+        // schon beim Start, nicht erst beim Öffnen der Suche. Kurz warten, damit das Wischen
+        // durch die Galerie Vorrang hat.
+        com.n3vibecode.gallery.ai.SearchIndex.warmUp(applicationContext, delayMs = 1200)
         // Wurde gespeichert, während die Liste nicht sichtbar war? Jetzt nachziehen.
         if (DataHub.consumePendingRescan()) reload()
     }
@@ -220,32 +359,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun openSearch() {
-        val edit = EditText(this).apply {
-            hint = getString(R.string.search_hint)
-            setText(DataHub.query)
-            setSingleLine()
-        }
-        val container = FrameLayout(this).apply {
-            val pad = (20 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad / 2, pad, 0)
-            addView(edit)
-        }
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.search)
-            .setView(container)
-            .setPositiveButton(R.string.ok) { _, _ ->
-                DataHub.query = edit.text.toString()
-                searchBar.setText(DataHub.query)
-                DataHub.refreshListeners()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .setNeutralButton(R.string.reset) { _, _ ->
-                DataHub.query = ""
-                searchBar.setText("")
-                DataHub.refreshListeners()
-            }
-            .show()
+    /** Bildersuche in eigenen Worten (Embeddings auf NPU/GPU/CPU). */
+    private fun openSearchAi() {
+        startActivity(android.content.Intent(this, SearchActivity::class.java))
     }
 
     /** Rastergröße: mehr Fotos pro Zeile (auch mit zwei Fingern im Raster zoombar). */

@@ -19,31 +19,14 @@
             android:layout_height="wrap_content"
             android:background="@color/n3_bg"
             android:minHeight="?attr/actionBarSize"
-            app:title="@string/brand_short_en"
-            app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge"
+            app:title="@string/tab_title"
+            app:titleTextAppearance="@style/TextAppearance.Material3.HeadlineMedium"
             app:menu="@menu/main" />
 
-        <TextView
-            android:id="@+id/promoBar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_marginTop="2dp"
-            android:background="@drawable/bg_promo"
-            android:clickable="true"
-            android:drawableEnd="@drawable/ic_info"
-            android:drawablePadding="6dp"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="7dp"
-            android:paddingBottom="7dp"
-            android:text="@string/promo_bar"
-            android:textColor="@color/n3_accent"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+        <!--
+            1.39: Die Werbe-/Hinweis-Leiste ist weg. Sie stand dauerhaft unter dem Titel und
+            nahm Platz weg; der gleiche Text steht jetzt im ⋮-Menü unter „Über die App“.
+        -->
 
         <com.google.android.material.search.SearchBar
             android:id="@+id/searchBar"
@@ -53,25 +36,40 @@
             android:layout_marginEnd="12dp"
             android:layout_marginBottom="4dp"
             android:hint="@string/search_hint"
-            app:iconifiedByDefault="true" />
+            android:clickable="true"
+            android:focusable="false"
+            app:iconifiedByDefault="false" />
 
+        <!--
+            1.38: Die Tab-Leiste oben ist raus. Gewechselt wird unten über die Leiste
+            „Bilder / Alben / Formate / Sammlungen / Menü“ (Google-Photos-Prinzip).
+            Das TabLayout bleibt als unsichtbare Steuerung im Layout – der ViewPager2
+            braucht sonst keine Verbindung, und so bleibt der Code an einer Stelle.
+        -->
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabLayout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@color/n3_bg"
-            app:tabGravity="start"
-            app:tabIndicatorColor="@color/n3_accent"
-            app:tabIndicatorFullWidth="false"
-            app:tabMode="scrollable"
-            app:tabTextColor="@color/n3_on_surface_variant"
-            app:tabSelectedTextColor="@color/n3_on_bg" />
+            android:layout_height="0dp"
+            android:visibility="gone" />
     </com.google.android.material.appbar.AppBarLayout>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@color/n3_surface"
+        app:elevation="3dp"
+        app:itemIconTint="@color/n3_nav_item"
+        app:itemTextColor="@color/n3_nav_item"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/bottom_nav" />
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_marginBottom="80dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
     <com.google.android.material.progressindicator.LinearProgressIndicator

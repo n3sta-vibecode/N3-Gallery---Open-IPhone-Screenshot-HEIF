@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Default = English. German lives in values-de/strings.xml. -->
-    <string name="app_name">N3 Gallery- Open HEIF iPhone Screenshots</string>
+    <string name="app_name">N3 Gallery – Open HEIF iPhone Screenshots</string>
     <!-- Short form for the app bar, dialogs and footers -->
     <string name="brand_name">N3 Gallery</string>
     <string name="brand_short_en">N3 Gallery - Open HEIF iPhone Screenshots</string>
@@ -154,6 +154,22 @@
     <string name="welcome_ok">Let\'s go</string>
     <string name="meta_page_title">Metadata</string>
     <string name="note_edit">Note &amp; tags</string>
+    <!-- 1.42: Foto-Detailansicht wie in Samsung/Google/Apple Fotos – Knöpfe unten,
+         wichtigste Metadaten &amp; Notiz per Wisch nach oben. -->
+    <string name="action_details">Info</string>
+    <string name="action_edit_short">Edit</string>
+    <string name="favorite_short">Favorite</string>
+    <string name="note_add_hint">Add a note…</string>
+    <string name="sheet_open">Show all metadata</string>
+    <string name="exif_copy">Copy</string>
+    <!-- 1.42: Second model – person classification (image embeddings, NPU). -->
+    <string name="persons_title">People</string>
+    <string name="persons_preparing">Preparing people view…</string>
+    <string name="persons_building">Embedding photos: %1$d / %2$d</string>
+    <string name="persons_no_model">For people, the \"Text + Image (440M)\" or \"Everything (740M)\" model is needed – download it via the search page (⋮ → Manage model).</string>
+    <string name="persons_empty">No similar photos found yet.</string>
+    <string name="persons_status">%1$d similar photos · %2$d embedded</string>
+    <string name="persons_stopped">Stopped.</string>
     <string name="copy_exif">Copy EXIF</string>
     <string name="share_text">Share as text</string>
     <string name="open_meta_page">Open metadata page (fully scrollable)</string>
@@ -274,4 +290,125 @@
     <string name="editor_save_heif_note">HEIC/HEIF cannot be overwritten – the copy is saved as JPEG.</string>
     <string name="editor_share_only_msg">The gallery did not accept the file. The photo is therefore in the sharing folder of the app – via “Share” you can keep it in Photos or send it. The original stays untouched.</string>
     <string name="editor_render_failed">The edited photo could not be prepared (not enough memory?). Try a smaller crop.</string>
+
+    <!-- ============ Karte (offline) ============ -->
+    <string name="map_title">Map</string>
+    <string name="map_show">Show on map</string>
+    <string name="map_subtitle">Offline · no internet needed</string>
+    <string name="map_scanning">Reading photo locations …</string>
+    <string name="map_scanning_count">Reading photo locations … %1$d / %2$d</string>
+    <string name="map_zoom_in">Zoom in</string>
+    <string name="map_zoom_out">Zoom out</string>
+    <string name="map_fit">Fit all photos</string>
+    <string name="map_open_photos">Show photos</string>
+    <string name="map_photos_from">from %1$s</string>
+    <string name="map_empty_title">No photo locations yet</string>
+    <string name="map_empty_hint">Photos taken with GPS enabled carry their place inside the file. The app reads it directly from the device – the map and place names come with the app, nothing is loaded from the internet.</string>
+
+    <!-- ============ Search with embeddings ============ -->
+    <string name="search_ai">Search in your own words</string>
+    <string name="search_title">Search photos</string>
+    <string name="search_hint_ai">Describe the photo – e.g. beach, breakfast, screenshot …</string>
+    <string name="search_idea_beach">beach &amp; sea</string>
+    <string name="search_idea_food">food</string>
+    <string name="search_idea_screenshot">screenshot</string>
+    <string name="search_idea_person">people &amp; family</string>
+    <string name="search_idea_mountain">mountains &amp; snow</string>
+    <string name="search_idea_pet">animals</string>
+    <string name="search_empty_title">Nothing found</string>
+    <string name="search_empty_hint">Try other words – for example what is on the photo, when it was taken or where. Notes and tags you added also help.</string>
+    <string name="ai_loading">Preparing search …</string>
+    <string name="ai_indexing">Preparing photos for search … %1$d / %2$d</string>
+    <string name="ai_engine_status">%1$s %2$s (%3$s)</string>
+    <string name="ai_engine_npu">on the NPU – fastest</string>
+    <string name="ai_engine_gpu">GPU acceleration</string>
+    <string name="ai_engine_cpu">CPU – works on every device</string>
+    <string name="ai_engine_local">built-in word model – no download needed</string>
+    <string name="fav_remove_short">Remove</string>
+
+    <!-- Bildersuche: Modell holen/auswählen -->
+    <string name="ai_model_missing_title">Search engine: built-in word model</string>
+    <string name="ai_model_missing_hint">EmbeddingGemma 2 (like in Google Edge Gallery) is not installed yet. Download it once – about 163 MB to 1.3 GB. Afterwards search runs on the device, fully offline.</string>
+    <string name="ai_model_download">Load model</string>
+    <string name="ai_model_pick">Pick file</string>
+    <string name="ai_model_ready">Model ready: %1$s</string>
+    <string name="ai_model_imported">Model loaded: %1$s</string>
+    <string name="ai_model_import_failed">The model could not be read. Please try again or pick another file.</string>
+    <string name="ai_model_download_hint">The model is downloaded straight into the app.</string>
+    <string name="ai_model_size">%1$s MB</string>
+    <string name="ai_model_remove">Remove model</string>
+    <string name="search_open_ai">Search in your own words</string>
+    <string name="map_tap_to_open">Tap the map for the full view</string>
+    <string name="ai_model_choose">Which model?</string>
+    <string name="ai_model_starting">Starting download · about %1$d MB</string>
+    <string name="ai_model_progress">%1$d of %2$d MB</string>
+    <string name="ai_model_progress_unknown">%1$d MB downloaded</string>
+    <string name="ai_model_no_space">Not enough space</string>
+    <string name="ai_model_no_space_msg">The model needs about %1$d MB. Please free up some space first.</string>
+    <string name="sheet_pull_title">Metadata, map &amp; notes</string>
+    <string name="sheet_pull_hint">swipe up · tap to open</string>
+    <string name="map_osm_on">OpenStreetMap</string>
+    <string name="map_osm_off">Offline map</string>
+    <string name="map_osm_hint">OpenStreetMap loads map tiles from the internet. Loaded areas stay on the device and are shown without a connection next time.</string>
+    <string name="ai_model_broken_title">Search model not running – built-in word model is used</string>
+    <string name="ai_model_broken_hint">The model file is there, but it could not start: %1$s. You can reload it or pick another variant.</string>
+    <string name="ai_engine_failed">%1$s – not running: %2$s</string>
+    <string name="search_empty_error">The photo index could not be built: %1$s</string>
+    <string name="search_empty_indexing">The photos are still being prepared for the search – the progress bar above shows how far it is.</string>
+    <string name="search_empty_no_model">No photo matches that yet. Tip: load EmbeddingGemma 2 above for search in your own words – it works with notes, tags, place and time.</string>
+    <string name="ai_status_building">%1$s · Fotos werden vorbereitet: %2$d / %3$d</string>
+    <string name="ai_status_building_unknown">%1$s · Fotos werden vorbereitet …</string>
+    <string name="ai_model_remove_confirm">Remove the model file from the app? Search then uses the built-in word model until you load a model again.</string>
+    <string name="ai_index_stop">Stop</string>
+    <string name="ai_index_stopped">Preparation stopped – search still works with the photos prepared so far.</string>
+    <string name="ai_index_done">Photos prepared: %1$d of %2$d</string>
+    <string name="ai_index_failed">Not possible: %1$s</string>
+    <string name="ai_model_manage">Model …</string>
+    <string name="ai_model_manage_title">EmbeddingGemma 2</string>
+    <string name="ai_index_status">Photo preparation …</string>
+    <string name="ai_model_download_failed">Download failed: %1$s</string>
+    <string name="ai_model_incomplete_title">Model file incomplete – built-in word model is used</string>
+    <string name="ai_model_incomplete_hint">“%1$s” has only %2$d of %3$d MB – the download was interrupted. Load it again (it continues where it stopped) or remove the file.</string>
+    <string name="ai_model_unavailable_title">Search model not running – built-in word model is used</string>
+    <string name="ai_model_unavailable_hint">A model file is there, but it does not start. Please load the model again – or pick another variant.</string>
+    <string name="ai_model_diag">Details: %1$s</string>
+    <string name="ai_selftest">Test model …</string>
+    <string name="ai_selftest_started">Test running – this takes a moment.</string>
+    <string name="ai_selftest_ok">OK · %1$s</string>
+    <string name="ai_selftest_failed">FAILED · %1$s</string>
+    <string name="ai_selftest_nomodel">No complete model file found.</string>
+    <string name="key_facts">Key facts</string>
+    <string name="meta_when">When</string>
+    <string name="meta_format">Format</string>
+    <string name="meta_resolution">Resolution</string>
+    <string name="meta_file_size">File size</string>
+    <string name="share_received">Opened from another app</string>
+    <string name="share_received_hint">Shared photo received. Use the menu to save it to the gallery.</string>
+    <string name="share_save">Save to gallery</string>
+    <string name="share_saved">Saved: %1$s</string>
+    <string name="share_open_in_app">Open in app</string>
+    <string name="meta_note">Note</string>
+    <string name="meta_tags">Tags</string>
+    <string name="map_no_place_title">No location stored in this photo</string>
+    <string name="map_no_place_hint">The camera did not write GPS data (or location was switched off). Tap to open the map of all photos.</string>
+    <string name="tab_title">Photos</string>
+    <string name="nav_menu">Menu</string>
+    <string name="share_in_failed">Taken over failed: %1$s</string>
+    <string name="fact_resolution_px">Resolution (pixels)</string>
+    <string name="fact_resolution_mp">Resolution (megapixels)</string>
+    <string name="fact_format">File format</string>
+    <string name="fact_datetime">Date &amp; time</string>
+    <string name="fact_place">Capture location</string>
+    <string name="fact_sensor">Capture sensor</string>
+    <string name="key_facts_copy">Copy</string>
+    <string name="key_facts_copied">Copied to clipboard</string>
+    <string name="location_hint_title">Show photo locations</string>
+    <string name="location_hint_text">Android hides GPS data from other apps by default. Allow “Photos and videos: location” so the app can read the real coordinates.</string>
+    <string name="location_hint_action">Allow</string>
+    <string name="map_osm_loading">Loading map tiles from OpenStreetMap …</string>
+    <string name="map_osm_offline_hint">No tiles yet. If nothing appears, check the internet connection — the map draws offline in the meantime.</string>
+    <string name="map_osm_unavailable">OpenStreetMap not reachable. Offline map is shown.</string>
+    <string name="map_online_only">OpenStreetMap needs internet.</string>
+    <string name="sensor_from_heif">read from HEIF container</string>
+    <string name="geo_read_from_heif">Location &amp; camera data read directly from the HEIF container</string>
 </resources>

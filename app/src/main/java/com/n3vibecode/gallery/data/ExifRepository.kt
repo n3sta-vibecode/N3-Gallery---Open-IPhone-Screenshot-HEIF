@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
+import com.n3vibecode.gallery.image.HeifGeo
 import com.n3vibecode.gallery.image.HeifInspector
 import com.n3vibecode.gallery.util.Fmt
 import java.text.SimpleDateFormat
@@ -21,7 +22,13 @@ data class MediaMeta(
     val exifTagDump: List<MetaRow>,
     val note: String,
     val tags: List<String>,
-    val writeSupported: Boolean
+    val writeSupported: Boolean,
+    /** Position des Fotos (lat, lon) – oder `null`, wenn keine GPS-Daten in der Datei sind. */
+    val mapPoint: Pair<Double, Double>? = null,
+    /** Kurzbezeichnung des Ortes für die Karte („Luzern, Schweiz“). */
+    val mapLabel: String? = null,
+    /** Die sechs wichtigsten Angaben in Reihenfolge (Auflösung px, MP, Format, Ort, Zeit, Sensor). */
+    val keyFacts: List<MetaRow> = emptyList()
 ) {
     /** Alle Metadaten als Text. [tr] erlaubt die Übersetzung der Beschriftungen. */
     fun asPlainText(tr: ((String) -> String)? = null): String {
@@ -71,6 +78,43 @@ object ExifRepository {
         if (e != null) {
             xmpRaw = runCatching { e.getAttribute("XMP") }.getOrNull()
         }
+
+        /**
+         * **Warum Koordinaten oft „fehlen“ (1.39).**
+         *
+         * Seit Android 10 gibt der Medienindex (MediaStore) Fotos nur **ohne** GPS-Position
+         * heraus – das nennt sich „redigiert“. Der echte Ort steckt weiterhin in der Datei und
+         * ist über `MediaStore.setRequireOriginal` + `ACCESS_MEDIA_LOCATION` erreichbar.
+         * Bisher wurde nur der normale (redigierte) Stream geöffnet, deshalb stand bei vielen
+         * Fotos „kein Ort gespeichert“, obwohl einer in der Datei ist.
+         *
+         * Zweiter Fall: Apple-HEIFs schreiben den Ort nicht immer ins klassische GPS-IFD.
+         * Deshalb wird zusätzlich XMP (`exif:GPSLatitude`/`GPSLongitude`) und – bei HEIF –
+         * der rohe Container nach ISO-6709-Koordinaten durchsucht.
+         */
+        // **Wichtigster neuer Weg (1.40):** EXIF direkt aus dem HEIF-Container lesen.
+        // `ExifInterface` liefert für viele iPhone-Dateien stillschweigend nichts – dort
+        // stecken Kamera, Objektiv und GPS aber im `Exif`-Item. Siehe [HeifGeo].
+        val heifGeo: HeifGeo.Geo? =
+            if (item.isHeif || item.isAvif) {
+                runCatching {
+                    HeifGeo.read(
+                        opener = {
+                            runCatching { ctx.contentResolver.openInputStream(Uri.parse(item.uri)) }.getOrNull()
+                        },
+                        fileSize = item.size
+                    )
+                }.getOrNull()
+            } else {
+                null
+            }
+
+        val rawPoint = originalLatLong(ctx, item)
+            ?: heifGeo?.takeIf { it.hasGps }?.let { doubleArrayOf(it.latitude!!, it.longitude!!) }
+            ?: xmpLatLong(exif)
+            ?: heifIso6709(ctx, item)
+
+        // ------------------------------ HEIF/AVIF-Container lesen
 
         // ------------------------------ HEIF/AVIF-Container lesen
         if (item.isHeif || item.isAvif) {
@@ -201,12 +245,82 @@ object ExifRepository {
             sections += MetaSection("HEIF/AVIF-Technik", rows)
         }
 
+        // === 2b) Kopf wie in der Samsung-Galerie (1.41) ==========================
+        // Aufbau der Referenz: großes Datum, darunter Dateiname und Pfad, dann Kamera,
+        // Objektiv/Brennweite, eine Größenzeile und eine Zeile mit den Aufnahmewerten.
+        // Diese Werte stehen hier ZUSÄTZLICH als eigener Block ganz oben – die ausführlichen
+        // Kapitel darunter bleiben vollständig („alle Metadaten“).
+        run {
+            val rows = mutableListOf<MetaRow>()
+            val g = heifGeo
+            val w = if (item.width > 0) item.width else heif?.primaryWidth ?: 0
+            val h = if (item.height > 0) item.height else heif?.primaryHeight ?: 0
+            val dtOriginal = runCatching { e?.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) }.getOrNull()
+            val whenText = if (!dtOriginal.isNullOrBlank()) exifDate(dtOriginal) else Fmt.dateTime(item.time)
+            // Großes Datum: „Montag, 16. November 2026 · 17:15“
+            rows += MetaRow("Aufgenommen", Fmt.longDate(whenText, item.time))
+            rows += MetaRow("Datei", item.name)
+            if (item.path.isNotBlank()) rows += MetaRow("Pfad", item.path)
+            val camera = listOfNotNull(
+                (e?.let { rawTag(it, ExifInterface.TAG_MAKE) } ?: g?.make)?.takeIf { it.isNotBlank() },
+                (e?.let { rawTag(it, ExifInterface.TAG_MODEL) } ?: g?.model)?.takeIf { it.isNotBlank() }
+            ).joinToString(" ").replace(Regex("\\s+"), " ").trim()
+            if (camera.isNotBlank()) rows += MetaRow("Kamera", camera)
+
+            // Objektiv mit Kleinbild-Brennweite: „Ultraweitwinkel · 13 mm“
+            val focal35 = (e?.let { rawTag(it, ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM) } ?: g?.focal35?.toString())
+                ?.toIntOrNull()
+            val lensClass = focal35?.let { lensKind(it) }
+            val lensText = listOfNotNull(lensClass, focal35?.let { "$it mm" }).joinToString(" · ")
+            if (lensText.isNotBlank()) rows += MetaRow("Objektiv", lensText)
+
+            // Größenzeile: „1,33 MB | 3000×4000 | 12 MP“
+            val sizeParts = ArrayList<String>(3)
+            if (item.size > 0) sizeParts.add(Fmt.bytes(item.size))
+            if (w > 0 && h > 0) sizeParts.add("$w×$h")
+            if (w > 0 && h > 0) sizeParts.add(megapixelPrecise(w, h).replace(" MP", "MP"))
+            if (sizeParts.isNotEmpty()) rows += MetaRow("Größe", sizeParts.joinToString("  |  "))
+
+            // Aufnahmezeile: „ISO 100 | 23 mm | 0.0 ev | F1.9 | 1/51 s“
+            val shot = ArrayList<String>(5)
+            (e?.let { rawTag(it, ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY) } ?: g?.iso?.toString())
+                ?.takeIf { it.isNotBlank() }?.let { shot.add("ISO $it") }
+            (e?.let { rawTag(it, ExifInterface.TAG_FOCAL_LENGTH) }?.let { Fmt.rational(it) } ?: g?.focalLength?.let {
+                String.format(Locale.GERMAN, "%.0f", it)
+            })?.let { shot.add("$it mm") }
+            (e?.let { rawTag(it, ExifInterface.TAG_EXPOSURE_BIAS_VALUE) }?.let { Fmt.rational(it) })
+                ?.let { shot.add("$it ev") }
+            (e?.let { rawTag(it, ExifInterface.TAG_F_NUMBER) }?.toDoubleOrNull() ?: g?.fNumber)
+                ?.let { shot.add(String.format(Locale.GERMAN, "F%.1f", it)) }
+            (e?.let { rawTag(it, ExifInterface.TAG_EXPOSURE_TIME) }?.let { Fmt.rational(it) } ?: g?.exposureTime)
+                ?.let { shot.add(it) }
+            if (shot.isNotEmpty()) rows += MetaRow("Aufnahme", shot.joinToString("  |  "))
+
+            if (rows.isNotEmpty()) sections += MetaSection("Aufnahme-Daten", rows)
+        }
+
         // === 3) Kamera & Optik =================================================
         if (e != null) {
             val rows = mutableListOf<MetaRow>()
             tag(rows, "Make", "Hersteller")
             tag(rows, "Model", "Modell")
             tag(rows, "LensModel", "Objektiv")
+            // Aus dem HEIF-Container gelesen, falls ExifInterface nichts geliefert hat
+            heifGeo?.let { g ->
+                fun add(label: String, value: String?) {
+                    if (value.isNullOrBlank()) return
+                    if (rows.any { it.label == label }) return
+                    rows += MetaRow(label, value)
+                }
+                add("Hersteller", g.make)
+                add("Modell", g.model)
+                add("Objektiv", g.lens)
+                add("Brennweite (35 mm)", g.focal35?.let { "$it mm" })
+                add("Blende", g.fNumber?.let { String.format(Locale.GERMAN, "f/%.2f", it) })
+                add("Belichtungszeit", g.exposureTime)
+                add("ISO", g.iso?.toString())
+                add("Aufnahmezeitpunkt (EXIF)", g.taken?.let { exifDate(it) })
+            }
             tag(rows, "LensMake", "Objektiv-Hersteller")
             tag(rows, "LensSpecification", "Objektiv-Spezifikation") { lensSpec(it) }
             tag(rows, "LensSerialNumber", "Objektiv-Seriennummer")
@@ -246,6 +360,11 @@ object ExifRepository {
             addRow(rows, "Motivabstand", Fmt.rational(e.getAttribute(ExifInterface.TAG_SUBJECT_DISTANCE))?.let { "$it m" })
             addRow(rows, "Digitalzoom", Fmt.rational(e.getAttribute(ExifInterface.TAG_DIGITAL_ZOOM_RATIO))?.let { "$it×" })
             addRow(rows, "Sensortyp", sensingMethodName(safeInt(e, ExifInterface.TAG_SENSING_METHOD)))
+            // Physikalische Sensorangaben: nur Kameras/RAWs schreiben sie, dann sind sie Gold wert
+            addRow(rows, "Pixelpitch", rawTag(e, "PixelPitch"))
+            addRow(rows, "Sensorfläche", rawTag(e, "SensorArea"))
+            addRow(rows, "Sensor-Typ (RAW)", rawTag(e, "SensorType"))
+            addRow(rows, "Gesamtpixel", rawTag(e, "TotalPixels"))
             addRow(rows, "Schärfe", senseName(safeInt(e, ExifInterface.TAG_SHARPNESS)))
             addRow(rows, "Kontrast", senseName(safeInt(e, ExifInterface.TAG_CONTRAST)))
             addRow(rows, "Sättigung", senseName(safeInt(e, ExifInterface.TAG_SATURATION)))
@@ -295,12 +414,41 @@ object ExifRepository {
         }
 
         // === 6) GPS ============================================================
+        // Position und Ortsname auch für die Karte in den Metadaten merken.
+        var mapPoint: Pair<Double, Double>? = null
+        var mapLabel: String? = null
+        var keyFactsRow: List<MetaRow> = emptyList()
         if (e != null) {
             val rows = mutableListOf<MetaRow>()
-            val latLong: DoubleArray? = runCatching { e.latLong }.getOrNull()
+            val fromExif = runCatching { e.latLong }.getOrNull()
+                ?: heifGeo?.takeIf { it.hasGps }?.let { doubleArrayOf(it.latitude!!, it.longitude!!) }
+            // Reihenfolge: unredigierte Datei (Android 10+) → EXIF → XMP/HEIF
+            val latLong: DoubleArray? = rawPoint ?: fromExif
             if (latLong != null && (latLong[0] != 0.0 || latLong[1] != 0.0)) {
+                mapPoint = latLong[0] to latLong[1]
+                // Ortsname offline bestimmen (GeoNames-Liste im App-Paket) – wie in Google Fotos
+                val loc = runCatching {
+                    com.n3vibecode.gallery.map.GeoIndex.load(ctx)
+                    com.n3vibecode.gallery.map.GeoIndex.nearest(latLong[0], latLong[1])
+                }.getOrNull()
+                if (loc != null) {
+                    // Ortsname (+ Entfernung, wenn das Foto nicht direkt im Ort entstand).
+                    // Der Abstandswert wird ohne Einheit eingesetzt, damit die Übersetzung
+                    // (Labels) „km entfernt“ → „km away“ sauber greifen kann.
+                    val label = loc.label()
+                    mapLabel = label
+                    rows += if (loc.distanceKm < 1.0) {
+                        MetaRow("Ort", label)
+                    } else {
+                        MetaRow("Ort", "$label · ${Math.round(loc.distanceKm)} km entfernt")
+                    }
+                }
                 rows += MetaRow("Breitengrad", String.format(Locale.GERMAN, "%.6f° %s", Math.abs(latLong[0]), if (latLong[0] >= 0) "Nord" else "Süd"))
                 rows += MetaRow("Längengrad", String.format(Locale.GERMAN, "%.6f° %s", Math.abs(latLong[1]), if (latLong[1] >= 0) "Ost" else "West"))
+                // Koordinaten zum Kopieren – so kann man sie in jede Karte einfügen
+                rows += MetaRow("Koordinaten", coordinates(latLong[0], latLong[1]))
+                // Tippen öffnet die Karte an dieser Stelle (siehe InfoActivity/DetailActivity)
+                rows += MetaRow("Auf Karte zeigen", "map:${latLong[0]},${latLong[1]}")
             }
             tag(rows, "GPSAltitude", "Höhe") { Fmt.rational(it)?.let { v -> "$v m" } ?: it }
             tag(rows, "GPSDateStamp", "GPS-Datum")
@@ -309,7 +457,54 @@ object ExifRepository {
             tag(rows, "GPSDOP", "Genauigkeit (DOP)") { Fmt.rational(it) }
             tag(rows, "GPSSpeed", "Geschwindigkeit")
             tag(rows, "GPSImgDirection", "Blickrichtung")
+            if (latLong == null || (latLong[0] == 0.0 && latLong[1] == 0.0)) {
+                // Kein Ort: ehrlich benennen und den Weg zeigen (Berechtigung/Redaktion).
+                rows += MetaRow(
+                    "Ort",
+                    if (!hasMediaLocationPermission(ctx)) {
+                        "Keine Position in dieser Ansicht – „Fotos und Videos: Ort“ erlauben, dann liest die App die echten GPS-Daten"
+                    } else {
+                        "In der Datei ist keine GPS-Position gespeichert"
+                    }
+                )
+            }
             if (rows.isNotEmpty()) sections += MetaSection("Ort (GPS)", rows)
+        }
+
+        // === 6b) Kern-Angaben ==================================================
+        // Genau die sechs Werte, die zuerst interessieren: Auflösung in Pixel, Auflösung in MP,
+        // Format, Ort, Datum/Uhrzeit, Aufnahme-Sensor. Bewusst als erstes Kapitel, damit sie
+        // oben stehen – und dieselben Werte nutzt die Karte „Wichtigste Angaben“.
+        run {
+            val rows = mutableListOf<MetaRow>()
+            val desc = Formats.description(item.ext)
+            val w = if (item.width > 0) item.width else heif?.primaryWidth ?: 0
+            val h = if (item.height > 0) item.height else heif?.primaryHeight ?: 0
+            if (w > 0 && h > 0) {
+                rows += MetaRow("Auflösung (Pixel)", "$w × $h")
+                // MP mit zwei Stellen: 12,19 MP statt „12,2 MP“ – so wie Kamera-Apps es zeigen
+                rows += MetaRow("Auflösung (Megapixel)", megapixelPrecise(w, h))
+            }
+            rows += MetaRow(
+                "Dateiformat",
+                if (desc.isNotEmpty()) "${item.format} · $desc" else item.format
+            )
+            val dtOriginal = runCatching { e?.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) }.getOrNull()
+            val offset = runCatching { e?.getAttribute("OffsetTimeOriginal") }.getOrNull()
+            rows += MetaRow(
+                "Datum & Uhrzeit",
+                if (!dtOriginal.isNullOrBlank()) exifDate(dtOriginal) + (offset?.let { " ($it)" } ?: "")
+                else Fmt.dateTime(item.time) + " (Dateisystem)"
+            )
+            rows += MetaRow("Aufnahme-Sensor", sensorSummary(e, item, heifGeo))
+            rows += MetaRow(
+                "Aufnahmeort",
+                mapPoint?.let { (lat, lon) ->
+                    (mapLabel ?: "") + " · " + coordinates(lat, lon)
+                } ?: "Kein Ort in der Datei gespeichert"
+            )
+            sections += MetaSection("Wichtigste Angaben", rows)
+            keyFactsRow = rows.toList()
         }
 
         // === 7) Notizen, Tags & XMP ============================================
@@ -337,12 +532,33 @@ object ExifRepository {
         }
 
         // === Restliche EXIF-Felder =============================================
+        // 1.41: deutlich vollständiger als vorher – die Liste in [ExifNames] deckt die Felder
+        // ab, die auch Metadata2Go/Metapho zeigen, inklusive Apple-MakerNote und aller
+        // HEIF-Eigenheiten. Was schon in einem Kapitel steht, wird nicht wiederholt.
         val dump = mutableListOf<MetaRow>()
         if (e != null) {
-            for ((tagName, label) in ALL_TAGS) {
+            for ((tagName, label) in ExifNames.ALL) {
                 if (shownTags.contains(tagName)) continue
                 val v = Fmt.cleanExif(runCatching { e.getAttribute(tagName) }.getOrNull()) ?: continue
                 dump += MetaRow(label, v.replace('\n', ' ').take(400))
+            }
+        }
+        // Apple legt seine Zusatzdaten (Bildstil, HDR, Linsentyp …) im MakerNote ab.
+        // Diese Werte werden aus dem HEIF-Container als Klartext gelesen.
+        if (item.isHeif || item.isAvif) {
+            runCatching {
+                ctx.contentResolver.openInputStream(Uri.parse(item.uri))?.use { input ->
+                    val buf = ByteArray(512 * 1024)
+                    var n = 0
+                    while (n < buf.size) {
+                        val r = input.read(buf, n, buf.size - n)
+                        if (r < 0) break
+                        n += r
+                    }
+                    AppleMakerNote.parse(String(buf, 0, n, Charsets.ISO_8859_1))
+                }
+            }.getOrNull()?.forEach { (label, value) ->
+                dump += MetaRow(label, value)
             }
         }
         if (heif != null) {
@@ -358,7 +574,10 @@ object ExifRepository {
             exifTagDump = dump,
             note = MetaStore.note(item.uri).ifBlank { e?.getAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION).orEmpty() },
             tags = MetaStore.tags(item.uri),
-            writeSupported = writeSupported
+            writeSupported = writeSupported,
+            mapPoint = mapPoint,
+            mapLabel = mapLabel,
+            keyFacts = keyFactsRow
         )
     }
 
@@ -632,35 +851,154 @@ object ExifRepository {
         out.format(inFmt.parse(v) ?: Date(0))
     }.getOrDefault(v)
 
-    private val ALL_TAGS: List<Pair<String, String>> = listOf(
-        "ImageWidth" to "Bildbreite", "ImageLength" to "Bildhöhe", "SamplesPerPixel" to "Abtastwerte",
-        "PlanarConfiguration" to "Ebenen-Konfiguration", "YCbCrSubSampling" to "YCbCr-Unterabtastung",
-        "XResolution" to "X-Auflösung", "YResolution" to "Y-Auflösung", "ResolutionUnit" to "Auflösungseinheit",
-        "DateTime" to "Datum/Uhrzeit (Datei)", "DateTimeDigitized" to "Digitalisiert",
-        "OffsetTime" to "Zeitzone (Datei)", "OffsetTimeDigitized" to "Zeitzone (digitalisiert)",
-        "SubSecTime" to "Subsekunden (Datei)", "SubSecTimeDigitized" to "Subsekunden (digitalisiert)",
-        "UserComment" to "Benutzerkommentar", "MakerNote" to "Hersteller-Notizen (MakerNote)",
-        "InteroperabilityIndex" to "Interoperabilität", "FlashpixVersion" to "FlashPix-Version",
-        "ComponentsConfiguration" to "Komponenten-Konfiguration", "PixelXDimension" to "Pixelbreite (EXIF)",
-        "PixelYDimension" to "Pixelhöhe (EXIF)", "RelatedSoundFile" to "Zugehörige Tondatei",
-        "ShutterSpeedValue" to "Verschlusszeit (APEX)", "ApertureValue" to "Blende (APEX)",
-        "BrightnessValue" to "Helligkeit (APEX)", "ExposureMode" to "Belichtungsmodus",
-        "SensitivityType" to "Empfindlichkeitstyp", "StandardOutputSensitivity" to "Standard-Empfindlichkeit",
-        "RecommendedExposureIndex" to "Empfohlener Belichtungsindex", "GainControl" to "Verstärkungsregelung",
-        "SubjectDistanceRange" to "Motivabstandsbereich", "SubjectArea" to "Motivbereich",
-        "ExposureIndex" to "Belichtungsindex", "SpectralSensitivity" to "Spektrale Empfindlichkeit",
-        "GPSVersionID" to "GPS-Version", "GPSStatus" to "GPS-Status", "GPSMeasureMode" to "GPS-Messmodus",
-        "GPSSatellites" to "GPS-Satelliten", "GPSSpeedRef" to "Geschwindigkeitseinheit",
-        "GPSTrack" to "Fahrtrichtung", "GPSImgDirectionRef" to "Blickrichtung (Referenz)",
-        "GPSMapDatum" to "Kartendatum", "GPSAreaInformation" to "GPS-Bereichsinfo",
-        "DNGPrivateData" to "DNG-Privatdaten", "OpcodeList1" to "DNG-Opcode-Liste 1",
-        "OpcodeList2" to "DNG-Opcode-Liste 2", "OpcodeList3" to "DNG-Opcode-Liste 3",
-        "NoiseProfile" to "Rauschprofil", "DefaultCropOrigin" to "Standard-Zuschnitt-Ursprung",
-        "DefaultScale" to "Standard-Skalierung", "BayerGreenSplit" to "Bayer-Grün-Split",
-        "AntiAliasStrength" to "Anti-Alias-Stärke", "ShadowScale" to "Schatten-Skalierung",
-        "BaselineNoise" to "Basis-Rauschen", "BaselineSharpness" to "Basis-Schärfe",
-        "ProfileToneCurve" to "Profil-Tonkurve", "ProfileEmbedPolicy" to "Profil-Einbettung",
-        "ProfileCopyright" to "Profil-Copyright", "PreviewDateTime" to "Vorschau erstellt",
-        "RawDataUniqueID" to "RAW-Kennung", "ThumbnailOffset" to "Miniaturbild-Offset"
-    )
+    /** Veraltetete Liste – ersetzt durch [ExifNames.ALL] (1.41). */
+    private val ALL_TAGS: List<Pair<String, String>> get() = ExifNames.ALL
+
+    // ------------------------------------------------------------------ Ort ermitteln
+
+    /**
+     * **Unredigierte Datei** (Android 10+). Der Medienindex liefert Fotos ohne GPS; über
+     * `setRequireOriginal` bekommt man den echten Inhalt – aber nur mit der Berechtigung
+     * `ACCESS_MEDIA_LOCATION`. Genau das ist der häufigste Grund, warum Koordinaten fehlten.
+     */
+    private fun originalLatLong(ctx: Context, item: MediaItem): DoubleArray? {
+        if (android.os.Build.VERSION.SDK_INT < 29) return null
+        if (!hasMediaLocationPermission(ctx)) return null
+        val uri = Uri.parse(item.uri)
+        if (uri.scheme != "content") return null
+        return runCatching {
+            val original = android.provider.MediaStore.setRequireOriginal(uri)
+            ctx.contentResolver.openInputStream(original)?.use { input ->
+                val e = ExifInterface(input)
+                val ll = e.latLong
+                if (ll != null && (ll[0] != 0.0 || ll[1] != 0.0)) ll else null
+            }
+        }.getOrNull()
+    }
+
+    fun hasMediaLocationPermission(ctx: Context): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < 29) return true
+        return androidx.core.content.ContextCompat.checkSelfPermission(
+            ctx, android.Manifest.permission.ACCESS_MEDIA_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
+    /** XMP-Zweig: `exif:GPSLatitude="47,0506N"` / `exif:GPSLongitude="8,3066E"`. */
+    private fun xmpLatLong(e: ExifInterface?): DoubleArray? {
+        val xmp = runCatching { e?.getAttribute("XMP") }.getOrNull() ?: return null
+        val lat = xmpCoordinate(xmp, "GPSLatitude") ?: return null
+        val lon = xmpCoordinate(xmp, "GPSLongitude") ?: return null
+        return doubleArrayOf(lat, lon)
+    }
+
+    /** Liest `47,050641N` (XMP) oder `+47.050641+008.306603/` (ISO 6709) in Grad um. */
+    fun xmpCoordinate(text: String, key: String): Double? {
+        // Wichtig: das Richtungszeichen (N/S/O/W) darf NICHT als Füllzeichen gelten, sonst
+        // wird aus „8,3065W“ ein positives 8,3065 statt −8,3065.
+        val re = Regex(key + """[^0-9+\-]{0,24}([+\-]?\d{1,3}(?:[.,]\d+)?)[^0-9NSEWnsew]{0,4}([NSEWnsew])?""")
+        val m = re.find(text) ?: return null
+        var value = m.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return null
+        val hemi = m.groupValues[2].uppercase()
+        if (hemi == "S" || hemi == "W" || value < 0) value = -kotlin.math.abs(value)
+        if (kotlin.math.abs(value) > 180.0) return null
+        return value
+    }
+
+    /** ISO-6709 aus dem HEIF-Container (`+47.0506+008.3066/`) – Apple schreibt den Ort so. */
+    private fun heifIso6709(ctx: Context, item: MediaItem): DoubleArray? {
+        if (!item.isHeif && !item.isAvif) return null
+        val head = runCatching {
+            ctx.contentResolver.openInputStream(Uri.parse(item.uri))?.use { input ->
+                val buf = ByteArray(256 * 1024)
+                val n = input.read(buf)
+                if (n > 0) String(buf, 0, n, Charsets.ISO_8859_1) else ""
+            }
+        }.getOrNull() ?: return null
+        return parseIso6709(head)
+    }
+
+    /** Reine Textprüfung (testbar ohne Android): findet `+LLLL.LLLL+OOOO.OOOO/` im Text. */
+    fun parseIso6709(text: String): DoubleArray? {
+        val m = Regex("""([+\-]\d{2,3}[.,]\d{2,8})([+\-]\d{2,3}[.,]\d{2,8})""").find(text) ?: return null
+        val lat = m.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return null
+        val lon = m.groupValues[2].replace(',', '.').toDoubleOrNull() ?: return null
+        if (kotlin.math.abs(lat) > 90.0 || kotlin.math.abs(lon) > 180.0) return null
+        return doubleArrayOf(lat, lon)
+    }
+
+    /** `47.050647, 8.306553` – kopierbar, ohne Gradzeichen-Fallen. */
+    fun coordinates(lat: Double, lon: Double): String =
+        String.format(Locale.US, "%.6f, %.6f", lat, lon)
+
+    // ------------------------------------------------------------------ Kern-Angaben
+
+    /** Rohes EXIF-Feld, ohne Übersetzung – für Sensorangaben, die Android nicht als Konstante kennt. */
+    private fun rawTag(e: ExifInterface, tag: String): String? =
+        Fmt.cleanExif(runCatching { e.getAttribute(tag) }.getOrNull())
+
+    /**
+     * Objektivart aus der Kleinbild-Brennweite – so benennt es auch die Samsung-Galerie.
+     * Unter 20 mm „Ultraweitwinkel“, bis 35 mm „Weitwinkel“, bis 70 mm „Normal“, darüber
+     * „Tele“, ab 135 mm „Super-Tele“.
+     */
+    fun lensKind(focal35: Int): String? = when {
+        focal35 <= 0 -> null
+        focal35 < 20 -> "Ultraweitwinkel"
+        focal35 < 36 -> "Weitwinkel"
+        focal35 < 70 -> "Normalobjektiv"
+        focal35 < 135 -> "Tele"
+        else -> "Super-Tele"
+    }
+
+    /** `4032 × 3024` → `12,19 MP` (zwei Stellen, wie Kamera-Apps es anzeigen). */
+    fun megapixelPrecise(w: Int, h: Int): String {
+        if (w <= 0 || h <= 0) return "–"
+        return String.format(Locale.GERMAN, "%.2f MP", (w.toLong() * h) / 1_000_000.0)
+    }
+
+    /**
+     * „Aufnahme-Sensor“ in einer Zeile: wer hat aufgenommen und womit.
+     *
+     * Kamera/Modell stehen immer zur Verfügung; Sensortyp, Brennweite, Blende und ISO nur,
+     * wenn die Quelle sie schreibt (iPhone-Screenshots und viele Messenger-Bilder tun das
+     * nicht – dann steht das da, statt eine leere Zeile zu zeigen).
+     */
+    fun sensorSummary(
+        e: ExifInterface?,
+        item: MediaItem,
+        geo: com.n3vibecode.gallery.image.HeifGeo.Geo? = null
+    ): String {
+        val parts = ArrayList<String>(6)
+        // Kamera nennen – EXIF zuerst, sonst der HEIF-Container
+        val make = (e?.let { rawTag(it, ExifInterface.TAG_MAKE) } ?: geo?.make).orEmpty()
+        val model = (e?.let { rawTag(it, ExifInterface.TAG_MODEL) } ?: geo?.model).orEmpty()
+        val camera = when {
+            make.isBlank() && model.isBlank() -> ""
+            model.startsWith(make, ignoreCase = true) || make.isBlank() -> model
+            else -> "$make $model"
+        }
+        if (camera.isNotBlank()) parts.add(camera.trim())
+
+        val lens = e?.let { rawTag(it, ExifInterface.TAG_LENS_MODEL) } ?: geo?.lens
+        if (!lens.isNullOrBlank() && !lens.contains("null", true)) parts.add(lens)
+
+        e?.let { sensingMethodName(safeInt(it, ExifInterface.TAG_SENSING_METHOD)) }?.let { parts.add(it) }
+
+        // Sensor-Kennzahlen: erst EXIF, dann HEIF
+        val focal35 = e?.let { rawTag(it, ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM) }
+            ?: geo?.focal35?.toString()
+        if (!focal35.isNullOrBlank()) parts.add("$focal35 mm (KB)")
+
+        val fnum = e?.let { rawTag(it, ExifInterface.TAG_F_NUMBER) }?.toDoubleOrNull() ?: geo?.fNumber
+        if (fnum != null) parts.add(String.format(Locale.GERMAN, "f/%.1f", fnum))
+
+        val iso = e?.let { rawTag(it, ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY) } ?: geo?.iso?.toString()
+        if (!iso.isNullOrBlank()) parts.add("ISO $iso")
+
+        if (parts.isEmpty()) {
+            return if (item.isHeif) "Kein Kamera-EXIF in dieser HEIF-Datei lesbar"
+            else "Kein Kamera-EXIF in der Datei"
+        }
+        return parts.joinToString(" · ")
+    }
 }

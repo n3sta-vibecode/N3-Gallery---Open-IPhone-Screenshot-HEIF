@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.31-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3-Gallery-1.31-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.31-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3-Gallery-1.31-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.31.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.31/N3Gallery-Projekt-1.31.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.42-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.42/N3-Gallery-1.42-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.42-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.42/N3-Gallery-1.42-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.42.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.42/N3Gallery-Projekt-1.42.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -35,7 +35,119 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.31 – SVG wird angezeigt
+## 🆕 Version 1.42 – Knöpfe unten wie Samsung, Notizfeld, NPU-Modelle pro Chipsatz
+
+* **Fotoansicht neu:** Knopfleiste **unten** (Details · Bearbeiten · Teilen · Favorit ·
+  Löschen), **Hochwischen irgendwo im Foto** öffnet die wichtigsten Metadaten als Blatt –
+  mit **Notizfeld** (Notiz + Tags, auf Wunsch direkt in die Datei geschrieben) und kleiner
+  Karte.
+* **Karte lädt wieder:** Meer-Kacheln wurden fälschlich als Sperrbilder erkannt und
+  weggeworfen; OpenStreetMap ist jetzt Standard (offline umschaltbar); gesperrte Kacheln
+  bekommen eine Schonfrist statt einer Anfrage-Flut.
+* **Gemma Embedding 2 läuft auf der NPU:** `Backend.NPU` wurde korrekt gebaut (vorher
+  scheiterte der Aufbau immer), die App lädt automatisch die **NPU-Fassung des eigenen
+  Chipsatzes** (z. B. `…_Qualcomm_SM8750.litertlm` für das Galaxy S25 Ultra) und prüft den
+  Download gegen **SHA-256**. Neu im APK: `litert-npu-runtime-qualcomm` + `qnn-runtime`
+  (Qualcomm-NPU-Laufzeit, +~60 MB).
+* **Zweites Modell – Personen:** das multimodale Modell (Text+Bild 440M/740M) bettet Fotos
+  ein; Knopf „Personen“ zeigt Fotos mit denselben Personen. Beide Modelle auf der NPU.
+* **Raster stufenlos:** kontinuierliches Zoomen um den Fingerpunkt, bis **200 Spalten**,
+  ohne Neubinden der Kacheln – sehr flüssig.
+* **Kleines:** genau eine Lupe im Suchfeld; Dateiformat steht nicht mehr auf Kacheln und
+  im Blatt; HEIC heißt nur noch „Apple“, wenn die Datei wirklich von Apple ist.
+
+## 🆕 Version 1.41 – Karte ohne Sperrbilder, nur NPU, Metadaten wie in der Samsung-Galerie
+
+* **Karte:** `tile.openstreetmap.org` und `.fr` liefern Apps ein **„Access blocked“-Bild**
+  (Politik-Sperre). Jetzt wird nur noch der für Apps freigegebene `tile.openstreetmap.de`
+  gefragt; Sperrbilder werden erkannt und nicht gespeichert.
+* **Nur NPU:** Kein stiller Rückfall auf GPU/CPU mehr. Rechnet die NPU nicht, sagt die App
+  das (Statuszeile + Modelltest) – statt mit dem Wortmodell Erfolg vorzutäuschen.
+* **Aufnahme-Kopf wie Samsung:** großes Datum, Dateiname, Pfad, Kamera, Objektivart mit
+  Kleinbild-Brennweite, Größenzeile (`1,33 MB | 3000×4000 | 12MP`) und Aufnahmezeile
+  (`ISO 100 | 23 mm | 0.0 ev | F1.9 | 1/51 s`).
+* **Alle Metadaten:** über 150 Felder (`ExifNames`) inkl. Apple-MakerNote (Bildstil, HDR,
+  Linsentyp …) und aller GPS-Felder.
+* **Hochwischen irgendwo im Foto** öffnet die Metadaten; waagerechtes Wischen bleibt der
+  Bildwechsel.
+
+## 🔧 Version 1.40 – iPhone-GPS und Sensor direkt aus dem HEIF gelesen
+
+* **Ursache gefunden:** Bei vielen iPhone-Fotos liefert `ExifInterface` **nichts** – Apple legt
+  Kamera, Objektiv, ISO, Blende und **GPS** im `Exif`-Item des HEIF-Containers ab. Die App
+  liest diese Boxen jetzt selbst (`HeifGeo`): `iinf` → Item, `iloc` → Position, dann TIFF mit
+  IFD0, Exif-IFD und GPS-IFD. Damit kommen Koordinaten und Aufnahme-Sensor an – auch wenn
+  Android die Datei „redigiert“ herausgibt.
+* **Karte:** zeigt jetzt „lädt …“, den konkreten Fehler (HTTP-Code/keine Verbindung) oder
+  „zeichnet offline“ – statt einer leeren hellen Fläche. Drei OSM-Server als Ausweichweg,
+  PNG-Prüfung gegen Fehlerseiten im Kachel-Ordner.
+* **Geprüft statt geraten:** `tools/heif/heif_geo_probe.py --self-test` baut echte
+  Apple-Container im Speicher und vergleicht die gelesenen Werte; derselbe Test läuft in CI,
+  dazu Unit-Tests mit echten Bytes (`HeifGeoTest`).
+
+## 🔧 Version 1.39 – Koordinaten wirklich lesen, Suche rangieren, ruhiges Wischen
+
+* **GPS-Koordinaten** kommen jetzt an: unredigierte Datei (`ACCESS_MEDIA_LOCATION` +
+  `setRequireOriginal`), XMP (`exif:GPSLatitude`) und ISO 6709 im HEIF-Container. Fehlt die
+  Berechtigung, sagt die App das – statt „kein Ort“.
+* **Wichtigste Angaben** = Auflösung in Pixel, Auflösung in MP, Dateiformat, Aufnahmeort,
+  Datum & Uhrzeit, Aufnahme-Sensor (plus Notiz). Kopierbar, auch aus dem ⋮-Menü erreichbar.
+* **Suche**: KI-Treffer werden **rangiert** statt an Wort-Treffer angehängt; Umlaute,
+  Teilwörter und mehrere Wörter in beliebiger Reihenfolge treffen.
+* **Wischen**: Nachbarfotos werden in Bildschirmgröße vorgeladen, kein sichtbares
+  Nachschärfen mehr beim Bilderwechsel.
+* **Aufgeräumt**: Werbe-Leiste weg, keine Symbole in der Kopfzeile (alles über ⋮),
+  obere Systemleisten in Galerie und Bildansicht ausgeblendet.
+
+## 🔧 Version 1.38 – Foto-App-Optik, Fotos aus anderen Apps annehmen, NPU-Versuch
+
+* Untere Leiste **Bilder · Alben · Formate · Sammlungen · Menü**, großer Titel, randloses Raster.
+* **Teilen** aus anderen Apps: `SEND`/`SEND_MULTIPLE` → Ansicht „Aus anderer App geöffnet“ mit
+  „In Galerie speichern“.
+* **Wichtigste Angaben** als Knopf, Metadaten-Blatt nur noch sichtbar, wenn offen.
+* **Karte bei jedem Foto** – ohne GPS mit klarer Aussage statt fehlendem Block.
+* **NPU** wird probiert (`Backend.NPU`) und nur bei bestandenem Testlauf gemeldet.
+* Kleine HEIF-Kacheln in 48 px → weniger Arbeit beim Scrollen.
+* **Keine Cloud** in dieser Version.
+
+## 🔧 Version 1.37 – Ursache gefunden: LiteRT-LM-Version und unvollständige Downloads
+
+* **EmbeddingGemma 2 kommt jetzt wirklich hoch.** Der Grund für „Modell läuft nicht“ war eine
+  zu alte LiteRT-LM: `tasks-retrieval` bringt 0.17.0-alpha1 mit, in der `ActivationDataType`
+  fehlt. Jetzt fest auf **0.19.1** (in CI gegen das AAR geprüft), zusätzlich ein direkter
+  LiteRT-LM-Weg ohne MediaPipe.
+* **Download direkt in der App** mit Auswahl (Text 163 MB / Text+Bild 530 MB / alles 1,3 GB),
+  Fortschritt, Abbrechen und Platzprüfung. Kein Browser-Umweg mehr.
+* **OpenStreetMap** auf der Karte zuschaltbar (echte Straßen, Kacheln bleiben gespeichert).
+* **Metadaten wieder erreichbar:** dauerhafte Leiste unten „Metadaten, Karte & Notizen“ –
+  antippen oder nach oben streichen. Vorher war das geschlossene Blatt nicht greifbar.
+
+## Version 1.33 – Gemma-Modell direkt in der App, Karte in den Details, eine Suchleiste
+
+* **Gemma-Embedding 2 holen, ohne das Projekt zu bauen:** In der Bildersuche steht unter dem
+  Suchfeld „Modell laden“ (öffnet die offizielle Google-Adresse im Browser) und „Datei
+  wählen“ – danach rechnet Gemma auf der **NPU**. Die App selbst bleibt ohne
+  Internet-Berechtigung; den Download macht der Browser.
+* **Karte direkt in den Metadaten:** Ganz oben in den Metadaten steht die Karte mit dem Ort
+  des Fotos (antippen = groß). Zusätzlich ein Karten-Knopf in der Detailansicht – kein
+  Umweg mehr über eine Zeile „Auf Karte zeigen“.
+* **Eine Suchleiste:** Die zweite Lupe im Menü und der klassische Suchdialog sind weg.
+  Tippen auf die eine Suchleiste öffnet die Bildersuche; Dateiname/Ordner/Tags werden dort
+  weiterhin mitgefunden.
+
+## Version 1.32 – Karte, Vorschau im Seitenverhältnis, Gemma-Suche
+
+* **Karte (offline):** Wo sind meine Fotos entstanden? Mit Ortsnamen („Luzern, Schweiz“),
+  Zusammenfassung dicht beieinanderliegender Fotos, Zwei-Finger-Zoom und „auf Karte zeigen“
+  in den Metadaten. Landflächen (Natural Earth) und 46 000 Orte (GeoNames) liegen im
+  App-Paket – **kein Kartendienst, kein Schlüssel, kein Internet**.
+* **Vorschau bei langem Drücken im richtigen Seitenverhältnis:** iPhone-Screenshot hochkant,
+  Kamera 3:2, Panorama breit – vollständig statt beschnitten, mit Ort und Schnellaktionen.
+* **Bildersuche in eigenen Worten (Gemma-Embedding):** wie in Google Edge Gallery.
+  Rechnet auf der **NPU**, sonst GPU, sonst CPU. Modell-Einbindung: [README-KI.md](README-KI.md).
+  Ohne Modell-Datei nutzt die App ein eingebautes Wortmodell – die Suche funktioniert immer.
+
+## Version 1.31 – SVG wird angezeigt
 
 * **SVG und SVGZ öffnen** – Android kann das von sich aus nicht, dafür ist ein SVG-Renderer
   eingebaut.
@@ -217,6 +329,9 @@ Das komplette **Android-Studio-Projekt** liegt im Ordner `N3Gallery/`
 | **Detailansicht** | Vollbild, Wischen zwischen Bildern, Info-Blatt hochziehen, Favorit, Teilen, Löschen, „EXIF kopieren“, Tippen blendet Bedienelemente aus |
 | **Metadaten** | Datei & Format, **Sensor & Aufnahme**, Kamera & Optik, **GPS**, **RAW/DNG-Details**, **HEIF/AVIF-Containertechnik**, Notizen/XMP + Rohdump **aller** EXIF-Felder |
 | **Notizen & Tags** | Werden als **echte EXIF/XMP-Metadaten in die Bilddatei geschrieben** (ImageDescription, UserComment, XMP dc:description/dc:subject) |
+| **Karte** | Alle Fotos mit GPS auf einer Karte – mit Ortsnamen („Luzern, Schweiz“), Zusammenfassung dicht beieinanderliegender Fotos, Zwei-Finger-Zoom. Standard ist die **gezeichnete Offline-Karte** (Natural Earth + 46 000 Orte im App-Paket); per Knopf lässt sich **OpenStreetMap** zuschalten (echte Straßen, Kacheln werden gemerkt). In den Metadaten steht die Karte ganz oben |
+| **Vorschau (langes Drücken)** | Zeigt das Foto **vollständig im Original-Seitenverhältnis** (iPhone-Screenshot hochkant, Panorama breit …), nichts beschnitten – mit Ort und Schnellaktionen (Favorit, Teilen, Bearbeiten, Details, Karte, Löschen) |
+| **Bildersuche** | Suche in eigenen Worten („strandurlaub“, „rechnung vom montag“) mit **Gemma-Embedding auf dem Gerät** – rechnet auf der **NPU**, sonst GPU, sonst CPU. Index wird gespeichert; ohne Modell-Datei springt ein eingebautes Wortmodell ein (siehe [README-KI.md](README-KI.md)) |
 
 ### Warum HEIC/HEIF jetzt immer geht (Fix in 1.1)
 
@@ -377,7 +492,20 @@ Geräte unproblematisch, für eine kommerzielle Veröffentlichung im Play Store 
 * `READ_EXTERNAL_STORAGE` (nur Android ≤ 12)
 * `ACCESS_MEDIA_LOCATION` (ungezensierte GPS-Daten)
 * `WRITE_EXTERNAL_STORAGE` (nur Android ≤ 10, fürs Metadaten-Schreiben)
-* **Kein** Internet, **kein** Netzwerkzugriff, **keine** Analyse-Bibliotheken
+* **Kein** Tracking, **keine** Analyse-Bibliotheken, **keine** Konten, keine Cloud
+
+### Netzwerk: nur auf ausdrückliche Handlung
+
+Die App enthält `INTERNET` – aber ausschließlich für zwei Dinge, die **du** antippst:
+
+| Was | Wann | Ohne Handlung |
+| --- | --- | --- |
+| Suchmodell EmbeddingGemma 2 (163 MB / 530 MB / 1,3 GB) | Knopf „Modell laden“ in der Bildersuche | nichts – Suche nutzt das eingebaute Wortmodell |
+| OpenStreetMap-Kacheln | Knopf „OpenStreetMap“ auf der Karte | nichts – es erscheint die gezeichnete Offline-Karte |
+
+Beides ist standardmäßig **aus**. Es gibt keine Hintergrundverbindung, keine Kennung, kein
+Konto. Galerie, Metadaten, Karte (offline) und Suche funktionieren dauerhaft ohne Netz.
+Geladene OSM-Kacheln bleiben auf dem Gerät und erscheinen danach auch offline.
 
 ---
 

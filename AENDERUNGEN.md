@@ -1,5 +1,589 @@
 # N3 Gallery – was neu ist
 
+## 1.42 – Knöpfe unten, Notizfeld, NPU-Modelle pro Chipsatz, stufenloses Zoomen
+
+### 📱 Fotoansicht wie Samsung Gallery / Google Fotos / Apple Fotos
+
+* Die Knöpfe stehen jetzt **unten** (Details · Bearbeiten · Teilen · Favorit · Löschen) –
+  dort, wo der Daumen ist. Oben bleiben nur Zurück, Dateiname und Zähler.
+* **Hochwischen irgendwo im Foto** öffnet unten ein Blatt mit den **wichtigsten
+  Metadaten** (Karte, Datum, Ort, Kamera, Auflösung …) und einem **Notizfeld** –
+  antippen bearbeitet Notiz + Tags, auf Wunsch direkt in der Datei (EXIF/XMP).
+* „Alle Metadaten“, Karte, Kopieren, Notiz und **Personen** liegen als Knopfzeile im Blatt.
+
+### 🗺️ „Die Karte lädt nicht“ – drei Ursachen behoben
+
+1. **Meer-Kacheln wurden weggeworfen:** Die Sperrbild-Erkennung hielt kleine, farbarme
+   Ozean-Kacheln fälschlich für „Access blocked“-Bilder. Jetzt zählt die Struktur
+   (dunkler Text auf hellem Grund) – Wasser und Wald bleiben.
+2. **OpenStreetMap ist jetzt Standard.** Vorher startete die Karte als grob gezeichnete
+   Offline-Karte, was wie „lädt nicht“ aussah. Wer offline bleiben will, schaltet unten
+   links auf „Offline-Karte“ um.
+3. **Keine Anfrage-Flut mehr:** Gesperrte/fehlgeschlagene Kacheln bekommen eine Schonfrist
+   (30–60 s), statt bei jedem Neuzeichnen sofort wieder angefragt zu werden.
+
+### ⚡ Gemma Embedding 2 auf der NPU – der eigentliche Fehler
+
+Zwei Dinge machten „läuft auf NPU“ bisher unmöglich:
+
+* **`Backend.NPU` wurde nie richtig gebaut:** Der Reflection-Weg nahm den Konstruktor mit
+  den meisten Parametern und setzte alles auf `null` – dieser Konstruktor verlangt aber ein
+  `int`, kein `null`. Die NPU konnte also **nie** starten. Jetzt wird
+  `Backend.NPU(nativeLibraryDir)` mit dem Bibliotheks-Ordner der App gebaut.
+* **Die Modell-Datei passte nicht zur NPU:** Google veröffentlicht die Modelle in zwei
+  Fassungen – die normale Datei rechnet auf CPU/GPU, die Dateien mit Anhang
+  (`…_Qualcomm_SM8750.litertlm`) sind **für die NPU dieses Chipsatzes vorkompiliert**.
+  Die App lädt jetzt automatisch die NPU-Fassung des eigenen Geräts
+  (Galaxy S25 Ultra = SM8750; auch SM8550/8650/8850, Tensor G5/G6, MT6991/6993).
+* **Die NPU-Bibliotheken fehlten im APK:** `litertlm-android` allein kann die NPU nicht
+  starten. Neu dabei: `litert-npu-runtime-qualcomm` (Google) + `qnn-runtime` (Qualcomm) –
+  zusammen die Dispatch- und QNN-Laufzeit für den Hexagon-DSP (+~60 MB APK).
+* **Download-Sicherheit:** Jede Datei wird nach dem Laden gegen **Größe und SHA-256**
+  geprüft (Werte von Hugging Face). Stimmt die Prüfsumme, wird die Datei verworfen und der
+  Grund genannt – keine halben Dateien mehr, die dann „nicht starten“.
+
+### 👤 Zweites Modell – Personen-Klassifizierung
+
+* **Neu:** das multimodale Modell (EmbeddingGemma 2 **Text+Bild 440M** oder 740M) bettet
+  **Fotos** ein – Knopf „Personen“ im Metadaten-Blatt zeigt die Fotos mit denselben
+  Personen/demselben Motiv. Die Bild-Vektoren werden einmal gebaut und in
+  `files/persons.idx` gespeichert; das Text-Modell (270M) rechnet weiter für die Suche.
+* Beide Modelle rechnen **auf der NPU** – weiterhin ohne stillen Rückfall.
+* Die Such-Präfixe aus der Google-Doku sind jetzt gesetzt
+  (`task: search result | text:` beim Index, `task: search query | text:` bei der Suche).
+
+### 🔍 Raster: stufenlos und flüssig
+
+* Zoomen ist **kontinuierlich**: Zwischen den Spaltenzahlen wird das Raster sichtbar um
+  den Fingerpunkt skaliert; beim Loslassen läuft es sanft auf die passende Größe zurück.
+* Bis **200 Spalten** statt 32 – „so viele Fotos auf einem Bild, wie man will“.
+* Beim Zoomen werden keine Kacheln mehr neu gebunden und keine Einstellungen geschrieben;
+  die Vorbereitung der Vorschaubilder läuft entzerrt 400 ms nach dem letzten Wechsel.
+
+### 🧹 Kleines
+
+* **Genau eine Lupe** im Suchfeld (vorher links und rechts je ein Such-Symbol).
+* **Dateiformat steht nicht mehr auf den Kacheln** (RAW/HEIC/AVIF/SVG) und auch nicht
+  mehr im Foto-Wischblatt – nur die Videolänge bleibt, wie bei Samsung/Google/Apple.
+* **HEIC heißt nicht mehr automatisch „Apple“:** Nur Dateien, die wirklich nach Apple
+  aussehen (Name/Endung), bekommen das Apple-Label und den Apple-Hinweis.
+* App-Name im Launcher hatte einen fehlenden Leerraum („N3 Gallery- Open…“).
+
+## 1.41 – Sperrbilder, NPU, Samsung-Kopf, alle Metadaten
+
+### 🚫 „Access blocked“ auf der Karte – Ursache und Lösung
+
+Die OSM-Kachelserver liefern Apps, die nicht in ihrer Freigabeliste stehen, **kein 403 ohne
+Inhalt**, sondern ein **Bild mit dem Text „Access blocked“** – HTTP 403 mit gültigem PNG.
+Genau das war auf dem Gerät zu sehen: ein Raster aus Sperrbildern.
+
+Behoben:
+
+* `tile.openstreetmap.org` und `*.tile.openstreetmap.fr` werden **nicht mehr gefragt**
+  (beide gesperrt). Es bleibt `tile.openstreetmap.de` – die Auslieferung des deutschen
+  OSM-Vereins, die für Anwendungen freigegeben ist.
+* Sperrbilder werden **erkannt** (klein, sehr wenige Farbtöne) und **nicht gespeichert** –
+  sonst bliebe das Raster im Zwischenspeicher für immer.
+* Fällt der Server aus, zeichnet die Karte die Offline-Karte und sagt es.
+
+### ⚡ Nur NPU, kein stiller Rückfall
+
+`GemmaEmbedder.NPU_ONLY = true`: das Modell rechnet ausschließlich über `Backend.NPU` von
+LiteRT-LM. Gibt es keine NPU, wird **nicht** auf GPU/CPU ausgewichen; stattdessen steht in
+der Statuszeile „NPU nicht aktiv – es wird nur die Wortsuche benutzt“ und der Modelltest
+nennt den Grund. So ist immer sichtbar, was wirklich rechnet.
+
+### 📋 Metadaten auf Samsung-Niveau
+
+Neuer erster Block **„Aufnahme-Daten“** genau in der Reihenfolge der Referenz:
+
+| Zeile | Inhalt |
+| --- | --- |
+| Aufgenommen | „Montag, 16. November 2026 · 17:15“ (Wochentag aus der EXIF-Zeit) |
+| Datei / Pfad | Dateiname und Ordner |
+| Kamera | Hersteller + Modell (EXIF oder HEIF-Container) |
+| Objektiv | Objektivart + Kleinbild-Brennweite („Ultraweitwinkel · 13 mm“) |
+| Größe | `1,33 MB │ 3000×4000 │ 12MP` |
+| Aufnahme | `ISO 100 │ 23 mm │ 0.0 ev │ F1.9 │ 1/51 s` |
+
+Darunter unverändert alle Kapitel – und der Rohbereich ist jetzt **vollständig**:
+`ExifNames` listet über 150 Felder (TIFF, EXIF, alle GPS-Felder, HEIF-Eigenheiten) plus
+Apple-MakerNote (Bildstil, Linsentyp, Qualität, Aufnahmeart, LDR/HDR-Spielraum …).
+Was nicht sauber lesbar ist, wird **nicht** angezeigt.
+
+### ↕️ Überall hochwischen
+
+Ein senkrechter Wisch nach oben – egal wo auf dem Foto – öffnet die Metadaten. Waagerechtes
+Wischen bleibt der Bildwechsel, Zoomen und Antippen bleiben unverändert.
+
+## 1.40 – Warum iPhone-Fotos keinen Ort und keinen Sensor zeigten
+
+### 🔬 Ursache: die EXIF-Daten stecken im Container, nicht im Dateikopf
+
+Apple legt bei HEIC/HEIF alles in ein **Item** vom Typ `Exif` innerhalb der `meta`-Box.
+`androidx.exifinterface` liest dieses Item nur in einer bestimmten Variante (Offset-Feld vor
+dem TIFF-Block). Passt die Variante nicht, liefert `ExifInterface` **keinen Fehler, sondern
+nichts** – deshalb stand „kein Ort gespeichert“ und kein Aufnahme-Sensor, obwohl die Daten
+in der Datei waren.
+
+**Behoben:** Die App liest den Container jetzt selbst (`image/HeifGeo.kt`):
+
+| Schritt | Was gelesen wird |
+| --- | --- |
+| `iinf` | Item-IDs und Typen (`Exif`, `hvc1`, `grid` …) |
+| `iloc` | Position und Länge des Exif-Items (alle Varianten: 16/32-Bit, mit/ohne `idat`) |
+| TIFF | IFD0 (Hersteller, Modell), Exif-IFD (ISO, Blende, Belichtung, KB-Brennweite, Objektiv, Datum), GPS-IFD (Grad/Minuten/Sekunden + N/S/O/W) |
+| `irot`/`imir` | Drehung und Spiegelung des Bildes |
+
+Diese Werte sind **zusätzliche** Quellen: `ExifInterface`, XMP und ISO 6709 bleiben erhalten
+und werden zuerst probiert.
+
+### 🗺️ Karte sagt jetzt, warum nichts kommt
+
+Vorher wurde ein fehlgeschlagener Kachel-Download nur ins Log geschrieben → auf dem Gerät
+war die Fläche leer und hell. Jetzt steht auf der Karte:
+
+* „Karte lädt Kacheln von OpenStreetMap …“
+* oder der konkrete Grund („HTTP 429“, „keine Verbindung“, „kein PNG“)
+* oder „zeichnet offline“ mit dem Hinweis auf die Internetverbindung.
+
+Dazu: drei OSM-Server (Hauptserver + zwei offizielle Auslieferungen), PNG-Prüfung, damit
+eine Fehlerseite nicht als Kachel im Zwischenspeicher landet, und 403/429 werden **nicht**
+dauerhaft als „fehlt“ gemerkt (vorher blieb eine gedrosselte Kachel für immer leer).
+
+### 🧪 Bewiesen, nicht behauptet
+
+* `tools/heif/heif_geo_probe.py --self-test` baut im Speicher ein echtes Apple-HEIF
+  (ftyp + meta + Exif-Item + GPS + irot) und prüft jeden gelesenen Wert – inklusive
+  Südhalbkugel/Westen und kaputter Dateien. Läuft als eigener CI-Schritt.
+* `HeifGeoTest.kt` macht dasselbe mit echten Bytes in der JVM (8 Tests).
+
+## 1.39 – Koordinaten, Suche, Wischen, Aufräumen
+
+Sechs Punkte, die du genannt hast – hier der Stand, jeweils mit der Ursache:
+
+### 🧭 Koordinaten-Metadaten wurden nicht gefunden (Ursache gefunden)
+
+Android **verbirgt GPS-Daten** vor anderen Apps: Der Medienindex liefert Fotos „redigiert“,
+also ohne Position. Bisher wurde genau dieser redigierte Stream gelesen – deshalb stand bei
+vielen Fotos „kein Ort gespeichert“, obwohl einer in der Datei ist.
+
+Jetzt gilt eine Kette von drei Wegen, die nacheinander probiert werden:
+
+| Weg | Wie | Wann nötig |
+| --- | --- | --- |
+| 1. Unredigierte Datei | `MediaStore.setRequireOriginal` mit `ACCESS_MEDIA_LOCATION` | Android 10+, Standardfall |
+| 2. XMP | `exif:GPSLatitude` / `GPSLongitude` inkl. N/S/W/O | Apple-HEIF, bearbeitete Fotos |
+| 3. ISO 6709 | `+47.0506+008.3066/` im HEIF-Container | Apple schreibt den Ort so |
+
+Dazu: Breiten-/Längengrad, **kopierbare Koordinaten** (`47.050647, 8.306553`) und – wenn
+wirklich nichts drin ist – der ehrliche Grund („Berechtigung fehlt“ vs. „in der Datei ist
+keine Position“). Die Berechtigung fragt die App einmalig selbst ab.
+
+### 📌 Wichtigste Angaben – genau deine sechs Werte
+
+Neues erstes Kapitel **„Wichtigste Angaben“** (und derselbe Dialog über den Knopf unten und
+über ⋮ → Wichtigste Angaben):
+
+1. **Auflösung (Pixel)** – z. B. `4032 × 3024`
+2. **Auflösung (Megapixel)** – z. B. `12,19 MP`
+3. **Dateiformat** – z. B. `HEIC · HEIF (Apple, 10-Bit)`
+4. **Aufnahmeort** – Ortsname + Koordinaten
+5. **Datum & Uhrzeit** – EXIF-Zeit inkl. Zeitzone
+6. **Aufnahme-Sensor** – Kamera, Objektiv, Sensortyp, Kleinbild-Äquivalent, Blende, ISO
+
+Der Dialog hat „Kopieren“ – die Angaben landen als Text in der Zwischenablage.
+
+### 🔍 Suche auf Ranglisten-Niveau
+
+Der eigentliche Fehler: Wort-Treffer und KI-Treffer wurden **aneinandergehängt**. Ein Bild,
+das die KI als *besten* Treffer sieht, landete dadurch hinter jedem zufälligen
+Dateinamen-Treffer. Jetzt wird rangiert: von beiden Wegen bestätigt → KI-Reihenfolge →
+reine Wort-Treffer. Dazu Teilwort- und Umlaut-Toleranz („grun“ findet „grün“, „strand“
+findet „Strandbad“) und mehr Text im Beschreibungssatz (Auflösung, MP, Klartext-Datum,
+„heute/gestern/diesen Monat“).
+
+### ↔️ Ruckeln beim Bilderwechsel
+
+Beim Wischen stand erst die 1024-px-Vorschau und wurde dann sichtbar durch das scharfe
+Bild ersetzt. Jetzt werden die **Nachbarfotos in Bildschirmgröße vorgeladen**, sobald der
+Pager steht – und während des Ziehens wird **nichts** Neues dekodiert.
+
+### 🧹 Werbe-Banner weg, alles nur über die drei Punkte
+
+* Die Werbe-/Hinweis-Leiste unter dem Titel ist entfernt (der Text steht im ⋮-Menü unter
+  „Über die App“).
+* Karte, Aktualisieren und Rastergröße sind keine eigenen Kopfzeilen-Symbole mehr –
+  **nur noch ⋮**.
+* Neu im ⋮-Menü: **Wichtigste Angaben**.
+
+### 📵 Obere Systemleisten aus
+
+Galerie: Statusleiste (Uhr, Akku) ausgeblendet, Bilder beginnen oben mit dem Titel.
+Bildansicht: beide Leisten aus (Wischen vom Rand holt sie zurück); beim offenen
+Metadaten-Blatt erscheinen sie wieder.
+
+## 1.38 – Sieht aus wie eine Foto-App, nimmt Fotos an, probiert die NPU
+
+Diese Runde ist **nur Oberfläche und Verhalten** – **keine Cloud** (so gewünscht). Was drin ist:
+
+### 🖼️ Galerie statt Tab-Leiste (Google-Photos-Prinzip)
+
+* Kopfzeile mit **großem Titel „Bilder“**, darunter unverändert die **eine** Suchleiste.
+  Die Tab-Leiste oben ist weg – sie war das, was nach „Einstellungen“ aussah.
+* **Untere Leiste**: `Bilder · Alben · Formate · Sammlungen · Menü`. „Menü“ öffnet die
+  ⋮-Liste (Karte, Aktualisieren, Sprache, Info …), genau wie in Google Photos.
+* **Randloses Raster**: 3 dp Rand statt 12 dp, Kachel-Abstand 0,5 dp statt 1–2 dp. Die
+  Kachelgröße wird daraus neu berechnet, damit rechts keine Lücke bleibt.
+
+### 📥 Fotos aus anderen Apps annehmen
+
+Neu im Manifest: `SEND` und `SEND_MULTIPLE` für `image/*`. Die App taucht damit im
+**Teilen-Menü** auf. Geteilte Bilder landen in einer eigenen Ansicht:
+
+* Vorschau-Liste (3 Spalten) der übernommenen Bilder,
+* **„In Galerie speichern“** → kopiert nach `<App-Ordner>/Uebernommen`, nummeriert bei
+  gleichem Namen, ohne Überschreiben,
+* **„In der App öffnen“** → zeigt das erste Bild groß,
+* funktioniert auch **ohne** Zugriff auf die Galerie (die Daten kommen vom absendenden
+  Programm), und auch, wenn die App schon läuft (`onNewIntent`).
+
+### 📌 „Wichtigste Angaben“ und die Karte bei **jedem** Foto
+
+* Neuer Knopf **„Wichtigste Angaben“** in der Leiste unten der Detailansicht: Wann, Wo,
+  Format, Auflösung, Dateigröße, Notiz, Tags, Favorit – auf einen Blick, ohne Wischen.
+  Der Knopf „nach oben“ öffnet weiterhin das große Blatt.
+* Das Metadaten-Blatt ist jetzt **nur sichtbar, wenn es offen ist**. Vorher lag es
+  geschlossen unsichtbar über dem Bild und konnte Berührungen abfangen – das ist der
+  Grund, warum „nach oben scrollen“ nicht zuverlässig traf.
+* Fotos **ohne** GPS-Daten bekommen keinen fehlenden Block mehr, sondern eine Karte-Karte
+  mit der klaren Aussage „In diesem Foto ist kein Ort gespeichert“ und dem Weg zur
+  Gesamtkarte.
+
+### ⚡ HEIF schneller
+
+Kleine Kacheln (bis 128 px) werden jetzt mit der **48-px-Stufe** dekodiert statt mit bis zu
+128 px. Bei iPhone-HEIFs steckt die Zeit im Öffnen des Containers, nicht in der Pixelzahl –
+weniger Pixel heißt hier also direkt weniger Arbeit und ein viermal größerer Bildspeicher.
+„in Anzeigegröße dekodieren“ bleibt für alle großen Ansichten erhalten.
+
+### 🧠 NPU – ehrlicher Versuch mit Rückfall
+
+* Neuer erster Weg: **`Backend.NPU` von LiteRT-LM** (MediaPipe kennt nur CPU/GPU).
+* Vorher wird geprüft, ob das Gerät überhaupt eine NPU haben kann (Qualcomm/QNN, Tensor,
+  MediaTek APU, Exynos, Kirin) – sonst kostet jedes Telefon einen Fehlversuch.
+* Der Weg gilt nur als gelungen, wenn ein **Testlauf** danach wirklich einen Vektor liefert;
+  andernfalls fällt die App still auf GPU → CPU zurück und schreibt den Grund in die
+  Statuszeile. Es wird also nichts behauptet, was nicht gemessen ist.
+
+**Nicht** enthalten und bewusst offen: Cloud-Anbindung (Google Drive ist in dieser Sitzung
+ausgeschaltet), echte Gesichtserkennung, Videos.
+
+## 1.37 – Der eigentliche Grund: falsche LiteRT-LM-Version, halbe Modelldatei
+
+Auf dem Gerät stand bisher nur der Klassenname:
+
+```
+GPU: com.google.ai.edge.litertlm.ActivationDataType · CPU: com.google.ai.edge.litertlm.ActivationDataType
+```
+
+Das war kein Anzeigefehler, sondern die Ursache: **Die Klasse gibt es im ausgelieferten Paket
+nicht.**
+
+### 🔬 Nachgemessen statt geraten
+
+Ein neuer CI-Lauf (`diag-modell.yml`) lädt die Artefakte direkt und schaut hinein:
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| `tasks-retrieval` | 1.2.3 – deklariert selbst `litertlm-android:0.17.0-alpha1` |
+| `EmbeddingEngineConfig` in 0.17.0-alpha1 | 8 Parameter – **ohne** `activationDataType` |
+| `ActivationDataType` in 0.17.0-alpha1 | **fehlt** |
+| ab 0.18.0 / 0.18.1 / 0.19.0 / 0.19.1 | 9 Parameter, `ActivationDataType`, `InputData`, `EmbeddingResponse` – alles vorhanden |
+
+MediaPipe 1.2.3 ist also gegen eine **neuere** LiteRT-LM gebaut, als es selbst mitbringt. Der
+UniversalEmbedder konnte deshalb nie starten – unabhängig davon, wie gut die Reflection ist.
+
+**Behoben:** `litertlm-android:0.19.1` ist jetzt fest eingetragen, und ein Schritt im
+Build-Workflow prüft bei jedem Bau, dass die aufgelöste Version mindestens 0.18 ist
+(sonst bricht der Bau mit einer klaren Meldung ab).
+
+### 🔁 Zweiter Weg, wenn MediaPipe zickt
+
+Neben dem dokumentierten `UniversalEmbedder` kann die App das Modell jetzt auch **direkt über
+LiteRT-LM** einbetten (`EmbeddingEngine` + `computeEmbedding`), auf der CPU. Beide Wege werden
+ausprobiert und mit einem Testlauf geprüft; welcher läuft, steht in der Statuszeile.
+
+### 📦 Die 740M-Datei war abgeschnitten
+
+Auf dem Gerät lag `embeddinggemma-2-740m.litertlm` mit **462 MB** – die Datei ist 462 **MiB**
+groß, also genau 484 622 336 Bytes. Der Download hatte sie bei ~462 MB abgebrochen und die
+halbe Datei als fertig übernommen.
+
+Jetzt gilt:
+
+* **Größenprüfung gegen den Server** (und gegen die hinterlegte Sollgröße). Stimmt sie nicht,
+  wird die Datei **nicht** als Modell verwendet; sie erscheint als „unvollständig, 462 von
+  462 MB“ … bzw. mit dem echten Sollwert.
+* **Fortsetzen statt neu beginnen** (`Range: bytes=…`), bis zu drei Anläufe.
+* Antwortet der Server auf `Range` mit `200` statt `206`, wird korrekt **neu** begonnen
+  (sonst entstünde eine Datei mit doppelten Anfangsbytes).
+* Unvollständige Dateien werden nie geladen – die Suchseite sagt jetzt ausdrücklich:
+  „Modelldatei unvollständig … bitte erneut laden (er läuft an dieser Stelle weiter)“.
+
+### 🧪 Jetzt wird getestet, nicht geraten
+
+* **Unit-Tests in CI** (`app/src/test/…`): Die Reflection-Suche wird gegen einen **Nachbau der
+  MediaPipe-Struktur** geprüft (abstrakter Builder, `AutoValue_…-Unterklasse`, `build()` in der
+  erzeugten Klasse). Genau daran ist 1.35 und 1.36 gescheitert – jetzt bricht der Bau ab, wenn
+  es wieder passiert. Dazu Tests für die Größenprüfung der Modelldateien (der 462-MB-Fall ist
+  ein Testfall) und für die Trefferbewertung der Suche.
+* **Nachweis im fertigen APK:** Der Build prüft im Dex, dass die LiteRT-LM-Klassen
+  (`ActivationDataType`, `EmbeddingEngineConfig`, `EmbeddingEngine`) und die Methoden
+  (`initialize`, `computeEmbedding`) wirklich enthalten sind. Fehlt etwas, bricht der Bau ab.
+* **Selbsttest in der App:** Menü **⋮ → „Modell testen …“** lädt das Modell neu, bettet einen
+  Satz ein und zeigt in einem Dialog zum Beispiel
+  `OK · EmbeddingGemma 2 · UniversalEmbedder · GPU · 768 Dimensionen`
+  oder `FEHLGESCHLAGEN · Klasse fehlt: …`. Damit ist beim nächsten Screenshot sofort klar, wo
+  es klemmt.
+* Die Unit-Tests haben gleich einen eigenen Fehler gefunden: Die MB-Anzeige schnitt ab statt zu
+  runden (369,75 → „369“). Behoben.
+
+### 🧾 Fehler, die man lesen kann
+
+`NoClassDefFoundError` ist ein `Error`, kein `Exception` – er wurde nicht gefangen und kam als
+nackter Klassenname an. Jetzt wird `Throwable` gefangen und übersetzt: „Klasse fehlt: … (LiteRT-
+LM/MediaPipe-Version passt nicht)“, „Natives Modul fehlt“, „Zu wenig Arbeitsspeicher für das
+Modell“.
+
+## 1.37 – Modell startet wirklich, Fortschritt sichtbar, bessere Fehlermeldungen
+
+1.35 hat die Ursachen benannt, aber einen Fehler selbst eingebaut – auf dem Gerät sichtbar als
+
+```
+GPU: setBaseOptions(AutoValue_BaseOptions) an Builder · CPU: setBaseOptions(…) an Builder
+```
+
+### 🔧 Was da schiefging (und jetzt behoben ist)
+
+Die Reflection hat die Methode über die **deklarierten** Parametertypen gesucht
+(`getDeclaredMethod("setBaseOptions", BaseOptions::class.java)`). Übergeben wurde aber ein
+`AutoValue_BaseOptions` – eine Unterklasse. Exakt gleich sind diese Typen nie, also wurde die
+Methode nicht gefunden. Jetzt werden alle Methoden mit dem Namen genommen und die
+**zugewiesenen** Parameter geprüft (`isAssignableFrom`), inklusive Boxing für `boolean`/`int`.
+
+Genau darauf ist auch 1.35 schon hereingefallen: Dort war es `build()`, das nicht im
+abstrakten Builder liegt. Beides ist jetzt derselbe, robuste Weg.
+
+### 📊 Fortschritt und Status
+
+* Die Statuszeile hatte **drei Schreiber** (Fortschritts-Tick, Suchergebnis, Modellwechsel) und
+  sprang dadurch zwischen „läuft nicht …“ und leer. Sie kommt jetzt aus einer Funktion:
+  wer rechnet · wie viele Fotos schon vorbereitet sind.
+* **Modell …** im Überlaufmenü: jederzeit ein anderes Modell laden, die Modelldateien sehen
+  und entfernen – auch wenn schon eine (falsche) Datei im Ordner lag. Vorher verschwand die
+  Modell-Leiste, sobald irgendeine Datei da war.
+* **Foto-Vorbereitung …** im selben Menü: Fortschritt, „Anhalten“ und neu starten.
+* Die Pause zwischen zwei Fotos richtet sich nach der Rechenzeit (mindestens 0 ms, höchstens
+  12 ms im Vordergrund). Eine feste Pause hätte den Aufbau bei 23 000 Fotos um Stunden
+  verlängert.
+
+### 🧾 Ehrliche Fehlermeldungen
+
+Der Download meldet jetzt den Grund („Kein Internet oder der Name wurde nicht gefunden.“,
+„Der Server antwortet mit HTTP 404.“, „Die Datei ist zu klein – die Adresse liefert keine
+Modelldatei.“) statt „Datei konnte nicht gelesen werden“. Das gilt auch für die Datei-Auswahl.
+
+### 🔤 Kleiner, aber ärgerlich: Umlaute im Wortmodell
+
+`assets/ai/wortmodell.txt` wurde ohne Zeichensatzangabe gelesen – Android nimmt dann Latin-1,
+„Frühstück“ wurde zu „FrÃ¼hstÃ¼ck“ und war nie auffindbar. Jetzt wird ausdrücklich UTF-8
+gelesen, alte doppelt kodierte Einträge werden beim Vergleich geradegezogen.
+
+## 1.37 – Suche rechnet im Hintergrund, Modell wird wirklich benutzt, Tastatur schließt
+
+Vier Beschwerden aus 1.34, alle mit derselben Wurzel: **Rechenarbeit lag auf dem Haupt-Thread
+oder wurde nie angestoßen.**
+
+### 🧠 Das Modell wurde tatsächlich nie benutzt
+
+`GemmaEmbedder` baute die Engine per Reflection – und griff dabei daneben:
+`BaseOptions.Builder` und `UniversalEmbedderOptions.Builder` sind `abstract`, die Methode
+`build()` steckt in der generierten Klasse `AutoValue_…Builder`. `getMethod("build")` findet
+sie dort **nicht**, also scheiterte jede Stufe (GPU wie CPU), und die Suche fiel still auf das
+eingebaute Wortmodell zurück – ohne dass irgendwo stand, warum.
+
+Jetzt sucht `findMethod` die ganze Klassenhierarchie ab, jeder Fehlversuch wird gesammelt und
+in der Suchseite angezeigt („läuft nicht: GPU: … · CPU: …“). Steht dort nichts, rechnet
+EmbeddingGemma 2 wirklich – 768 Dimensionen, GPU oder CPU.
+
+### ⏳ „Bilder werden am Anfang nicht analysiert“
+
+Der Index wurde nur gebaut, wenn man die Suchseite öffnete – und blieb dort bei `0 / n`
+stehen. Drei Fehler auf einmal:
+
+* `if (!building.compareAndSet(false, true)) return` verwarf den Aufruf still, **ohne** das
+  versprochene `onDone`. Die Suchseite wartete bei „Suche wird vorbereitet …“.
+* `if (entries.isEmpty()) loadFromDisk(...)` lud Vektoren des **vorigen** Modells. Sie
+  blockierten jede Neuberechnung, weil das Foto ja „schon einen Vektor“ hatte.
+* Ein `catch (_: Throwable) {}` verschluckte jeden Fehler und meldete trotzdem fertig.
+
+Jetzt baut die App den Index **beim Start und nach jedem Neuscan** im Hintergrund
+(`SearchIndex.warmUp`, angestoßen von `DataHub.onLibraryChanged`), zeigt den Fortschritt in der
+Suchseite und merkt sich mit einem Stempeleintrag, zu welchem Modell die Vektoren gehören.
+
+### 🥶 Die App fror nach der Suche ein
+
+Zwei Ursachen:
+
+1. **Jede Suche startete einen neuen Thread**, der erneut `AiEngine.prepare()` aufrief – also
+   das 163–1300 MB große Modell **noch einmal** lud, während der Haupt-Thread auf Sperren
+   wartete. Jetzt wird nie doppelt geladen, und `AiEngine.embed` ist mit einem Schloss
+   serialisiert (die LiteRT-LM-Laufzeit ist nicht thread-sicher).
+2. **Die klassische Suche lief auf dem Haupt-Thread**: Bei jedem Tastendruck wurde für *jedes*
+   Foto der Beschreibungstext neu gebaut, inklusive Datenbankabfrage für den Ort. Bei einigen
+   tausend Fotos stand die App. Jetzt rechnet die Suche komplett im Hintergrund, der Text wird
+   zwischengespeichert, und der Index macht nach jedem Foto eine kurze Pause (im Hintergrund
+   länger, für den Akku).
+
+### ⌨️ Tastatur bleibt nicht mehr stehen
+
+Tippen auf die Treffer – oder irgendwo daneben – schließt die Tastatur (der Fokus wandert auf
+die Wurzel, sonst holt das Feld ihn zurück). „Suchen“ auf der Tastatur schließt sie ebenfalls.
+Umgesetzt über einen `OnItemTouchListener`, damit auch ein Tippen **auf ein Bild** zählt.
+
+### 🔍 Ehrliche Statuszeile
+
+Kein stiller Rückfall mehr: Ist eine Modelldatei da, startet aber nicht, steht der Grund in
+der Statuszeile und im leeren Suchergebnis („Der Foto-Index ließ sich nicht aufbauen: …“).
+Ohne Modell steht dort, dass das eingebaute Wortmodell rechnet.
+
+## 1.37 – EmbeddingGemma 2, Download in der App, OpenStreetMap, Metadaten erreichbar
+
+### 🧠 EmbeddingGemma 2 – das Modell aus Google Edge Gallery
+
+Die Bildersuche rechnet jetzt mit **EmbeddingGemma 2** (740 M Parameter, multimodal,
+Apache 2.0) – dem Modell, das Google am 6. Oktober 2026 veröffentlicht und in „Edge Gallery“
+für „Instant Media Search“ einsetzt. Technisch: `com.google.mediapipe:tasks-retrieval`
+(UniversalEmbedder) auf der LiteRT-LM-Laufzeit, Modelldateien im `.litertlm`-Format.
+
+Drei Varianten zur Auswahl, **Download direkt in der App** (mit Fortschritt, Abbrechen und
+Platzprüfung):
+
+| Variante | Größe | Inhalt |
+| --- | --- | --- |
+| Text (270M) | ca. 163 MB | nur Text-Embeddings |
+| Text + Bild (440M) | ca. 530 MB | empfohlen |
+| alles (740M) | ca. 1,3 GB | Text, Bild, Audio |
+
+Der Download läuft in der App (kein Browser-Umweg), die Datei liegt danach in
+`files/models/`. Gesucht wird vollständig auf dem Gerät.
+
+### 🗺️ OpenStreetMap auf der Karte
+
+Auf der Karte gibt es einen Umschalter: **gezeichnete Offline-Karte** (wie bisher, aus
+Natural Earth im App-Paket) oder **OpenStreetMap** mit echten Straßen und Ortsnamen.
+Geladene Kacheln bleiben im App-Speicher und erscheinen beim nächsten Mal ohne Netz.
+Nennung „© OpenStreetMap-Mitwirkende“ steht auf der Karte.
+
+### ↥ Metadaten wieder erreichbar
+
+Das Info-Blatt war im geschlossenen Zustand **nicht greifbar**: Es hatte Höhe 0, und die
+Metadaten-Liste darunter schluckte jede Berührung – Hochstreichen tat nichts. Jetzt gibt es
+eine **dauerhafte Leiste unten** („Metadaten, Karte & Notizen“): antippen öffnet, hochstreichen
+öffnet, und der Pfeil zeigt die Richtung.
+
+### 🗺️ Karte in den Metadaten
+
+Die Karte steht **ganz oben** in den Metadaten (eigenes Foto als roter Punkt, antippen =
+große Ansicht) – plus Karten-Knopf in der Detailansicht.
+
+### 🔒 Netzwerk nur auf ausdrückliche Handlung
+
+Die App hat jetzt `INTERNET` – ausschließlich für die zwei Dinge, die man selbst antippt
+(Modell-Download, OpenStreetMap-Kacheln). Beides ist standardmäßig aus; Galerie, Metadaten,
+Offline-Karte und die Suche mit Wortmodell brauchen kein Netz.
+
+## 1.33 – Modell-Download, Karte in den Details, eine Suchleiste
+
+### 🧠 Gemma-Embedding 2 direkt holen – ohne Projekt-Bau
+
+Bisher musste die Modelldatei beim Bauen im App-Paket liegen. Jetzt steht in der Bildersuche
+eine Leiste, solange kein Modell da ist:
+
+* **„Modell laden“** öffnet die offizielle Google-Adresse im **Browser** – der Browser lädt
+  `embedding_gemma.task` (~ 200 MB).
+* **„Datei wählen“** übernimmt die Datei in den App-Speicher (`files/models/`), prüft sie und
+  startet die Suchmaschine neu. Danach: **NPU → GPU → CPU**, wie gehabt.
+
+Die App selbst bleibt **ohne Internet-Berechtigung**: den Download macht der Browser, die App
+liest nur die fertige Datei. Das ist in der APK weiterhin prüfbar.
+
+### 🗺️ Karte direkt in den Metadaten
+
+Die Karte steht jetzt **ganz oben in den Metadaten** – mit dem eigenen Foto als rotem Punkt
+und antippbar zur großen Ansicht. Dazu ein Karten-Knopf in der Detailansicht. Der Umweg über
+die Zeile „Auf Karte zeigen“ (die man erst erscrollen musste) entfällt; die Zeile bleibt als
+Text erhalten.
+
+### 🔍 Nur noch eine Suchleiste
+
+Die zweite Lupe im Menü und der klassische Such-Dialog sind entfernt. Es gibt genau eine
+Suchleiste; sie öffnet die Bildersuche, in der die klassische Suche (Dateiname, Ordner, Tags)
+weiterhin mitläuft.
+
+## 1.32 – Karte, Vorschau im richtigen Seitenverhältnis, Bildersuche mit Gemma
+
+### 🗺️ Karte: wo sind meine Fotos entstanden?
+
+Ein neuer Knopf in der Kopfzeile (Karten-Symbol) zeigt alle Fotos auf einer **Karte**.
+Tippen auf einen Punkt zeigt Ort, Datum und die Fotos dieses Ortes; Punkte, die dicht
+beieinanderliegen, werden zu einer Blase mit Anzahl zusammengefasst.
+
+* **Ortsnamen offline:** „Luzern, Schweiz“ statt „47.0502, 8.3093“. Die Ortsliste
+  (46 000 Orte, GeoNames, CC BY 4.0) und die Landflächen (Natural Earth, gemeinfrei)
+  liegen im App-Paket (zusammen ~ 1,2 MB). Kein Kartendienst, kein Schlüssel, kein Internet.
+* **Positionen einmal gelesen, dann gespeichert:** zuerst aus dem Android-Medienindex,
+  sonst aus den EXIF-Daten der Datei. Das Ergebnis liegt in einer kleinen Datenbank –
+  die Karte ist deshalb beim zweiten Öffnen **sofort** da.
+* **Flüssig und scharf:** beim Wischen/Zoomen wird ein vorbereitetes Kartenbild bewegt,
+  sobald der Finger ruht, werden die Landflächen als Pfade scharf gezeichnet.
+  Zwei-Finger-Zoom, Verschieben, Doppeltipp, „alles einpassen“, −/+ Knöpfe.
+* In den **Metadaten** eines Fotos gibt es jetzt die Zeile „Ort“ (mit Entfernung) und
+  „Auf Karte zeigen“ – antippen öffnet die Karte genau an dieser Stelle.
+
+### 🔍 Vorschau nach langem Drücken – im richtigen Seitenverhältnis
+
+Langes Drücken auf eine Kachel zeigt das Foto groß – **vollständig und im Original-
+Seitenverhältnis** (iPhone-Screenshot 9:19,5 hochkant, Kamera 3:2, Panorama breit,
+RAW 4:3 …), nicht beschnitten und nicht verzerrt. Im Raster bleiben die Kacheln
+quadratisch (gleichmäßiges Raster wie bei Apple Fotos); die Vorschau zeigt das ganze Bild,
+begrenzt auf 58 % der Bildschirmhöhe, damit auch sehr hohe Screenshots passen.
+
+Darunter: Dateiname, Format/Größe, Datum, **Ort** (offline bestimmt) und Schnellaktionen
+(Favorit, Teilen, Bearbeiten, Details, Auf Karte zeigen, Löschen). Antippen der Vorschau
+öffnet das Foto in der Großansicht.
+
+### 🧠 Bildersuche in eigenen Worten – Gemma-Embedding, auf der NPU
+
+Tippen auf die Suchleiste öffnet die neue **Bildersuche** (Vorbild: Google Edge Gallery):
+
+* Der Suchtext wird mit einem **Embedding-Modell (Gemma / EmbeddingGemma)** in einen Vektor
+  umgerechnet, jedes Foto hat ebenfalls einen Vektor – gesucht wird nach Ähnlichkeit.
+* Beschleuniger automatisch: **NPU → GPU → CPU**. Jede Stufe wird mit einem Testlauf
+  geprüft; angezeigt wird, welche gerade rechnet („⚡ Gemma Embedding (NPU)“).
+* In den Foto-Vektor fließen alle vorhandenen Angaben ein: Notizen, Tags, Ort, Zeit
+  (Jahr/Monat/Tageszeit), Format (HEIC, RAW, Screenshot), Hochformat/Panorama, Kamera.
+  Die klassische Suche (Dateiname, Ordner, Tags) läuft immer mit.
+* **Ohne Modell-Download:** Liegt keine `.task`-Datei im App-Paket, springt ein eingebautes
+  Wort-Bedeutungsmodell ein (11 kB) – die Suche funktioniert also auf jedem Gerät sofort.
+  Wie man das volle Gemma-Modell einbindet, steht in **[README-KI.md](README-KI.md)**.
+* Der Index wird gespeichert (kein Neuberechnen nach einem Neustart) und im Hintergrund
+  aufgebaut, mit Fortschrittsanzeige.
+
+**Datenschutz unverändert:** kein Internet, keine Cloud, keine Konten. Karte, Ortsnamen und
+Modell liegen im App-Paket und rechnen auf dem Gerät.
+
 ## Produktseite im Projekt (`docs/`)
 
 Neu ist eine **Produktseite** als reine HTML-Seite ohne Bauwerkzeuge: `docs/index.html`.

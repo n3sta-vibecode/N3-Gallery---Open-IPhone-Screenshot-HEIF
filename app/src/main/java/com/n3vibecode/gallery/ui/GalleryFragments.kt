@@ -9,7 +9,6 @@ import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.ScaleGestureDetector
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.IntentSenderRequest
@@ -74,9 +73,6 @@ abstract class BaseGridFragment : Fragment(), PageAware {
     /** Maßstab seit Beginn der Zwei-Finger-Geste (1 = unverändert). */
     private var pinchScale = 1f
     private var pinchBaseSpan = GridPrefs.DEFAULT
-    private var consumingPinch = false
-    private var overviewOpened = false
-    private lateinit var pinchDetector: ScaleGestureDetector
     private var pinchLabel: TextView? = null
 
     private val main = Handler(Looper.getMainLooper())
@@ -220,28 +216,17 @@ abstract class BaseGridFragment : Fragment(), PageAware {
     @Volatile
     private var lastVisible: List<MediaItem>? = null
 
-    /** Langes Drücken: Bearbeiten, Teilen, Details, Löschen. */
+    /**
+     * Langes Drücken: **Vorschau im richtigen Seitenverhältnis** (wie auf dem iPhone) mit
+     * Ortsangabe und Schnellaktionen. Die Aktionen selbst stecken im Vorschau-Dialog
+     * (siehe [com.n3vibecode.gallery.ui.PeekPreview]).
+     */
     private fun onItemLongPress(item: MediaItem) {
-        val labels = arrayOf(
-            getString(R.string.editor_title),
-            getString(R.string.share),
-            getString(R.string.info),
-            getString(R.string.delete)
-        )
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-            .setTitle(item.name)
-            .setItems(labels) { _, which ->
-                when (which) {
-                    0 -> EditorActivity.start(requireContext(), item.uri)
-                    1 -> share(item)
-                    2 -> {
-                        val index = lastVisible?.indexOfFirst { it.uri == item.uri } ?: -1
-                        if (index >= 0) openDetail(index, item.uri)
-                    }
-                    else -> confirmDelete(item)
-                }
-            }
-            .show()
+        // Die sichtbare Liste ist die „Welt“ der Vorschau: Antippen des Bildes öffnet die
+        // Großansicht an genau dieser Stelle, „Details“ und „Karte“ arbeiten mit ihr.
+        lastVisible?.let { ViewState.viewList = it }
+        val index = lastVisible?.indexOfFirst { it.uri == item.uri } ?: -1
+        PeekPreview.show(requireActivity(), item, index)
     }
 
     // ------------------------------------------------------------------ Löschen
@@ -472,38 +457,56 @@ abstract class BaseGridFragment : Fragment(), PageAware {
      * auseinanderziehen → größer und weniger. Läuft im Ereignisweg der Raster-Klasse
      * (siehe [com.n3vibecode.gallery.widget.ZoomGridRecyclerView]) und ist damit
      * unabhängig von Kacheln, Scrollen oder der Tab-Wischgeste.
+     *
+     * 1.42 – **stufenlos und mega flüssig**: Zwischen den ganzzahligen Spaltenzahlen wird
+     * das Raster sichtbar kontinuierlich um den Fingerpunkt skaliert. Die Kachelgröße auf
+     * dem Bildschirm folgt dadurch exakt den Fingern; springt die Spaltenzahl weiter,
+     * springt die Rest-Skalierung im Gegenzug zurück – für das Auge bleibt die Größe
+     * konstant.
+     * Beim Loslassen läuft die Skalierung sanft auf 1 zurück (das Layout hat dann
+     * die passende Spaltenzahl). Außerdem werden während der Geste keine Einstellungen
+     * geschrieben und keine Kacheln neu gebunden – deshalb ruckelt nichts.
      */
     private fun setupPinchZoom() {
         val grid = recycler as? com.n3vibecode.gallery.widget.ZoomGridRecyclerView ?: return
         grid.onPinchStart = {
             pinchScale = 1f
             pinchBaseSpan = span
-            overviewOpened = false
+            recycler.animate().cancel()
+            recycler.scaleX = 1f
+            recycler.scaleY = 1f
             recycler.stopScroll()
         }
         grid.onPinchScale = { factor ->
-            pinchScale *= factor
-            if (pinchScale <= 0.01f) pinchScale = 0.01f
-            if (pinchScale >= 100f) pinchScale = 100f
+            pinchScale = (pinchScale * factor).coerceIn(0.01f, 100f)
             // Zusammenziehen (Maßstab < 1) => mehr Spalten, auseinanderziehen => weniger
-            setColumnsLive(Math.round(pinchBaseSpan / pinchScale))
+            val ideal = pinchBaseSpan / pinchScale
+            val applied = kotlin.math.round(ideal).toInt().coerceIn(GridPrefs.MIN, GridPrefs.MAX)
+            if (applied != span) setColumnsLive(applied, fromPinch = true)
+            // Sichtbare Rest-Skalierung: Kachelgröße = W/applied * visual ≈ W/ideal
+            val visual = if (ideal > 0.01f) (applied / ideal).coerceIn(0.55f, 1.8f) else 1f
+            recycler.pivotX = grid.lastFocusX
+            recycler.pivotY = grid.lastFocusY
+            recycler.scaleX = visual
+            recycler.scaleY = visual
         }
-        grid.onPinchEnd = { hidePinchLabelSoon() }
+        grid.onPinchEnd = {
+            hidePinchLabelSoon()
+            // Erst jetzt dauerhaft merken – während der Geste kein Schreibzugriff,
+            // damit nichts die Finger bewegt.
+            runCatching { GridPrefs.setSpan(requireContext(), span) }
+            // Skalierung sanft auf 1 zurückführen (das Layout hat die exakte Größe)
+            recycler.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+            scheduleWarmUp()
+        }
     }
 
     /** Spaltenzahl live während des Zoomens setzen (ohne Toast, dafür mit Einblendung). */
-    private fun setColumnsLive(target: Int) {
-        // Weiter als bis zur Rastergrenze zoomen? Dann öffnet sich die Gesamtübersicht,
-        // in der wirklich alle Fotos auf einen Blick zu sehen sind.
-        if (target > GridPrefs.MAX && !overviewOpened) {
-            overviewOpened = true
-            openOverview()
-            return
-        }
+    private fun setColumnsLive(target: Int, fromPinch: Boolean) {
         val t = target.coerceIn(GridPrefs.MIN, GridPrefs.MAX)
         if (t == span) return
         span = t
-        GridPrefs.setSpan(requireContext(), t)
+        if (!fromPinch) GridPrefs.setSpan(requireContext(), t)
         applySpan()
         showPinchLabel()
         recycler.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -553,17 +556,14 @@ abstract class BaseGridFragment : Fragment(), PageAware {
     }
 
     protected fun changeSpan(delta: Int) {
-        // Am Maximum: „+“ öffnet die Gesamtübersicht (statt einer Grenzmeldung)
-        if (delta > 0 && span >= GridPrefs.MAX) {
-            overviewOpened = true
-            openOverview()
-            return
-        }
         // Sinnvolle Schrittweite: bis 8 Spalten einzeln, danach größere Sprünge
+        // (die Gesamtübersicht bleibt über das ⋮-Menü erreichbar – das Zoomen selbst
+        // springt nicht mehr woanders hin, 1.42)
         val step = when {
             span < 8 -> 1
             span < 16 -> 2
-            else -> 4
+            span < 40 -> 4
+            else -> 10
         }
         val direction = if (delta >= 0) 1 else -1
         val target = (span + direction * step).coerceIn(GridPrefs.MIN, GridPrefs.MAX)
@@ -581,11 +581,23 @@ abstract class BaseGridFragment : Fragment(), PageAware {
     private fun applySpan() {
         (recycler.layoutManager as? GridLayoutManager)?.spanCount = span
         adapter.setSpan(span)
-        recycler.requestLayout()
         syncControls()
-        // Andere Kachelgröße = andere Vorschaugröße: Hintergrund-Aufbau neu ausrichten
-        val list = lastVisible
-        if (isAdded && !list.isNullOrEmpty()) {
+        // Andere Kachelgröße = andere Vorschaugröße: Hintergrund-Aufbau neu ausrichten –
+        // aber entzerrt (nicht bei jedem Spaltenwechsel mitten in der Zoom-Geste).
+        scheduleWarmUp()
+    }
+
+    /** Kachel-Vorbereitung in der neuen Größe – 400 ms nach dem letzten Wechsel. */
+    private fun scheduleWarmUp() {
+        main.removeCallbacks(warmUpRunnable)
+        if (!isAdded) return
+        main.postDelayed(warmUpRunnable, 400)
+    }
+
+    private val warmUpRunnable = object : Runnable {
+        override fun run() {
+            val list = lastVisible ?: return
+            if (!isAdded || list.isEmpty()) return
             ImageLoader.startWarmUp(requireContext().applicationContext, list, adapter.tilePx())
         }
     }

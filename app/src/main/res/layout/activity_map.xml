@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mapRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/n3_bg">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/n3_bg"
+        app:elevation="0dp">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/n3_bg"
+            app:navigationIcon="@drawable/ic_arrow_back"
+            app:title="@string/map_title" />
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <FrameLayout
+        android:id="@+id/mapHost"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <com.n3vibecode.gallery.map.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Fortschritt beim erstmaligen Auslesen der Positionen -->
+        <LinearLayout
+            android:id="@+id/scanBox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_map_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:visibility="gone">
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/scanSpinner"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:indeterminate="true"
+                app:indicatorSize="18dp"
+                app:trackThickness="2dp" />
+
+            <TextView
+                android:id="@+id/tvScan"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="@string/map_scanning"
+                android:textColor="@color/n3_on_bg"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Hinweis zur Karte: „lädt …“, konkreter Fehler oder „zeichnet offline“ -->
+        <TextView
+            android:id="@+id/tvOsmNote"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="14dp"
+            android:layout_marginTop="56dp"
+            android:background="@drawable/bg_map_card"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:textColor="@color/n3_on_bg"
+            android:textSize="12sp"
+            android:visibility="gone"
+            tools:text="Karte lädt …" />
+
+        <!-- Zoom-Stufen (statt einer echten Karten-App ohne Internet) -->
+        <LinearLayout
+            android:id="@+id/zoomBox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="14dp"
+            android:background="@drawable/bg_map_card"
+            android:orientation="horizontal"
+            android:padding="2dp">
+
+            <ImageButton
+                android:id="@+id/btnZoomOut"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/map_zoom_out"
+                android:padding="9dp"
+                android:src="@drawable/ic_map_zoom_out"
+                app:tint="@color/n3_on_bg" />
+
+            <ImageButton
+                android:id="@+id/btnZoomIn"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/map_zoom_in"
+                android:padding="9dp"
+                android:src="@drawable/ic_map_zoom_in"
+                app:tint="@color/n3_on_bg" />
+        </LinearLayout>
+
+        <!-- Umschalter: gezeichnete Karte (offline) ↔ OpenStreetMap -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnProvider"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="12dp"
+            android:minWidth="0dp"
+            android:text="@string/map_osm_on"
+            android:textSize="11sp"
+            app:icon="@drawable/ic_map"
+            app:iconSize="16dp" />
+
+        <!-- „Alles einpassen“ -->
+        <ImageButton
+            android:id="@+id/btnFit"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="14dp"
+            android:layout_marginBottom="84dp"
+            android:background="@drawable/bg_map_fab"
+            android:contentDescription="@string/map_fit"
+            android:padding="11dp"
+            android:src="@drawable/ic_map_fit"
+            app:tint="@color/n3_accent" />
+
+        <!-- Ausgewählter Ort -->
+        <LinearLayout
+            android:id="@+id/placeCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:layout_margin="10dp"
+            android:background="@drawable/bg_map_card"
+            android:orientation="vertical"
+            android:padding="14dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvPlaceTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/n3_on_bg"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvPlaceSub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/n3_on_surface_variant"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnOpenPlace"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginTop="8dp"
+                android:text="@string/map_open_photos" />
+        </LinearLayout>
+
+        <!-- Keine Fotos mit Ort -->
+        <LinearLayout
+            android:id="@+id/emptyBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="28dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvEmptyTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/map_empty_title"
+                android:textColor="@color/n3_on_bg"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvEmptySub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:text="@string/map_empty_hint"
+                android:textColor="@color/n3_on_surface_variant"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </FrameLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -52,6 +52,34 @@ object Fmt {
         return String.format(Locale.GERMAN, "%.2f GB", mb / 1024.0)
     }
 
+    /**
+     * Kopfzeile wie in der Samsung-Galerie: „Montag, 16. November 2026 · 17:15“.
+     * [exifText] ist die bereits formatierte EXIF-Zeit („16.11.2026, 17:15“); daraus wird
+     * der Wochentag bestimmt, damit Anzeige und Datei übereinstimmen.
+     */
+    fun longDate(exifText: String?, fallbackMs: Long): String {
+        val ms = parseGermanDateTime(exifText) ?: fallbackMs
+        if (ms <= 0) return "–"
+        val day = sdf("EEEE, d. MMMM yyyy").format(Date(ms))
+        val time = sdf("HH:mm").format(Date(ms))
+        return "$day · $time"
+    }
+
+    /** „16.11.2026, 17:15“ → Millisekunden (für Wochentag/Monatsname). */
+    fun parseGermanDateTime(text: String?): Long? {
+        if (text.isNullOrBlank()) return null
+        val formats = listOf("dd.MM.yyyy, HH:mm:ss", "dd.MM.yyyy, HH:mm", "dd.MM.yyyy")
+        for (f in formats) {
+            val parsed = runCatching {
+                val s = java.text.SimpleDateFormat(f, Locale.GERMAN)
+                s.isLenient = false
+                s.parse(text.trim())
+            }.getOrNull()
+            if (parsed != null) return parsed.time
+        }
+        return null
+    }
+
     fun dateTime(ms: Long): String {
         if (ms <= 0) return "–"
         return sdf("dd.MM.yyyy, HH:mm").format(Date(ms))

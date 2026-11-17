@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Überlaufmenü der Bildersuche.
+
+    Wozu: Auch wenn ein Modell installiert ist (oder gerade keins läuft), muss man jederzeit
+    ein anderes Modell laden oder eine vorhandene Datei ersetzen können. In 1.34 verschwand
+    die Modell-Leiste, sobald irgendeine Datei im Ordner lag – wer eine ungeeignete Datei
+    erwischt hatte, kam nicht mehr weiter.
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_search_model"
+        android:title="@string/ai_model_manage"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_search_test"
+        android:title="@string/ai_selftest"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_search_index"
+        android:title="@string/ai_index_status"
+        app:showAsAction="never" />
+</menu>

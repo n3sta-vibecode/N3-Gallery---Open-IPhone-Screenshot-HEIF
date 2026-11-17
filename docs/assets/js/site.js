@@ -396,6 +396,68 @@
      ------------------------------------------------------------------ */
   const LOG = [
     {
+      v: '1.42', de: 'Knöpfe unten wie Samsung, Notizfeld, NPU-Modelle pro Chipsatz, stufenloses Zoomen', en: 'Bottom bar like Samsung, notes field, per-chipset NPU models, stepless zoom',
+      de_items: [
+        'Fotoansicht wie Samsung/Google/Apple: Knopfleiste unten, Hochwischen irgendwo im Foto öffnet unten die wichtigsten Metadaten – mit Notizfeld und kleiner Karte.',
+        '„Die Karte lädt nicht“ behoben: Meer-Kacheln wurden fälschlich als Sperrbilder weggeworfen; OpenStreetMap ist jetzt Standard, und fehlgeschlagene Kacheln bekommen eine Schonfrist statt einer Anfrage-Flut.',
+        'Gemma Embedding 2 läuft wirklich auf der NPU: Backend.NPU wurde korrekt gebaut (vorher scheiterte der Aufbau immer), und die App lädt automatisch die NPU-Fassung des eigenen Chipsatzes (Galaxy S25 Ultra: SM8750) – Download mit SHA-256-Prüfung.',
+        'Zweites Modell für die Personen-Klassifizierung (Text+Bild 440M oder 740M): Knopf „Personen“ zeigt Fotos mit denselben Personen. Beide Modelle rechnen nur auf der NPU.',
+        'Raster stufenlos zoombar (bis 200 Spalten, kontinuierliche Skalierung um den Fingerpunkt), genau eine Lupe im Suchfeld, Dateiformat steht nicht mehr auf den Kacheln, und HEIC heißt nur noch „Apple“, wenn die Datei wirklich von Apple ist.',
+        'Die APK wächst um die NPU-Laufzeitbibliotheken von Qualcomm (rund 63 MB) – deshalb jetzt 291 MB.'
+      ],
+      en_items: [
+        'Photo view like Samsung/Google/Apple: bottom button bar, swiping up anywhere in the photo opens the key metadata – with a notes field and a small map.',
+        '“The map doesn’t load” fixed: ocean tiles were mistakenly discarded as block notices; OpenStreetMap is now the default, and failed tiles get a grace period instead of a request flood.',
+        'Gemma Embedding 2 truly runs on the NPU: Backend.NPU is now constructed correctly (the construction always failed before), and the app automatically downloads the NPU build for your chipset (Galaxy S25 Ultra: SM8750) – with SHA-256 verification.',
+        'Second model for person classification (Text+Image 440M or 740M): the “People” button shows photos with the same people. Both models run on the NPU only.',
+        'Grid zooms steplessly (up to 200 columns, continuous scaling around the finger point), exactly one magnifier in the search field, no more file-format labels on tiles, and HEIC is only called “Apple” when the file really is from Apple.',
+        'The APK grows by Qualcomm’s NPU runtime libraries (about 63 MB) – hence 291 MB now.'
+      ]
+    },
+    {
+      v: '1.41', de: 'Karte ohne Sperrbilder, nur NPU, Metadaten wie Samsung', en: 'Map without block pages, NPU only, Samsung-style metadata',
+      de_items: [
+        'Der eigentliche Grund für „Suchmodell läuft nicht“: tasks-retrieval 1.2.3 bringt eine zu alte LiteRT-LM mit (0.17.0-alpha1), in der die Klasse ActivationDataType fehlt. Jetzt fest auf 0.19.1 – und der Build prüft das bei jedem Lauf.',
+        'Zweiter Weg ohne MediaPipe: dieselbe Datei lässt sich direkt über LiteRT-LM einbetten (CPU). Beide Wege werden mit einem Testlauf geprüft, welcher läuft steht in der Statuszeile.',
+        'Modelldownload prüft jetzt die Größe gegen den Server, setzt bei Abbruch fort (statt von vorn) und übernimmt keine halbe Datei mehr. Genau das war passiert: 462 MB von 462 MiB.',
+        'Unvollständige Modelldateien werden klar benannt, und Fehler wie „Klasse fehlt“ statt eines nackten Klassennamens.'
+      ],
+      en_items: [
+        'The real reason for “search model not running”: tasks-retrieval 1.2.3 ships an outdated LiteRT-LM (0.17.0-alpha1) that lacks the ActivationDataType class. Now pinned to 0.19.1 – and the build verifies this on every run.',
+        'Second route without MediaPipe: the same file can be embedded directly via LiteRT-LM (CPU). Both routes are checked with a test run; the status line shows which one runs.',
+        'Model downloads now verify the size against the server, resume after an interruption instead of restarting, and never accept a half file. That is exactly what happened: 462 MB out of 462 MiB.',
+        'Incomplete model files are named clearly, and errors read “class missing” instead of a bare class name.'
+      ]
+    },
+    {
+      v: '1.33', de: 'Modell-Download, Karte in den Details', en: 'Model download, map in the details',
+      de_items: [
+        'Gemma-Modell direkt in der App holen: „Modell laden“ öffnet die offizielle Adresse im Browser, „Datei wählen“ übernimmt sie – danach rechnet die Suche auf der NPU. Die App bleibt ohne Internet-Berechtigung.',
+        'Karte ganz oben in den Metadaten (eigenes Foto als roter Punkt) plus Karten-Knopf in der Detailansicht.',
+        'Nur noch eine Suchleiste: Menü-Lupe und klassischer Such-Dialog sind entfernt.'
+      ],
+      en_items: [
+        'Fetch the Gemma model right in the app: “Download model” opens the official address in the browser, “Pick file” imports it – afterwards search runs on the NPU. The app still has no internet permission.',
+        'Map at the top of the metadata (your photo as a red dot) plus a map button in the detail view.',
+        'Just one search bar now: the menu magnifier and the classic search dialog are gone.'
+      ]
+    },
+    {
+      v: '1.32', de: 'Karte, Vorschau, Gemma-Suche', en: 'Map, preview, Gemma search',
+      de_items: [
+        'Karte: alle Fotos mit GPS auf einer Karte, mit Ortsnamen („Luzern, Schweiz“) – Landflächen und 46 000 Orte liegen im App-Paket, kein Kartendienst, kein Netz.',
+        'Vorschau per Langdruck im Original-Seitenverhältnis: der hohe iPhone-Screenshot bleibt hoch, das Panorama breit – nichts beschnitten, nichts verzerrt.',
+        'Bildersuche in eigenen Worten mit Gemma-Embedding auf dem Gerät: NPU, sonst GPU, sonst CPU. Ohne Modell-Datei springt ein eingebautes Wortmodell ein.',
+        'Metadaten zeigen jetzt den Ort mit Entfernung und „Auf Karte zeigen“.'
+      ],
+      en_items: [
+        'Map: every photo with GPS on one map, with place names (“Luzern, Switzerland”) – coastlines and 46,000 places ship inside the app, no map service, no network.',
+        'Long-press preview in the original aspect ratio: the tall iPhone screenshot stays tall, the panorama stays wide – nothing cropped, nothing stretched.',
+        'Image search in your own words with on-device Gemma embedding: NPU, else GPU, else CPU. Without a model file a built-in word model steps in.',
+        'Metadata now shows the place with distance and “Show on map”.'
+      ]
+    },
+    {
       v: '1.31', de: 'SVG und SVGZ', en: 'SVG and SVGZ',
       de_items: [
         'SVG-Dateien werden angezeigt – Android kann das nicht von sich aus, dafür ist ein SVG-Renderer eingebaut.',
@@ -563,7 +625,7 @@
     'hero.h1a': 'Apple screenshots.',
     'hero.h1b': 'Finally on Android.',
     'hero.lead': 'N3 Gallery opens Apple’s tiled HEIC containers – including 10-bit, HDR and gain maps. Plus 35 RAW formats, AVIF, SVG and HEVC video. Entirely offline.',
-    'hero.note': 'Version 1.31 · 29 MB · open source',
+    'hero.note': 'Version 1.42 · 291 MB · open source',
     'hero.f1': 'No internet access',
     'hero.f2': 'No accounts',
     'hero.f3': 'No ads',
@@ -638,13 +700,19 @@
     'f7.d': 'German and English, following the rules of each language – including date and size formats.',
     'f8.t': 'Large libraries stay calm',
     'f8.d': 'Previews are created once and kept; the grid builds its rows in the background so swiping and tapping always come first.',
+    'f9.t': 'A map – without the internet',
+    'f9.d': 'Every photo with GPS on one map, with place names (“Luzern, Switzerland”). Coastlines and 46,000 places ship inside the app – no map service, no key, no network.',
+    'f10.t': 'Long press shows the whole picture',
+    'f10.d': 'The preview appears in its original aspect ratio – the tall iPhone screenshot stays tall, the panorama stays wide. Nothing cropped, nothing stretched.',
+    'f11.t': 'Image search in your own words',
+    'f11.d': 'Gemma embedding on the device, computed on the NPU: “beach holiday” finds the shot noted “summer by the sea”. Without a model file a built-in word model steps in.',
     'privacy.kicker': 'Offline',
     'privacy.claim': 'The app requests <em>no internet permission</em>. That is not a promise, it is a line that is missing from the manifest.',
     'privacy.c1': 'No <code>android.permission.INTERNET</code> in the manifest – verifiable right inside the APK.',
     'privacy.c2': 'No account, no sign-in, no cloud, no server.',
     'privacy.c3': 'No ads, no telemetry, no analytics SDK.',
     'privacy.c4': 'Notes, tags and favourites are additionally backed up outside the app – a reinstall costs nothing.',
-    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.31-release.apk | grep uses-permission</code>',
+    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.42-release.apk | grep uses-permission</code>',
     'install.kicker': 'Installation',
     'install.h2': 'Three steps onto the device.',
     'install.p': 'The app is not distributed through a store: the finished APK comes straight from the build and the signing key stays the same. That is why new versions can simply be laid over the installed one.',

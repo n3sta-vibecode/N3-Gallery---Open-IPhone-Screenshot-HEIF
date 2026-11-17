@@ -511,22 +511,4 @@ object Decoder {
 
     private fun buffered(input: InputStream) = java.io.BufferedInputStream(input, 1 shl 20)
 
-    // ------------------------------------------------------------------ Hinweise
-
-    fun hintFor(item: MediaItem): String? = when {
-        item.isVector -> "SVG-Vektorgrafik – in jeder Größe scharf"
-        item.isRaw -> "RAW – Anzeige über die eingebettete Kamera-Vorschau"
-        item.isAvif && HeifSupport.available -> null
-        item.isAvif && Build.VERSION.SDK_INT < 31 -> "AVIF-Vorschau ab Android 12 – Metadaten unten trotzdem vollständig"
-        item.isHeif -> "HEIF/HEIC – inkl. Apple-Screenshot-Container"
-        else -> null
-    }
-
-    fun hintForPath(path: DecodePath): String? = when (path) {
-        DecodePath.HEIF_LIB -> "Angezeigt mit dem integrierten HEIF-Decoder (libheif) – gekachelte & 10-Bit-Apple-Container"
-        DecodePath.RAW_PREVIEW -> "Angezeigt aus der eingebetteten Kamera-Vorschau"
-        DecodePath.EMBEDDED_JPEG -> "Angezeigt aus dem eingebetteten JPEG im Container"
-        DecodePath.VECTOR -> "Als Vektorgrafik in Bildschirmgröße gezeichnet – verlustfrei scharf"
-        else -> null
-    }
 }

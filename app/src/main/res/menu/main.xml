@@ -1,25 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    1.39: Alles nur noch über die drei Punkte (⋮).
+    Vorher standen Karte, Aktualisieren und Rastergröße als eigene Symbole in der Kopfzeile –
+    das drängte den Titel „Bilder" weg und wirkte wie eine Werkzeugleiste statt wie eine
+    Foto-App. Jetzt: großer Titel, drei Punkte, fertig.
+-->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_search"
-        android:icon="@drawable/ic_search"
-        android:title="@string/search"
-        app:showAsAction="ifRoom" />
+        android:id="@+id/action_key_facts"
+        android:title="@string/key_facts"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_map"
+        android:icon="@drawable/ic_map"
+        android:title="@string/map_title"
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_refresh"
         android:icon="@drawable/ic_refresh"
         android:title="@string/refresh"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_grid"
         android:icon="@drawable/ic_grid"
         android:title="@string/grid_size"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_lang_toggle"
         android:title="@string/language_toggle"
-        app:showAsAction="always" />
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_overview"
         android:title="@string/overview_open"

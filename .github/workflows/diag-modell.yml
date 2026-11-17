@@ -1,0 +1,138 @@
+name: Modell-Umgebung messen
+
+# Diagnose-Werkzeug: prüft, welche Klassen im ausgelieferten MediaPipe-Paket wirklich
+# vorhanden sind und welche Größe die Modelldateien auf dem Server haben.
+#
+# Warum: Die App baut die Engine per Reflection. Wenn eine Klasse fehlt, die MediaPipe
+# intern braucht (z. B. com.google.ai.edge.litertlm.ActivationDataType), scheitert der
+# Start mit einer Meldung, die auf dem Gerät nur als Klassenname ankommt. Dieses Werkzeug
+# schaut direkt in das AAR, das Gradle für die App auflöst – und schreibt die Fakten als
+# Commit-Kommentar heraus, damit man sie ohne Runner-Logs lesen kann.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'arena/**'
+    paths:
+      - '.github/workflows/diag-modell.yml'
+
+jobs:
+  messen:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Abhängigkeiten auflösen
+        shell: bash
+        run: |
+          # Nur auflösen, nicht bauen – das AAR landet dabei im Gradle-Cache.
+          ./gradlew :app:dependencies --configuration releaseRuntimeClasspath --no-daemon \
+            > /tmp/deps.txt 2>&1 || true
+          grep -iE "mediapipe|litert" /tmp/deps.txt | sort -u > /tmp/deps-mediapipe.txt || true
+
+      - name: LiteRT-LM-Versionen vergleichen
+        shell: bash
+        continue-on-error: true
+        run: |
+          set +e +o pipefail
+          OUT=/tmp/bericht.md
+          D="https://dl.google.com/dl/android/maven2/com/google/ai/edge/litertlm/litertlm-android"
+
+          {
+            echo "## Welche LiteRT-LM-Version passt zu tasks-retrieval 1.2.3?"
+            echo ""
+            echo "### Verfügbare Versionen"
+            echo '```'
+            curl -sSL -m 90 -o /tmp/lm-meta.xml -w "metadata HTTP %{http_code}\n" "$D/maven-metadata.xml"
+            head -c 2000 /tmp/lm-meta.xml
+            echo ""
+            echo "-- gefiltert:"
+            tr '<' '\n' < /tmp/lm-meta.xml | sed -n 's/^version>\(.*\)/\1/p'
+            echo '```'
+            echo ""
+          } > "$OUT" 2>&1
+
+          # Welche Klasse fehlt? ActivationDataType + InputData + passende Signatur prüfen
+          VERSIONS=$(curl -sSL -m 90 "$D/maven-metadata.xml" 2>/dev/null | tr '<' '\n' | sed -n 's/^version>\(.*\)/\1/p' | tail -12)
+          if [ -z "$VERSIONS" ]; then
+            echo "Keine Versionen gelesen – feste Liste" >> "$OUT"
+            VERSIONS="0.17.0-alpha1 0.16.0 0.15.0 0.14.0"
+          fi
+          for V in $VERSIONS; do
+            JAR="/tmp/lm-$V.jar"
+            mkdir -p /tmp/unz
+            rm -rf /tmp/unz/*
+            if curl -sSL -m 180 -o "/tmp/lm-$V.aar" "$D/$V/litertlm-android-$V.aar"; then
+              ( cd /tmp/unz && unzip -oq "/tmp/lm-$V.aar" classes.jar ) && mv /tmp/unz/classes.jar "$JAR"
+              {
+                echo "### Version $V"
+                echo '```'
+                echo -n "ActivationDataType: "
+                unzip -l "$JAR" | grep -q "ActivationDataType" && echo "vorhanden" || echo "FEHLT"
+                echo -n "InputData:          "
+                unzip -l "$JAR" | grep -q "InputData" && echo "vorhanden" || echo "FEHLT"
+                echo -n "EmbeddingResponse:  "
+                unzip -l "$JAR" | grep -q "EmbeddingResponse" && echo "vorhanden" || echo "FEHLT"
+                echo "Konstruktor EmbeddingEngineConfig:"
+                javap -classpath "$JAR" com.google.ai.edge.litertlm.EmbeddingEngineConfig 2>&1 | grep "EmbeddingEngineConfig(" | head -3
+                echo '```'
+                echo ""
+              } >> "$OUT" 2>&1
+            else
+              echo "### Version $V – nicht ladbar" >> "$OUT"
+            fi
+          done
+
+          head -c 60000 "$OUT" > /tmp/bericht-kurz.md 2>/dev/null || echo "kein Bericht" > /tmp/bericht-kurz.md
+
+      - name: APK-Inhalt prüfen (Klassen wirklich enthalten?)
+        shell: bash
+        continue-on-error: true
+        run: |
+          set +e +o pipefail
+          OUT=/tmp/bericht-apk.md
+          APK=$(ls app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)
+          {
+            echo "## APK: sind die LiteRT-LM-Klassen drin?"
+            echo '```'
+            if [ -z "$APK" ]; then
+              echo "kein APK gefunden (Diagnose-Workflow baut keins)"
+            else
+              echo "APK: $APK"
+              # dex-Dateien nach Klassennamen durchsuchen
+              rm -rf /tmp/apk && mkdir -p /tmp/apk && cd /tmp/apk && unzip -oq "$APK" 'classes*.dex' 2>/dev/null
+              ls -l /tmp/apk
+              for K in ActivationDataType EmbeddingEngineConfig UniversalEmbedder; do
+                echo -n "$K: "
+                strings /tmp/apk/classes*.dex 2>/dev/null | grep -c "$K"
+              done
+              echo "--- native Bibliotheken:"
+              unzip -l "$APK" | grep -E "lib/.*\.so" | awk '{print $4}' | sed 's|lib/||; s|/.*||' | sort -u
+            fi
+            echo '```'
+          } > "$OUT" 2>&1
+          cat "$OUT" >> /tmp/bericht-kurz.md 2>/dev/null || cp "$OUT" /tmp/bericht-kurz.md
+
+      - name: Bericht als Commit-Kommentar ablegen
+        if: always()
+        shell: bash
+        run: |
+          test -f /tmp/bericht-kurz.md || echo "kein Bericht entstanden" > /tmp/bericht-kurz.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+            -F body=@/tmp/bericht-kurz.md -f path= >/dev/null \
+            && echo "Kommentar geschrieben" \
+            || echo "::error::Kommentar konnte nicht geschrieben werden"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

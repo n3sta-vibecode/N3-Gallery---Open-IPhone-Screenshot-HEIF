@@ -61,6 +61,17 @@ object ImageLoader {
      */
     private val BUCKETS = intArrayOf(64, 128, 256, 512, 1024)
 
+    /**
+     * **Kleine Kacheln bekommen kein 512-px-Decode mehr (1.38).**
+     *
+     * Vorher wurde für eine 64-px-Kachel bis zu doppelt so groß dekodiert (128 px). Bei einem
+     * 12-MP-HEIC bedeutet das trotzdem einen vollen libheif-Durchlauf; die Zeit steckt im
+     * Öffnen des Containers, nicht in der Pixelzahl. Deshalb: bis 128 px wird die
+     * **Mikro-Stufe** (48 px) benutzt – sichtbar gleich, aber deutlich schneller, und der
+     * Zwischenspeicher hält viermal mehr Kacheln.
+     */
+    private fun effectiveBucket(px: Int): Int = if (px <= 128) MICRO else bucketFor(px)
+
     private fun bucketFor(px: Int): Int {
         for (b in BUCKETS) if (px <= b) return b
         return BUCKETS.last()
@@ -129,6 +140,17 @@ object ImageLoader {
     fun put(key: String, bmp: Bitmap) {
         cache.put(key, bmp)
         cacheBytes(key, bmp)
+    }
+
+    /**
+     * Legt ein Bild **nur** in den Bildspeicher, ohne es zu komprimieren.
+     *
+     * Für Vollbilder: Beim Vorladen der Nachbarfotos würde `cacheBytes` die Bitmap auf dem
+     * Hintergrund-Thread als JPEG kodieren – reine Rechenzeit, die beim Wischen fehlt, und
+     * die Vollbildstufe wird ohnehin nie aus den Bytes zurückgeholt (nur ≤ 512 px).
+     */
+    fun putBitmap(key: String, bmp: Bitmap) {
+        cache.put(key, bmp)
     }
 
     /** Leert den Speicher-Cache (Vorschauen auf der Festplatte bleiben gültig). */
@@ -283,7 +305,7 @@ object ImageLoader {
      * Speicher, erscheint sie sofort; fehlt die passende, wird sie nachgeladen.
      */
     fun into(ctx: Context, item: MediaItem, sizePx: Int, target: ImageView, placeholder: Bitmap? = null) {
-        val bucket = if (sizePx <= MICRO * 2) MICRO else bucketFor(sizePx)
+        val bucket = effectiveBucket(sizePx)
         val key = keyFor(item, bucket)
         target.tag = key
 
@@ -452,7 +474,7 @@ object ImageLoader {
     fun prefetch(ctx: Context, items: List<MediaItem>, sizePx: Int, limit: Int = 48) {
         if (items.isEmpty()) return
         val app = ctx.applicationContext
-        val bucket = if (sizePx <= MICRO * 2) MICRO else bucketFor(sizePx)
+        val bucket = effectiveBucket(sizePx)
         var queued = 0
         for (item in items) {
             if (queued >= limit) break
@@ -549,6 +571,28 @@ object ImageLoader {
      * Schnelle Vorschau (1024 px) für die Großansicht: Antippen zeigt sofort etwas Scharfes,
      * während das Vollbild noch dekodiert. Läuft vor allen wartenden Raster-Kacheln.
      */
+    /**
+     * Wie [loadPreview], aber in einer gewünschten Größe – für die Vorschau nach langem
+     * Drücken (dort wird das Bild groß und im richtigen Seitenverhältnis gezeigt).
+     * Der Rückruf kommt garantiert im Haupt-Thread.
+     */
+    fun loadPreview(ctx: Context, item: MediaItem, sizePx: Int, onDone: (Bitmap?) -> Unit) {
+        val bucket = bucketFor(sizePx.coerceAtLeast(MICRO))
+        memGet(keyFor(item, bucket))?.let { onDone(it); return }
+        val appCtx = ctx.applicationContext
+        interactiveBusy.incrementAndGet()
+        fullPool.execute {
+            val bmp = try {
+                obtainThumb(appCtx, item, bucket, null)
+            } catch (_: Throwable) {
+                null
+            } finally {
+                interactiveBusy.decrementAndGet()
+            }
+            main.post { onDone(bmp) }
+        }
+    }
+
     fun loadPreview(ctx: Context, item: MediaItem, onDone: (Bitmap?) -> Unit) {
         memGet(keyFor(item, BUCKETS.last()))?.let { onDone(it); return }
         val appCtx = ctx.applicationContext
@@ -604,7 +648,8 @@ object ImageLoader {
             } finally {
                 interactiveBusy.decrementAndGet()
             }
-            result.bitmap?.let { put(key, it) }
+            // Vollbild: nur in den Bitmap-Speicher (kein JPEG-Kodieren auf dem Hintergrund-Thread)
+            result.bitmap?.let { putBitmap(key, it) }
             runningFull.remove(key)
             val snapshot = ArrayList(waiters)
             main.post { for (w in snapshot) runCatching { w(result.bitmap, result.path) } }

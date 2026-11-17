@@ -1,0 +1,776 @@
+package com.n3vibecode.gallery.ui
+
+import android.content.Context
+import android.content.Intent
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.Menu
+import android.view.MenuItem
+import android.view.MotionEvent
+import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.n3vibecode.gallery.R
+import com.n3vibecode.gallery.ai.AiEngine
+import com.n3vibecode.gallery.ai.ModelStore
+import com.n3vibecode.gallery.ai.PersonIndex
+import com.n3vibecode.gallery.ai.SearchIndex
+import com.n3vibecode.gallery.data.DataHub
+import com.n3vibecode.gallery.data.GridPrefs
+import com.n3vibecode.gallery.data.MediaItem
+
+/**
+ * Bildersuche in eigenen Worten – wie in „Google Edge Gallery“:
+ *
+ *  • Der Suchtext wird mit **EmbeddingGemma 2** in einen Vektor umgerechnet (GPU oder CPU).
+ *  • Jedes Foto hat ebenfalls einen Vektor (aus Namen, Notizen, Tags, Ort, Zeit, Format …).
+ *  • Gezeigt werden die Fotos mit der größten Ähnlichkeit.
+ *
+ * Zusätzlich bleibt die klassische Suche erhalten (Dateiname, Ordner, Format) – die Treffer
+ * beider Wege werden gemischt, damit auch „IMG_2043“ gefunden wird.
+ *
+ * **Zwei Dinge, die das Gerät in 1.34 einfrieren ließen und hier behoben sind:**
+ *  1. Jede Suche startete einen neuen Thread, der wieder `AiEngine.prepare()` aufrief und
+ *     dabei das Modell **neu lud** – mehrere Ladevorgänge gleichzeitig, während der Haupt-
+ *     Thread auf Sperren wartete. Jetzt wird nie mehrfach geladen.
+ *  2. Der Index-Aufbau meldete sich nie zurück (`onDone` wurde verworfen), deshalb blieb die
+ *     Fortschrittsanzeige bei „0 / n“ stehen. Jetzt zeigt sie Foto für Foto den Fortschritt.
+ */
+class SearchActivity : AppCompatActivity() {
+
+    private lateinit var queryEdit: TextInputEditText
+    private lateinit var tvEngine: TextView
+    private lateinit var suggestions: ChipGroup
+    private lateinit var recycler: RecyclerView
+    private lateinit var emptyBox: View
+    private lateinit var tvEmptyTitle: TextView
+    private lateinit var tvEmptySub: TextView
+    private lateinit var progress: View
+
+    private lateinit var modelBox: View
+    private lateinit var tvModelTitle: TextView
+    private lateinit var tvModelHint: TextView
+
+    private lateinit var adapter: GridAdapter
+    private val main = Handler(Looper.getMainLooper())
+
+    /** Zuletzt angezeigte Treffer (für das Öffnen der Großansicht). */
+    private var results: List<MediaItem> = emptyList()
+
+    private var searchToken = 0
+    private var lastStatus: AiEngine.Status? = null
+
+    /**
+     * 1.42 – **Personen-Modus**: Wird die Seite mit einem Foto-Verweis geöffnet
+     * (EXTRA_SIMILAR_TO), zeigt sie die Fotos mit denselben Personen/demselben Motiv
+     * statt einer Textsuche. Siehe [PersonIndex].
+     */
+    private var personsUri: String? = null
+
+    private val rerun = Runnable { search() }
+
+    /** Fortschritt des Index-Aufbaus in der Statuszeile (nur solange wirklich gebaut wird). */
+    private val progressTick: Runnable = object : Runnable {
+        override fun run() {
+            if (isFinishing || isDestroyed) return
+            // 1.42: Im Personen-Modus gehört die Zeile zum Bild-Index (2. Modell)
+            if (personsUri != null) {
+                val (pDone, pTotal) = PersonIndex.progress()
+                val pBuilding = PersonIndex.isRunning()
+                progress.visibility = if (pBuilding) View.VISIBLE else View.GONE
+                if (pBuilding) {
+                    tvEngine.text = if (pTotal > 0) {
+                        getString(R.string.persons_building, pDone, pTotal)
+                    } else {
+                        getString(R.string.persons_preparing)
+                    }
+                }
+                main.postDelayed(this, 700)
+                return
+            }
+            val (done, total) = SearchIndex.progress()
+            val building = SearchIndex.isRunning()
+            progress.visibility = if (building) View.VISIBLE else View.GONE
+            // Eine Quelle für die Statuszeile: Status **und** Fortschritt. Vorher schrieben
+            // Tick, Such-Ergebnis und Modellwechsel abwechselnd hinein – die Zeile sprang
+            // dadurch zwischen „läuft nicht …“ und einer leeren Fläche hin und her.
+            val st = AiEngine.currentStatus()
+            lastStatus = st
+            showEngineStatus(st, done, total, building)
+            main.postDelayed(this, 700)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_search)
+
+        queryEdit = findViewById(R.id.queryEdit)
+        tvEngine = findViewById(R.id.tvEngine)
+        suggestions = findViewById(R.id.suggestions)
+        recycler = findViewById(R.id.recycler)
+        emptyBox = findViewById(R.id.emptyBox)
+        tvEmptyTitle = findViewById(R.id.tvEmptyTitle)
+        tvEmptySub = findViewById(R.id.tvEmptySub)
+        progress = findViewById(R.id.progress)
+
+        modelBox = findViewById(R.id.modelBox)
+        tvModelTitle = findViewById(R.id.tvModelTitle)
+        tvModelHint = findViewById(R.id.tvModelHint)
+
+        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
+        toolbar.setNavigationOnClickListener { finish() }
+        // Überlaufmenü: Modell verwalten und Foto-Vorbereitung – immer erreichbar
+        toolbar.inflateMenu(R.menu.search)
+        toolbar.setOnMenuItemClickListener { item -> onMenuItem(item) }
+
+        findViewById<View>(R.id.btnModelDownload).setOnClickListener { chooseModelAndDownload() }
+        findViewById<View>(R.id.btnModelCancel).setOnClickListener { ModelStore.cancel() }
+        findViewById<View>(R.id.btnModelPick).setOnClickListener { pickModelFile() }
+
+        val root = findViewById<View>(R.id.searchRoot)
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+
+        val span = GridPrefs.span(this).coerceAtMost(6)
+        recycler.layoutManager = GridLayoutManager(this, span)
+        adapter = GridAdapter(span, false, { item, index ->
+            ViewState.viewList = results
+            startActivity(
+                Intent(this, DetailActivity::class.java)
+                    .putExtra(DetailActivity.EXTRA_POSITION, index)
+                    .putExtra(DetailActivity.EXTRA_URI, item.uri)
+            )
+        }, { item -> PeekPreview.show(this, item, results.indexOfFirst { it.uri == item.uri }) })
+        recycler.adapter = adapter
+
+        queryEdit.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                hideKeyboard()
+                search()
+                true
+            } else false
+        }
+        queryEdit.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                // Kurz warten, damit beim Tippen nicht jeder Buchstabe eine Suche startet
+                main.removeCallbacks(rerun)
+                main.postDelayed(rerun, 320)
+            }
+        })
+        // Lupen-Symbol im Eingabefeld: antippen startet die Suche sofort
+        findViewById<View>(R.id.queryBox)
+            .findViewById<View>(com.google.android.material.R.id.text_input_end_icon)
+            ?.setOnClickListener {
+                hideKeyboard()
+                search()
+            }
+
+        // Tippen auf die Treffer (oder irgendwo daneben) schließt die Tastatur – zusätzlich
+        // zum Zurück-Wischen. Vorher blieb sie stehen, weil der Fokus im Feld blieb.
+        //
+        // Wichtig: ein OnItemTouchListener läuft **vor** den Kacheln. Ein OnTouchListener am
+        // RecyclerView käme bei einem Tippen auf ein Bild gar nicht an (das Kind behandelt es).
+        recycler.addOnItemTouchListener(object : RecyclerView.OnItemTouchListener {
+            override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                if (e.actionMasked == MotionEvent.ACTION_DOWN) hideKeyboard()
+                return false   // nie konsumieren – Antippen/Langesdrücken bleibt wie es war
+            }
+
+            override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) = Unit
+            override fun onRequestDisallowInterceptTouchEvent(disallowIntercept: Boolean) = Unit
+        })
+        root.setOnTouchListener { v, e ->
+            if (e.actionMasked == MotionEvent.ACTION_DOWN) {
+                v.performClick()
+                hideKeyboard()
+            }
+            false
+        }
+
+        buildSuggestions()
+
+        // 1.42: Personen-Modus? Dann keine Textsuche, sondern ähnliche Fotos zeigen.
+        personsUri = intent.getStringExtra(EXTRA_SIMILAR_TO)
+        if (personsUri != null) {
+            toolbar.title = getString(R.string.persons_title)
+            findViewById<View>(R.id.queryBox).visibility = View.GONE
+            suggestions.visibility = View.GONE
+            startPersonsSearch(personsUri!!)
+            watchProgress()
+            return
+        }
+
+        // Suchmaschine vorbereiten und – falls nötig – den Index bauen. Alles im Hintergrund;
+        // die Seite ist sofort bedienbar und zeigt den Fortschritt in der Statuszeile.
+        progress.visibility = View.VISIBLE
+        tvEngine.text = getString(R.string.ai_loading)
+        Thread({
+            AiEngine.prepare(applicationContext)
+            SearchIndex.warmUp(applicationContext)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                val st = AiEngine.currentStatus()
+                lastStatus = st
+                showEngineStatus(st)
+                refreshModelBox(st)
+                // Läuft der Index noch, bleibt der Fortschritt stehen; sonst ausblenden
+                if (!SearchIndex.isRunning()) progress.visibility = View.GONE
+                search()
+            }
+        }, "n3-search-prepare").apply { isDaemon = true }.start()
+        watchProgress()
+    }
+
+    /**
+     * Personen-Ähnlichkeit: Index aufbauen (mit Fortschritt) und dann die Treffer zeigen.
+     * Fehlt das Bild-Modell, erklärt die Modell-Leiste, welches zu laden ist (440M/740M).
+     */
+    private fun startPersonsSearch(uri: String) {
+        progress.visibility = View.VISIBLE
+        tvEngine.text = getString(R.string.persons_preparing)
+        PersonIndex.ensureBuilt(applicationContext) { ok, reason ->
+            if (isFinishing || isDestroyed) return@ensureBuilt
+            if (!ok) {
+                progress.visibility = View.GONE
+                results = emptyList()
+                adapter.submitItems(emptyList())
+                emptyBox.visibility = View.VISIBLE
+                tvEmptyTitle.text = getString(R.string.persons_title)
+                tvEmptySub.text = reason.ifBlank { getString(R.string.persons_no_model) }
+                return@ensureBuilt
+            }
+            Thread({
+                val list = runCatching { PersonIndex.similar(applicationContext, uri) }
+                    .getOrDefault(emptyList())
+                main.post {
+                    if (isFinishing || isDestroyed) return@post
+                    progress.visibility = View.GONE
+                    results = list
+                    adapter.submitItems(list)
+                    if (list.isEmpty()) {
+                        emptyBox.visibility = View.VISIBLE
+                        tvEmptyTitle.text = getString(R.string.persons_title)
+                        tvEmptySub.text = getString(R.string.persons_empty)
+                    } else {
+                        emptyBox.visibility = View.GONE
+                    }
+                    tvEngine.text = getString(R.string.persons_status, list.size, PersonIndex.size())
+                }
+            }, "n3-persons-search").apply { isDaemon = true }.start()
+        }
+    }
+
+    private fun onMenuItem(item: MenuItem): Boolean = when (item.itemId) {
+        R.id.action_search_model -> { showModelDialog(); true }
+        R.id.action_search_index -> { showIndexDialog(); true }
+        R.id.action_search_test -> { runSelfTest(); true }
+        else -> false
+    }
+
+    /**
+     * Selbsttest: lädt das Modell neu, bettet einen Satz ein und meldet das Ergebnis.
+     * Damit lässt sich auf dem Gerät sagen, ob es am Modell, an der Bibliothek oder am
+     * Speicher liegt – ohne Log-Ausgabe.
+     */
+    private fun runSelfTest() {
+        if (ModelStore.incomplete(this).isNotEmpty()) {
+            // Unvollständige Datei zuerst nennen – sonst sucht man an der falschen Stelle
+            refreshModelBox(AiEngine.currentStatus())
+            Toast.makeText(this, R.string.ai_model_incomplete_title, Toast.LENGTH_LONG).show()
+            return
+        }
+        progress.visibility = View.VISIBLE
+        tvEngine.text = getString(R.string.ai_selftest_started)
+        Thread({
+            val (ok, info) = runCatching { AiEngine.selfTest(applicationContext) }
+                .getOrElse { false to (it.message ?: it.javaClass.simpleName) }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                progress.visibility = View.GONE
+                val st = AiEngine.currentStatus()
+                lastStatus = st
+                showEngineStatus(st)
+                refreshModelBox(st)
+                // Meldung im Dialog (kopierbar), nicht als kurzlebiger Toast
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.ai_selftest)
+                    .setMessage(
+                        if (ok) getString(R.string.ai_selftest_ok, info)
+                        else getString(R.string.ai_selftest_failed, info)
+                    )
+                    .setPositiveButton(R.string.ok, null)
+                    .show()
+            }
+        }, "n3-selftest").apply { isDaemon = true }.start()
+    }
+
+    /**
+     * Modell verwalten – unabhängig davon, ob gerade eins läuft: laden, ersetzen, entfernen.
+     */
+    private fun showModelDialog() {
+        val installed = ModelStore.models(this)
+        val st = AiEngine.currentStatus()
+        val lines = ArrayList<String>()
+        lines.add(
+            if (st.failure.isNotBlank() && st.modelInstalled) {
+                getString(R.string.ai_engine_failed, st.modelName, st.failure)
+            } else {
+                getString(R.string.ai_engine_status, "◆", st.modelName, st.accelerator.label)
+            }
+        )
+        val half = ModelStore.incomplete(this)
+        if (installed.isNotEmpty() || half.isNotEmpty()) {
+            lines.add("")
+            installed.forEach { f ->
+                lines.add("• ${f.name} · ${f.length() / 1048576} MB")
+            }
+            half.forEach { f ->
+                val known = ModelStore.variants().firstOrNull { it.file == f.name }
+                lines.add("• ${f.name} · ${f.length() / 1048576} von ${known?.expectedMb ?: "?"} MB (unvollständig)")
+            }
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.ai_model_manage_title)
+            .setMessage(lines.joinToString("\n"))
+            .setPositiveButton(R.string.ai_model_download) { _, _ -> chooseModelAndDownload() }
+            .setNegativeButton(R.string.ai_model_remove) { _, _ -> removeModels() }
+            .setNeutralButton(R.string.close, null)
+            .show()
+    }
+
+    private fun removeModels() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.ai_model_remove)
+            .setMessage(R.string.ai_model_remove_confirm)
+            .setPositiveButton(R.string.ai_model_remove) { _, _ ->
+                ModelStore.clear(this)
+                Toast.makeText(this, R.string.ai_index_stopped, Toast.LENGTH_SHORT).show()
+                reloadEngine()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    /** Foto-Vorbereitung: wie weit sie ist, anhalten, oder neu starten. */
+    private fun showIndexDialog() {
+        val (done, total) = SearchIndex.progress()
+        val building = SearchIndex.isRunning()
+        val problem = SearchIndex.lastError()
+        val message = when {
+            problem.isNotBlank() -> getString(R.string.ai_index_failed, problem)
+            building && total > 0 -> getString(R.string.ai_index_done, done, total)
+            building -> getString(R.string.ai_loading)
+            else -> getString(R.string.ai_index_done, done, total)
+        }
+        val b = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.ai_index_status)
+            .setMessage(message.trim())
+            .setNegativeButton(R.string.close, null)
+        if (building) {
+            b.setPositiveButton(R.string.ai_index_stop) { _, _ ->
+                SearchIndex.requestStop()
+                Toast.makeText(this, R.string.ai_index_stopped, Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            b.setPositiveButton(R.string.ai_index_status) { _, _ ->
+                SearchIndex.invalidate(applicationContext)
+                SearchIndex.warmUp(applicationContext)
+                Toast.makeText(this, R.string.ai_loading, Toast.LENGTH_SHORT).show()
+            }
+        }
+        b.show()
+    }
+
+    private fun watchProgress() {
+        main.removeCallbacks(progressTick)
+        main.postDelayed(progressTick, 400)
+    }
+
+    override fun onDestroy() {
+        main.removeCallbacksAndMessages(null)
+        super.onDestroy()
+    }
+
+    // ------------------------------------------------------------------ Tastatur
+
+    /**
+     * Tastatur schließen und den Fokus vom Eingabefeld nehmen. Wichtig: Der Fokus muss
+     * **irgendwohin** wandern (hier auf die Wurzel), sonst holt sich das Feld ihn beim
+     * nächsten Layout-Durchlauf zurück und die Tastatur geht wieder auf.
+     */
+    private fun hideKeyboard() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(queryEdit.windowToken, 0)
+        queryEdit.clearFocus()
+        val root = findViewById<View>(R.id.searchRoot)
+        root.isFocusableInTouchMode = true
+        root.requestFocus()
+    }
+
+    // ------------------------------------------------------------------ Modell-Leiste
+
+    /**
+     * Modell-Leiste: zeigt den Download an, solange kein EmbeddingGemma-2-Modell da ist –
+     * und den **Grund**, wenn eine Datei da ist, das Modell aber nicht startet.
+     */
+    private fun refreshModelBox(status: AiEngine.Status) {
+        // Immer sichtbar, solange kein EmbeddingGemma läuft – nur die Überschrift ist anders.
+        // Vorher verschwand die Leiste, sobald eine Datei da war: Wer eine kaputte oder falsche
+        // Datei erwischt hatte, konnte kein anderes Modell mehr laden.
+        modelBox.visibility = View.VISIBLE
+        if (status.accelerator != AiEngine.Accelerator.LOCAL) {
+            // EmbeddingGemma läuft → Leiste zu, im Überlaufmenü bleibt sie erreichbar
+            modelBox.visibility = View.GONE
+            return
+        }
+        val half = ModelStore.incomplete(this).firstOrNull()
+        when {
+            // Wichtigster Fall auf dem Gerät: 740M-Datei mit 462 MB statt 1,3 GB
+            half != null -> {
+                val known = ModelStore.variants().firstOrNull { it.file == half.name }
+                tvModelTitle.text = getString(R.string.ai_model_incomplete_title)
+                tvModelHint.text = if (known != null) {
+                    getString(
+                        R.string.ai_model_incomplete_hint,
+                        half.name, (half.length() / 1048576).toInt(), known.expectedMb
+                    )
+                } else {
+                    getString(R.string.ai_model_incomplete_hint, half.name,
+                        (half.length() / 1048576).toInt(), 0)
+                }
+            }
+
+            ModelStore.hasModel(this) -> {
+                tvModelTitle.text = getString(R.string.ai_model_unavailable_title)
+                tvModelHint.text = getString(R.string.ai_model_unavailable_hint) +
+                    if (status.failure.isNotBlank()) {
+                        "\n" + getString(R.string.ai_model_diag, status.failure)
+                    } else ""
+            }
+
+            else -> {
+                tvModelTitle.text = getString(R.string.ai_model_missing_title)
+                tvModelHint.text = getString(R.string.ai_model_missing_hint)
+            }
+        }
+    }
+
+    /** Auswahl: welches EmbeddingGemma-2-Modell geladen werden soll. */
+    private fun chooseModelAndDownload() {
+        // 1.42: Die Liste zeigt automatisch die **NPU-Fassung dieses Geräts** (z. B.
+        // „…_Qualcomm_SM8750“ auf dem Galaxy S25 Ultra) – nur damit rechnet die NPU.
+        val variants = ModelStore.variants()
+        val soc = ModelStore.socTag()
+        val labels = variants.map { v ->
+            val npu = if (v.isNpu) {
+                " · NPU (${ModelStore.socLabel(v.soc)})"
+            } else if (soc.isNotEmpty()) {
+                " · CPU/GPU (keine NPU-Fassung veröffentlicht)"
+            } else ""
+            "${v.label}\n${v.note} · ca. ${v.expectedMb} MB$npu"
+        }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.ai_model_choose)
+            .setItems(labels) { _, which -> startDownload(variants[which]) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    /** Download in der App – mit Fortschritt, Abbrechen und Platzprüfung. */
+    private fun startDownload(variant: ModelStore.Variant) {
+        if (!ModelStore.hasRoomFor(this, variant)) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.ai_model_no_space)
+                .setMessage(getString(R.string.ai_model_no_space_msg, variant.expectedMb))
+                .setPositiveButton(R.string.ok, null)
+                .show()
+            return
+        }
+        findViewById<View>(R.id.modelButtons).visibility = View.GONE
+        findViewById<View>(R.id.modelProgressBox).visibility = View.VISIBLE
+        val bar = findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(
+            R.id.modelProgress
+        )
+        val tv = findViewById<TextView>(R.id.tvModelProgress)
+        bar.isIndeterminate = true
+        tv.text = getString(R.string.ai_model_starting, variant.expectedMb)
+
+        Thread({
+            ModelStore.download(applicationContext, variant,
+                onProgress = { done, total ->
+                    runOnUiThread {
+                        if (isFinishing || isDestroyed) return@runOnUiThread
+                        if (total > 0) {
+                            bar.isIndeterminate = false
+                            bar.progress = ((done * 100) / total).toInt()
+                            tv.text = getString(
+                                R.string.ai_model_progress, done / 1048576, total / 1048576
+                            )
+                        } else {
+                            tv.text = getString(R.string.ai_model_progress_unknown, done / 1048576)
+                        }
+                    }
+                },
+                onDone = { file, reason ->
+                    runOnUiThread {
+                        if (isFinishing || isDestroyed) return@runOnUiThread
+                        findViewById<View>(R.id.modelButtons).visibility = View.VISIBLE
+                        findViewById<View>(R.id.modelProgressBox).visibility = View.GONE
+                        bar.isIndeterminate = false
+                        bar.progress = 0
+                        if (file == null) {
+                            // Grund nennen – vorher stand hier immer nur „konnte nicht gelesen werden“
+                            Toast.makeText(
+                                this,
+                                getString(R.string.ai_model_download_failed, reason.ifBlank { "?" }),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            Toast.makeText(
+                                this, getString(R.string.ai_model_imported, file.name),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            reloadEngine()
+                        }
+                    }
+                })
+        }, "n3-model-download").apply { isDaemon = true }.start()
+    }
+
+    /** Datei-Auswahl (SAF) – falls das Modell schon auf dem Gerät liegt. */
+    private fun pickModelFile() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        runCatching { startActivityForResult(intent, REQ_PICK_MODEL) }
+            .onFailure {
+                Toast.makeText(this, R.string.ai_model_import_failed, Toast.LENGTH_LONG).show()
+            }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_PICK_MODEL || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        progress.visibility = View.VISIBLE
+        tvEngine.text = getString(R.string.ai_loading)
+        Thread({
+            val file = ModelStore.importTo(applicationContext, uri)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                progress.visibility = View.GONE
+                if (file == null) {
+                    Toast.makeText(
+                        this, R.string.ai_model_import_failed, Toast.LENGTH_LONG
+                    ).show()
+                    return@runOnUiThread
+                }
+                Toast.makeText(
+                    this, getString(R.string.ai_model_imported, file.name), Toast.LENGTH_SHORT
+                ).show()
+                reloadEngine()
+            }
+        }, "n3-model-import").apply { isDaemon = true }.start()
+    }
+
+    /**
+     * Suchmaschine mit dem neuen Modell neu starten und Index neu aufbauen.
+     * Läuft komplett im Hintergrund, die Seite bleibt bedienbar.
+     */
+    private fun reloadEngine() {
+        progress.visibility = View.VISIBLE
+        tvEngine.text = getString(R.string.ai_loading)
+        Thread({
+            AiEngine.prepare(applicationContext, force = true)
+            SearchIndex.invalidate(applicationContext)
+            SearchIndex.warmUp(applicationContext)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                val st = AiEngine.currentStatus()
+                lastStatus = st
+                showEngineStatus(st)
+                refreshModelBox(st)
+                if (!SearchIndex.isRunning()) progress.visibility = View.GONE
+                // 1.42: Im Personen-Modus neu einbetten (neues Modell = neuer Vektorraum)
+                val uri = personsUri
+                if (uri != null) startPersonsSearch(uri) else search()
+            }
+        }, "n3-engine-reload").apply { isDaemon = true }.start()
+    }
+
+    // ------------------------------------------------------------------ Statuszeile
+
+    /**
+     * Statuszeile – **immer vollständig**: wer rechnet, mit welchem Beschleuniger, und wie
+     * weit der Index ist. So bleibt sie zwischen zwei Durchläufen stehen statt zu flackern.
+     */
+    private fun showEngineStatus(
+        status: AiEngine.Status,
+        done: Int = SearchIndex.progress().first,
+        total: Int = SearchIndex.progress().second,
+        building: Boolean = SearchIndex.isRunning()
+    ) {
+        lastStatus = status
+        val (prefix, label) = when (status.accelerator) {
+            AiEngine.Accelerator.NPU -> "⚡" to status.accelerator.label
+            AiEngine.Accelerator.GPU -> "◆" to status.accelerator.label
+            AiEngine.Accelerator.CPU -> "●" to status.accelerator.label
+            AiEngine.Accelerator.LOCAL -> "◦" to getString(R.string.ai_engine_local)
+        }
+        val engine = getString(R.string.ai_engine_status, prefix, status.modelName, label) +
+            if (status.detail.isNotBlank()) " · ${status.detail}" else ""
+        val base = if (status.modelInstalled && status.failure.isNotBlank()) {
+            getString(R.string.ai_engine_failed, engine, status.failure)
+        } else {
+            engine
+        }
+        tvEngine.text = when {
+            building && total > 0 -> getString(R.string.ai_status_building, base, done, total)
+            building -> getString(R.string.ai_status_building_unknown, base)
+            else -> base
+        }
+    }
+
+    private fun buildSuggestions() {
+        suggestions.removeAllViews()
+        val ideas = listOf(
+            R.string.search_idea_beach,
+            R.string.search_idea_food,
+            R.string.search_idea_screenshot,
+            R.string.search_idea_person,
+            R.string.search_idea_mountain,
+            R.string.search_idea_pet
+        )
+        for (id in ideas) {
+            val chip = Chip(this).apply {
+                text = getString(id)
+                isCheckable = false
+                isClickable = true
+                setOnClickListener {
+                    queryEdit.setText(text)
+                    queryEdit.setSelection(text.length)
+                    runSearch(text.toString())
+                }
+            }
+            suggestions.addView(chip)
+        }
+    }
+
+    // ------------------------------------------------------------------ Suche
+
+    /** Sucht mit dem aktuellen Inhalt des Eingabefelds. */
+    private fun search() {
+        runSearch(queryEdit.text?.toString().orEmpty())
+    }
+
+    /**
+     * Suche ausführen – **vollständig im Hintergrund**.
+     *
+     * In 1.34 lief die klassische Suche (Dateiname, Ordner, Notizen …) noch auf dem
+     * Haupt-Thread: Bei jedem Tastendruck wurde die Beschreibung **jedes** Fotos neu gebaut
+     * (inklusive Datenbankzugriff für den Ort). Bei einigen tausend Fotos stand die App dabei
+     * – genau das war das „Einfrieren nach der Suche“. Jetzt rechnet alles im Hintergrund,
+     * und die Treffer kommen als fertige Liste zurück.
+     */
+    private fun runSearch(rawQuery: String) {
+        val query = rawQuery.trim()
+        val token = ++searchToken
+        if (query.length < 2) {
+            results = emptyList()
+            adapter.submitItems(emptyList())
+            emptyBox.visibility = View.GONE
+            return
+        }
+        Thread({
+            // Modell nur vorbereiten, wenn noch nichts läuft (prepare ist sonst billig)
+            if (!AiEngine.ready()) AiEngine.prepare(applicationContext)
+            // Klassische Suche: gleicher Wortlaut in Name/Ordner/Notizen/Tags/Format
+            val plain = runCatching { classicSearch(query) }.getOrDefault(emptyList())
+            // KI-Suche in derselben Reihenfolge wie die Ähnlichkeit (beste zuerst)
+            val ai = runCatching { SearchIndex.search(query) }.getOrDefault(emptyList())
+            // **Nicht mehr mischen, sondern rangieren** (1.39): Vorher kamen erst alle
+            // Wort-Treffer, dann alle KI-Treffer. Ein Bild, das die KI als besten Treffer
+            // sieht, landete dadurch hinter jedem zufälligen Dateinamen-Treffer – genau
+            // darum fühlte sich die Suche schwächer an als in AI Edge Studio.
+            val list = rankResults(plain, ai)
+            main.post {
+                if (token != searchToken || isFinishing || isDestroyed) return@post
+                results = list
+                adapter.submitItems(list)
+                if (list.isEmpty()) {
+                    emptyBox.visibility = View.VISIBLE
+                    tvEmptyTitle.text = getString(R.string.search_empty_title)
+                    tvEmptySub.text = emptyHint()
+                } else {
+                    emptyBox.visibility = View.GONE
+                }
+                // Statuszeile auffrischen: zeigt jetzt auch, wie weit der Index ist
+                lastStatus?.let { showEngineStatus(it) }
+            }
+        }, "n3-search").apply { isDaemon = true }.start()
+    }
+
+    /** Hinweis im leeren Zustand – nennt den echten Grund, nicht nur „nichts gefunden“. */
+    private fun emptyHint(): String {
+        val st = lastStatus ?: AiEngine.currentStatus()
+        val problem = SearchIndex.lastError()
+        return when {
+            problem.isNotBlank() -> getString(R.string.search_empty_error, problem)
+            SearchIndex.isRunning() -> getString(R.string.search_empty_indexing)
+            st.modelInstalled && st.failure.isNotBlank() ->
+                getString(R.string.search_empty_error, st.failure)
+
+            !st.modelInstalled -> getString(R.string.search_empty_no_model)
+            else -> getString(R.string.search_empty_hint)
+        }
+    }
+
+    /**
+     * Rangliste aus beiden Wegen: Wort-Treffer und KI-Treffer werden **verschmolzen und
+     * nach Güte sortiert**, nicht aneinandergehängt. Die Logik sitzt in
+     * [com.n3vibecode.gallery.ai.SearchRanking] und ist dort mit Tests abgesichert.
+     */
+    private fun rankResults(plain: List<MediaItem>, ai: List<MediaItem>): List<MediaItem> =
+        com.n3vibecode.gallery.ai.SearchRanking.rank(plain, ai) { it.uri }
+
+    /**
+     * Wortsuche mit **Teilwörtern und Umlaut-Toleranz**: „strand“ findet „Strandbad“,
+     * „grun“ findet „grün“, und mehrere Wörter dürfen in beliebiger Reihenfolge vorkommen.
+     */
+    private fun classicSearch(query: String): List<MediaItem> =
+        DataHub.all.filter { item ->
+            com.n3vibecode.gallery.ai.SearchRanking.matches(
+                query, SearchIndex.describeCached(this, item)
+            )
+        }
+
+    companion object {
+        private const val REQ_PICK_MODEL = 4711
+
+        /** Foto-Verweis für den Personen-Modus („ähnliche Fotos“). */
+        const val EXTRA_SIMILAR_TO = "similar_to"
+    }
+}

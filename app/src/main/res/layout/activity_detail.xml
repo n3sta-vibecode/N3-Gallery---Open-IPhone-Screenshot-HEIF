@@ -1,4 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Vollbild-Ansicht – aufgebaut wie die Foto-Apps von Samsung / Google / Apple:
+
+      • Oben: nur zurück, Dateiname und Zähler.
+      • Unten: die Knöpfe (Details, Bearbeiten, Teilen, Favorit, Löschen) – wie in
+        Samsung Gallery und Apple Fotos am unteren Rand.
+      • Hochwischen irgendwo im Foto (oder „Details“ antippen) öffnet unten ein Blatt
+        mit den wichtigsten Metadaten, einer kleinen Karte und dem Notizfeld.
+        „Alle Metadaten“ führt zur Vollbild-Metadaten-Seite.
+
+    Das alte, den ganzen Bildschirm füllende Metadaten-Blatt ist damit weg: Die
+    wichtigsten Angaben stehen jetzt **unten**, wo man den Daumen hat.
+-->
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -12,7 +25,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Kopfzeile (sichtbar, solange das Info-Blatt geschlossen ist) -->
+    <!-- Kopfzeile: zurück, Dateiname, Zähler. Beim Antippen des Fotos ein-/ausblendbar. -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
@@ -44,77 +57,176 @@
             android:singleLine="true"
             android:textColor="#FFFFFFFF"
             android:textSize="15sp" />
-
-        <ImageButton
-            android:id="@+id/btnEdit"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/editor_title"
-            android:src="@drawable/ic_brush"
-            android:tint="#FFFFFFFF" />
-
-        <ImageButton
-            android:id="@+id/btnFav"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/favorite"
-            android:src="@drawable/ic_heart_outline"
-            android:tint="#FFFFFFFF" />
-
-        <ImageButton
-            android:id="@+id/btnShare"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/share"
-            android:src="@drawable/ic_share"
-            android:tint="#FFFFFFFF" />
-
-        <!-- Löschen immer erreichbar: vorher gab es den Knopf nur als letztes Element
-             einer seitlich scrollbaren Reihe im hochziehbaren Blatt – also praktisch
-             unsichtbar. -->
-        <ImageButton
-            android:id="@+id/btnTrash"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/delete"
-            android:src="@drawable/ic_delete"
-            android:tint="#FFFFFFFF" />
-
-        <ImageButton
-            android:id="@+id/btnInfo"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/info"
-            android:src="@drawable/ic_info"
-            android:tint="#FFFFFFFF" />
     </LinearLayout>
 
-    <!-- Info-/EXIF-Blatt: Ziehen nach oben = alle Details, nach unten = schließen -->
+    <!--
+        Untere Knopfleiste wie in Samsung Gallery / Apple Fotos:
+        Details · Bearbeiten · Teilen · Favorit · Löschen.
+        (Vorher standen Bearbeiten/Favorit/Teilen/Löschen oben – dort ist kein Daumen.)
+    -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#66000000"
+        android:orientation="horizontal"
+        android:paddingTop="6dp"
+        android:paddingBottom="8dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <ImageButton
+                android:id="@+id/btnSheetInfo"
+                android:layout_width="46dp"
+                android:layout_height="42dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/key_facts"
+                android:src="@drawable/ic_info"
+                android:tint="#FFFFFFFF" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/action_details"
+                android:textColor="#E6FFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <ImageButton
+                android:id="@+id/btnEdit"
+                android:layout_width="46dp"
+                android:layout_height="42dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/editor_title"
+                android:src="@drawable/ic_brush"
+                android:tint="#FFFFFFFF" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/action_edit_short"
+                android:textColor="#E6FFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <ImageButton
+                android:id="@+id/btnShare"
+                android:layout_width="46dp"
+                android:layout_height="42dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/share"
+                android:src="@drawable/ic_share"
+                android:tint="#FFFFFFFF" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/share"
+                android:textColor="#E6FFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <ImageButton
+                android:id="@+id/btnFav"
+                android:layout_width="46dp"
+                android:layout_height="42dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/favorite"
+                android:src="@drawable/ic_heart_outline"
+                android:tint="#FFFFFFFF" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/favorite_short"
+                android:textColor="#E6FFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <ImageButton
+                android:id="@+id/btnTrash"
+                android:layout_width="46dp"
+                android:layout_height="42dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/delete"
+                android:src="@drawable/ic_delete"
+                android:tint="#FFFFFFFF" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/delete"
+                android:textColor="#E6FFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!--
+        Blatt „Wichtigste Angaben“: Hochwischen irgendwo im Foto oder „Details“ unten.
+        Passt sich dem Inhalt an (fitToContents) – es nimmt nur so viel Platz unten ein,
+        wie die Angaben brauchen. Darin: kleine Karte, Kern-Angaben, Notizfeld und
+        Knöpfe für alles Weitere.
+    -->
     <LinearLayout
         android:id="@+id/sheet"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:background="@drawable/bg_sheet"
         android:orientation="vertical"
-        app:behavior_fitToContents="false"
+        app:behavior_fitToContents="true"
         app:behavior_hideable="true"
         app:behavior_peekHeight="0dp"
         app:behavior_skipCollapsed="true"
+        android:visibility="gone"
         app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
         <View
             android:id="@+id/sheetHandle"
             android:layout_width="44dp"
-            android:layout_height="10dp"
+            android:layout_height="5dp"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="2dp"
+            android:layout_marginBottom="4dp"
             android:background="@drawable/bg_handle" />
 
         <LinearLayout
@@ -151,15 +263,6 @@
                     android:paddingBottom="4dp"
                     android:textColor="@color/n3_on_surface_variant"
                     android:textSize="12sp" />
-
-                <TextView
-                    android:id="@+id/tvSheetHint"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingBottom="4dp"
-                    android:text="@string/sheet_hint"
-                    android:textColor="@color/n3_accent"
-                    android:textSize="11sp" />
             </LinearLayout>
 
             <ImageButton
@@ -172,11 +275,68 @@
                 android:tint="@color/n3_on_surface_variant" />
         </LinearLayout>
 
+        <!--
+            Notizfeld wie in Apple Fotos („Beschreibung hinzufügen“): Antippen öffnet den
+            Notiz-Dialog, der Notiz und Tags bearbeitet und auf Wunsch direkt in die
+            EXIF-/XMP-Daten der Datei schreibt.
+        -->
+        <LinearLayout
+            android:id="@+id/noteCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="14dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_map_card"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/meta_note"
+                android:textColor="@color/n3_on_surface_variant"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:minLines="1"
+                android:textColor="@color/n3_on_bg"
+                android:textSize="14sp"
+                android:text="@string/note_add_hint" />
+        </LinearLayout>
+
+        <!-- Die wichtigsten Angaben (Datum, Ort, Kamera, Auflösung, Format …) -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clipToPadding="false"
+            android:overScrollMode="ifContentScrolls"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:paddingBottom="8dp"
+            android:scrollbars="vertical">
+
+            <LinearLayout
+                android:id="@+id/metaContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </androidx.core.widget.NestedScrollView>
+
+        <!-- Weitere Knöpfe: alle Metadaten, Karte, EXIF kopieren -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingStart="14dp"
             android:paddingEnd="14dp"
+            android:paddingBottom="10dp"
             android:scrollbars="none">
 
             <LinearLayout
@@ -184,18 +344,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnDelete"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp"
-                    android:text="@string/delete"
-                    android:textColor="?attr/colorError"
-                    android:textSize="12sp"
-                    app:icon="@drawable/ic_delete"
-                    app:iconTint="?attr/colorError"
-                    app:iconSize="16dp" />
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnMetaPage"
                     style="@style/Widget.Material3.Button.TonalButton"
@@ -207,19 +355,32 @@
                     android:textStyle="bold"
                     app:icon="@drawable/ic_info"
                     app:iconSize="16dp" />
+
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnPhotoEdit"
+                    android:id="@+id/btnMap"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="6dp"
-                    android:text="@string/editor_title"
+                    android:text="@string/map_title"
                     android:textSize="12sp"
                     android:textStyle="bold"
-                    app:icon="@drawable/ic_brush"
+                    app:icon="@drawable/ic_map"
                     app:iconSize="16dp" />
+
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnNote"
+                    android:id="@+id/btnCopy"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="@string/exif_copy"
+                    android:textSize="12sp"
+                    app:icon="@drawable/ic_copy"
+                    app:iconSize="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTags"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -228,42 +389,18 @@
                     android:textSize="12sp"
                     app:icon="@drawable/ic_edit"
                     app:iconSize="16dp" />
+
+                <!-- 1.42: 2. Modell – Fotos mit denselben Personen finden (Bild-Einbettung, NPU) -->
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnCopy"
+                    android:id="@+id/btnPersons"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp"
-                    android:text="EXIF kopieren"
+                    android:text="@string/persons_title"
                     android:textSize="12sp"
-                    app:icon="@drawable/ic_copy"
+                    app:icon="@drawable/ic_person"
                     app:iconSize="16dp" />
             </LinearLayout>
         </HorizontalScrollView>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="8dp"
-            android:background="@color/n3_divider" />
-
-        <androidx.core.widget.NestedScrollView
-            android:id="@+id/scroll"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:overScrollMode="ifContentScrolls"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:paddingBottom="40dp"
-            android:scrollbars="vertical">
-
-            <LinearLayout
-                android:id="@+id/metaContainer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </androidx.core.widget.NestedScrollView>
     </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

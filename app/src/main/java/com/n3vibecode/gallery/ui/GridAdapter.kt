@@ -65,19 +65,29 @@ class GridAdapter(
     fun setSpan(newSpan: Int) {
         val s = newSpan.coerceAtLeast(1)
         if (s == spanCount) return
+        val oldTiny = tiny
+        val oldPad = padPx
         spanCount = s
         measureTiles(null)
-        // Nur die sichtbaren Kacheln neu binden – kein kompletter Neuaufbau der Liste.
-        notifyItemRangeChanged(0, itemCount)
+        // 1.42 „mega flüssig“: Beim Spaltenwechsel werden nicht mehr ALLE Zeilen neu
+        // gebunden (das war die Hauptarbeit beim Zoomen). Die Kachelgröße ergibt sich
+        // aus dem Layout (match_parent); nur Deko-Details hängen von der Spaltenzahl ab
+        // und werden billig per Payload aktualisiert.
+        if (oldTiny != tiny || oldPad != padPx) {
+            notifyItemRangeChanged(0, itemCount, PAYLOAD_SPAN)
+        }
     }
 
     private fun measureTiles(anyView: View?) {
         val res = anyView?.resources ?: appResources ?: return
         val dm = res.displayMetrics
-        val w = (dm.widthPixels - 24 * dm.density) / spanCount
+        // 1.38: randloses Raster – die 3-dp-Ränder des Recyclers werden mitgerechnet,
+        // damit die Kacheln wirklich bis an den Bildschirmrand gehen.
+        val w = (dm.widthPixels - 6 * dm.density) / spanCount
         thumbPx = (w * 1.3f).toInt().coerceIn(64, 1024)
         tiny = spanCount >= 12
-        padPx = if (tiny) 1 else dm.density.toInt().coerceAtLeast(1)
+        // Randlos wie in einer Foto-App: nur ein Hauch Abstand, nie mehr als 1 dp.
+        padPx = if (tiny) 0 else (dm.density * 0.5f).toInt().coerceAtLeast(0)
     }
 
     private var appResources: android.content.res.Resources? = null
@@ -223,35 +233,11 @@ class GridAdapter(
                     measureTiles(holder.itemView)
                 }
 
-                // setPadding löst jedes Mal einen Layout-Durchlauf aus – beim Scrollen
-                // unnötige Arbeit, deshalb nur bei echter Änderung setzen.
-                if (h.itemView.paddingLeft != padPx) {
-                    h.itemView.setPadding(padPx, padPx, padPx, padPx)
-                }
                 // ImageLoader zeigt sofort eine vorhandene Stufe oder den Platzhalter und
                 // lädt dann nach – das Bild wird NICHT vorher geleert.
                 ImageLoader.into(holder.itemView.context, item, thumbPx, h.image)
 
-                val badgeText = when {
-                    item.isVideoFile && item.durationMs > 0 -> Fmt.duration(item.durationMs)
-                    item.isVideoFile -> "VIDEO"
-                    item.isRaw || item.isHeif || item.isAvif || item.isVector -> item.format
-                    else -> null
-                }
-                if (badgeText != null && !tiny) {
-                    if (h.badge.text != badgeText) h.badge.text = badgeText
-                    h.badge.visibility = View.VISIBLE
-                } else {
-                    h.badge.visibility = View.GONE
-                }
-
-                h.fav.visibility =
-                    if (!tiny && MetaStore.isFavorite(item.uri)) View.VISIBLE else View.GONE
-                h.iconOverlay.visibility =
-                    if (!tiny && item.isVideoFile) View.VISIBLE else View.GONE
-                if (h.iconOverlay.visibility == View.VISIBLE) {
-                    h.iconOverlay.setImageResource(R.drawable.ic_play)
-                }
+                bindDecorations(h, item)
 
                 // Antippen: Position kommt direkt aus der Zeile – dadurch öffnet sich
                 // garantiert genau dieses Foto, unabhängig von anderen Listen im Speicher.
@@ -264,10 +250,64 @@ class GridAdapter(
         }
     }
 
+    /**
+     * Spaltenwechsel während des Zoomens: nur Badge/Rand/Favorit aktualisieren –
+     * kein neues Bild laden, kein Neu-Binden des ganzen Eintrags.
+     */
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder,
+        position: Int,
+        payloads: MutableList<Any>
+    ) {
+        val row = differ.currentList.getOrNull(position)
+        if (payloads.isNotEmpty() && payloads.contains(PAYLOAD_SPAN) &&
+            holder is ItemHolder && row is Row.Entry
+        ) {
+            bindDecorations(holder, row.item)
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
+    }
+
+    /**
+     * Alles, was von der Spaltenzahl abhängt: Rand, Badge (nur noch Videolänge –
+     * 1.42: das Dateiformat steht nicht mehr auf den Kacheln), Favorit, Play-Symbol.
+     */
+    private fun bindDecorations(h: ItemHolder, item: MediaItem) {
+        // setPadding löst jedes Mal einen Layout-Durchlauf aus – nur bei echter Änderung setzen.
+        if (h.itemView.paddingLeft != padPx) {
+            h.itemView.setPadding(padPx, padPx, padPx, padPx)
+        }
+
+        val badgeText = when {
+            // 1.42: Nur die Videolänge bleibt (wie in Samsung/Google/Apple) – RAW/HEIC/AVIF
+            // stehen nicht mehr auf den Kacheln, wenn man mehrere Fotos anschaut.
+            item.isVideoFile && item.durationMs > 0 -> Fmt.duration(item.durationMs)
+            else -> null
+        }
+        if (badgeText != null && !tiny) {
+            if (h.badge.text != badgeText) h.badge.text = badgeText
+            h.badge.visibility = View.VISIBLE
+        } else {
+            h.badge.visibility = View.GONE
+        }
+
+        h.fav.visibility =
+            if (!tiny && MetaStore.isFavorite(item.uri)) View.VISIBLE else View.GONE
+        h.iconOverlay.visibility =
+            if (!tiny && item.isVideoFile) View.VISIBLE else View.GONE
+        if (h.iconOverlay.visibility == View.VISIBLE) {
+            h.iconOverlay.setImageResource(R.drawable.ic_play)
+        }
+    }
+
     companion object {
         private const val TYPE_HEADER = 0
         private const val TYPE_ITEM = 1
         private const val TYPE_BANNER = 2
+
+        /** Payload: nur Deko-Details (Badge/Rand) sind nach einem Spaltenwechsel neu. */
+        private const val PAYLOAD_SPAN = "span"
 
         private val DIFF = object : DiffUtil.ItemCallback<Row>() {
             override fun areItemsTheSame(oldItem: Row, newItem: Row): Boolean = oldItem.id == newItem.id

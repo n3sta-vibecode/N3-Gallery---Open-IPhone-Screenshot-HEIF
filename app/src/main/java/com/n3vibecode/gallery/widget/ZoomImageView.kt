@@ -35,6 +35,13 @@ class ZoomImageView @JvmOverloads constructor(
     /** Wischt man (ohne Zoom) nach unten → Übersicht. */
     var onSwipeDownBack: (() -> Unit)? = null
 
+    /** 1.42: Hochwischen im Foto öffnet die wichtigsten Metadaten (Blatt unten). */
+    var onSwipeUp: (() -> Unit)? = null
+
+    /** Wie weit muss das Hochwischen gehen, bevor es zählt? (40 dp) */
+    private val swipeUpSlopPx: Int
+        get() = (40 * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+
     private val drawMatrix = Matrix()
     private val baseMatrix = Matrix()
 
@@ -247,6 +254,11 @@ class ZoomImageView @JvmOverloads constructor(
                     if (dy > height * 0.18f && dy > kotlin.math.abs(dx) * 1.4f) {
                         downSwipeFired = true
                         onSwipeDownBack?.invoke()
+                    } else if (dy < -swipeUpSlopPx && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.4f) {
+                        // 1.42: Hochwischen irgendwo im Foto öffnet die wichtigsten
+                        // Metadaten (Blatt unten, wie Samsung/Google/Apple).
+                        downSwipeFired = true
+                        onSwipeUp?.invoke()
                     }
                 }
                 return true

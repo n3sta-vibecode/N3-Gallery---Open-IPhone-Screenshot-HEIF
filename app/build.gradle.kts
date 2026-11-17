@@ -22,8 +22,8 @@ android {
         applicationId = "com.n3vibecode.gallery"
         minSdk = 26
         targetSdk = 35
-        versionCode = 32
-        versionName = "1.31"
+        versionCode = 43
+        versionName = "1.42"
         resourceConfigurations += listOf("de", "en")
         vectorDrawables.useSupportLibrary = true
 
@@ -96,6 +96,11 @@ android {
         }
     }
 
+    testOptions {
+        // Reine Logik-Tests (Reflection, Größenprüfung, Suche) laufen ohne Gerät in CI.
+        unitTests.isReturnDefaultValues = true
+    }
+
     lint {
         abortOnError = false
         checkReleaseBuilds = false
@@ -105,6 +110,15 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+// LiteRT-LM-Version hart festlegen. Grund: tasks-retrieval 1.2.3 bringt 0.17.0-alpha1 mit,
+// ist aber gegen 0.18+ gebaut (ActivationDataType/InputData fehlen in der alten Fassung).
+// "force" gewinnt auch gegen eine exakte Angabe der Bibliothek.
+configurations.all {
+    resolutionStrategy {
+        force("com.google.ai.edge.litertlm:litertlm-android:0.19.1")
     }
 }
 
@@ -127,6 +141,49 @@ dependencies {
     // damit werden SVG/SVGZ-Dateien in der gewünschten Größe gerendert (verlustfrei,
     // weil Vektorgrafik).
     implementation("com.caverock:androidsvg-aar:1.4")
+
+    // Bildersuche mit **EmbeddingGemma 2** (Google AI Edge / MediaPipe Tasks).
+    // `tasks-retrieval` bringt den UniversalEmbedder mit (multimodal, LiteRT-LM).
+    // Rechnet auf GPU, sonst CPU – siehe ai/GemmaEmbedder.kt.
+    // WICHTIG: Ohne diese Bibliothek baut die App trotzdem – die Suche nutzt dann
+    // automatisch das eingebaute Wortmodell (siehe ai/AiEngine.kt).
+    // Die von MediaPipe mitgelieferte LiteRT-LM-Version wird hier ausgeschlossen: Sie ist zu
+    // alt (siehe unten) und wurde von Gradle auch gegen eine neuere Angabe durchgesetzt –
+    // ohne exclude kam trotz eigener Version 0.17.0 im Ergebnis heraus.
+    implementation("com.google.mediapipe:tasks-retrieval:1.2.3") {
+        exclude(group = "com.google.ai.edge.litertlm", module = "litertlm-android")
+    }
+
+    // **Feste LiteRT-LM-Version – der eigentliche Fehler bis 1.36.**
+    // tasks-retrieval:1.2.3 deklariert selbst litertlm-android:0.17.0-alpha1, ist aber
+    // gegen eine neuere Fassung gebaut: Der Konstruktor von EmbeddingEngineConfig hat dort
+    // 9 Parameter (mit ActivationDataType), in 0.17.0-alpha1 nur 8 – die Klasse
+    // com.google.ai.edge.litertlm.ActivationDataType existiert gar nicht. Folge auf dem
+    // Gerät: „NoClassDefFoundError: com.google.ai.edge.litertlm.ActivationDataType“ und die
+    // Suche fiel auf das Wortmodell zurück. Ab 0.18.0 ist alles vorhanden (in CI geprüft:
+    // 0.18.0 / 0.18.1 / 0.19.0 / 0.19.1 – deshalb die neueste stabile).
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.19.1")
+
+    // **1.42 – NPU-Support („beide Modelle auf NPU“).**
+    // Die reine LiteRT-LM-Bibliothek kann die NPU nicht starten – ihr fehlt der
+    // Dispatch-Teil. Für Qualcomm-Chipsätze (Galaxy S25 Ultra = SM8750) gehören diese
+    // beiden Pakete in die App:
+    //   • litert-npu-runtime-qualcomm (Google Maven): libLiteRtDispatch_Qualcomm.so +
+    //     libLiteRt.so und der Compiler-Anschluss an den Hexagon-DSP.
+    //   • qnn-runtime (Qualcomm, Maven Central): die QNN-Bibliotheken (libQnnHtp,
+    //     libQnnSystem, libQnnHtpV79Stub und die .skel-Teile) – ohne sie bricht die NPU
+    //     mit „No usable Dispatch runtime found“ ab (LiteRT-Ausgabe #6889).
+    // Beide müssen aus einer QAIRT-Version stammen – deshalb auf 2.3.0/2.50.0 gepinnt.
+    // Auf Geräten ohne Qualcomm-NPU schadet der Zusatz nichts: Die Bibliotheken liegen
+    // nur ungenutzt im APK, die App prüft den Chipsatz, bevor sie die NPU startet.
+    // Achtung: nie eine zweite Dispatch-Bibliothek eines anderen Herstellers dazupacken
+    // (die zuerst geladene gewinnt, siehe LiteRT-Ausgabe #11250). Das APK wächst um
+    // etwa 60 MB – der Preis dafür, dass die Modelle wirklich auf der NPU rechnen.
+    implementation("com.google.ai.edge.litert:litert-npu-runtime-qualcomm:2.3.0")
+    implementation("com.qualcomm.qti:qnn-runtime:2.50.0")
+
+    // Tests: reine JVM-Unit-Tests (laufen in CI mit `gradlew test`)
+    testImplementation("junit:junit:4.13.2")
 
     // Eingebauter HEIF/AVIF-Decoder (libheif + libde265 + libdav1d).
     // Ohne ihn kann Android nur "einfache" HEICs öffnen – gekachelte Apple-Container

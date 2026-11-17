@@ -1,6 +1,7 @@
 package com.n3vibecode.gallery
 
 import android.app.Application
+import com.n3vibecode.gallery.util.AppVisibility
 import com.n3vibecode.gallery.util.Fmt
 import java.io.File
 
@@ -16,6 +17,8 @@ class GalleryApp : Application() {
         super.onCreate()
         instance = this
         Fmt.appContext = this
+        // Wann ist die App sichtbar? (Index-Arbeit drosseln, siehe SearchIndex)
+        AppVisibility.install(this)
         // Notizen/Tags/Favoriten im Hintergrund wiederherstellen, falls die App neu
         // installiert wurde (sie liegen sonst nur in den App-Einstellungen).
         Thread({
@@ -23,6 +26,12 @@ class GalleryApp : Application() {
             // Danach die Sicherung anlegen, falls noch keine da ist: So ist sie schon
             // vorhanden, bevor jemand die App deinstalliert.
             runCatching { com.n3vibecode.gallery.data.MetaBackup.saveIfAny() }
+            // Ortsliste (Karte + Ortsnamen in der Suche) im Hintergrund bereitstellen
+            runCatching { com.n3vibecode.gallery.map.GeoIndex.warmUp(this) }
+            // Jedes neue Scanergebnis löst den (inkrementellen) Suchindex aus
+            com.n3vibecode.gallery.data.DataHub.onLibraryChanged = {
+                com.n3vibecode.gallery.ai.SearchIndex.warmUp(this, delayMs = 2500)
+            }
         }, "n3-meta-restore").apply { priority = Thread.MIN_PRIORITY; isDaemon = true }.start()
     }
 

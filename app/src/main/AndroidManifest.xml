@@ -18,6 +18,12 @@
     <!-- Unzensierte GPS-Daten lesen (Android 10+) -->
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
 
+    <!-- Suchmodell (EmbeddingGemma 2, ~163 MB bis 1,3 GB) einmalig herunterladen.
+         Die App geht NUR dafür online – ausgelöst durch den Knopf in der Bildersuche.
+         Ohne Download funktioniert die Suche mit dem eingebauten Wortmodell. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- Bewusst KEINE INTERNET-Berechtigung: die App arbeitet zu 100 % offline. -->
 
     <application
@@ -43,6 +49,20 @@
             <!-- Bilder direkt aus anderen Apps öffnen ("Öffnen mit -> N3 Photos") -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <!-- Fotos aus anderen Apps ANNEHMEN: „Teilen“ in Galerie/Kamera/Messenger.
+                 Einzelbild (SEND) und mehrere Bilder (SEND_MULTIPLE) landen in der
+                 Übernahme-Ansicht (ShareInActivity). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="image/*" />
             </intent-filter>
@@ -73,6 +93,30 @@
             android:exported="false"
             android:label="@string/meta_page_title"
             android:parentActivityName=".ui.MainActivity"
+            android:theme="@style/Theme.N3Gallery" />
+
+        <!-- Karte: zeigt, wo die Fotos entstanden sind (offline, ohne Kartendienst) -->
+        <activity
+            android:name=".ui.MapActivity"
+            android:exported="false"
+            android:label="@string/map_title"
+            android:parentActivityName=".ui.MainActivity"
+            android:theme="@style/Theme.N3Gallery" />
+
+        <!-- Bildersuche mit Gemma-Embedding (NPU/GPU/CPU) -->
+        <activity
+            android:name=".ui.ShareInActivity"
+            android:exported="false"
+            android:label="@string/share_received"
+            android:parentActivityName=".ui.MainActivity"
+            android:theme="@style/Theme.N3Gallery" />
+
+        <activity
+            android:name=".ui.SearchActivity"
+            android:exported="false"
+            android:label="@string/search_title"
+            android:parentActivityName=".ui.MainActivity"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.N3Gallery" />
 
         <activity
