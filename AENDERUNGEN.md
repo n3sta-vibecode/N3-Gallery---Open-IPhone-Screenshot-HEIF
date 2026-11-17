@@ -1,5 +1,52 @@
 # N3 Gallery – was neu ist
 
+## 1.41 – Sperrbilder, NPU, Samsung-Kopf, alle Metadaten
+
+### 🚫 „Access blocked“ auf der Karte – Ursache und Lösung
+
+Die OSM-Kachelserver liefern Apps, die nicht in ihrer Freigabeliste stehen, **kein 403 ohne
+Inhalt**, sondern ein **Bild mit dem Text „Access blocked“** – HTTP 403 mit gültigem PNG.
+Genau das war auf dem Gerät zu sehen: ein Raster aus Sperrbildern.
+
+Behoben:
+
+* `tile.openstreetmap.org` und `*.tile.openstreetmap.fr` werden **nicht mehr gefragt**
+  (beide gesperrt). Es bleibt `tile.openstreetmap.de` – die Auslieferung des deutschen
+  OSM-Vereins, die für Anwendungen freigegeben ist.
+* Sperrbilder werden **erkannt** (klein, sehr wenige Farbtöne) und **nicht gespeichert** –
+  sonst bliebe das Raster im Zwischenspeicher für immer.
+* Fällt der Server aus, zeichnet die Karte die Offline-Karte und sagt es.
+
+### ⚡ Nur NPU, kein stiller Rückfall
+
+`GemmaEmbedder.NPU_ONLY = true`: das Modell rechnet ausschließlich über `Backend.NPU` von
+LiteRT-LM. Gibt es keine NPU, wird **nicht** auf GPU/CPU ausgewichen; stattdessen steht in
+der Statuszeile „NPU nicht aktiv – es wird nur die Wortsuche benutzt“ und der Modelltest
+nennt den Grund. So ist immer sichtbar, was wirklich rechnet.
+
+### 📋 Metadaten auf Samsung-Niveau
+
+Neuer erster Block **„Aufnahme-Daten“** genau in der Reihenfolge der Referenz:
+
+| Zeile | Inhalt |
+| --- | --- |
+| Aufgenommen | „Montag, 16. November 2026 · 17:15“ (Wochentag aus der EXIF-Zeit) |
+| Datei / Pfad | Dateiname und Ordner |
+| Kamera | Hersteller + Modell (EXIF oder HEIF-Container) |
+| Objektiv | Objektivart + Kleinbild-Brennweite („Ultraweitwinkel · 13 mm“) |
+| Größe | `1,33 MB │ 3000×4000 │ 12MP` |
+| Aufnahme | `ISO 100 │ 23 mm │ 0.0 ev │ F1.9 │ 1/51 s` |
+
+Darunter unverändert alle Kapitel – und der Rohbereich ist jetzt **vollständig**:
+`ExifNames` listet über 150 Felder (TIFF, EXIF, alle GPS-Felder, HEIF-Eigenheiten) plus
+Apple-MakerNote (Bildstil, Linsentyp, Qualität, Aufnahmeart, LDR/HDR-Spielraum …).
+Was nicht sauber lesbar ist, wird **nicht** angezeigt.
+
+### ↕️ Überall hochwischen
+
+Ein senkrechter Wisch nach oben – egal wo auf dem Foto – öffnet die Metadaten. Waagerechtes
+Wischen bleibt der Bildwechsel, Zoomen und Antippen bleiben unverändert.
+
 ## 1.40 – Warum iPhone-Fotos keinen Ort und keinen Sensor zeigten
 
 ### 🔬 Ursache: die EXIF-Daten stecken im Container, nicht im Dateikopf

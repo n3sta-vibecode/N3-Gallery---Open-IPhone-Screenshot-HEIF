@@ -43,18 +43,30 @@ object OsmTiles {
     /** Kachelgröße in Pixeln (OSM-Standard). */
     const val TILE = 256
 
-    private const val UA = "N3Gallery/1.40 (Android; Offline-Galerie mit optionaler Karte)"
+    /**
+     * **Warum die Kacheln „Access blocked“ zeigten (1.41).**
+     *
+     * `tile.openstreetmap.org` und `*.tile.openstreetmap.fr` verweigern Kacheln für Apps,
+     * die nicht in ihrer Liste freigegebener Anwendungen stehen – sie liefern dann ein
+     * **Bild mit dem Text „Access blocked“** und HTTP 403. Genau das war auf dem Gerät zu
+     * sehen: ein Raster aus Sperrbildern.
+     *
+     * `tile.openstreetmap.de` ist die Auslieferung des deutschen OSM-Vereins und für
+     * Anwendungen ausdrücklich freigegeben (solange die Kacheln zwischengespeichert werden
+     * und der User-Agent die App nennt – beides macht diese Klasse). Er ist jetzt der
+     * **einzige** Weg; die gesperrten Server werden nicht mehr gefragt.
+     */
+    private const val UA = "N3Gallery/1.41 (Android; Offline-Fotogalerie)"
 
     /**
-     * Kachel-Server. `tile.openstreetmap.org` ist der Hauptserver und drosselt streng
-     * (HTTP 429); die beiden anderen sind offizielle, für Apps gedachte Auslieferungen
-     * derselben Daten. Ausgewählt wird je Kachel – so verteilt sich die Last.
+     * Kachel-Server: **nur** die für Apps freigegebene Auslieferung.
+     *
+     * `tile.openstreetmap.org` (Politik-Sperre für Apps) und `*.tile.openstreetmap.fr`
+     * (leitet auf den Hauptserver weiter) antworten mit einem Sperrbild. Deshalb steht hier
+     * nur noch `tile.openstreetmap.de`. Fällt er aus, zeigt die Karte die gezeichnete
+     * Offline-Karte – ehrlicher als ein Raster aus Sperrbildern.
      */
-    private val SPIGEL = listOf(
-        "tile.openstreetmap.org",
-        "a.tile.openstreetmap.fr",
-        "tile.openstreetmap.de"
-    )
+    private val SPIGEL = listOf("tile.openstreetmap.de")
 
     private val memory = ConcurrentHashMap<String, Bitmap>()
     private val missing = ConcurrentHashMap.newKeySet<String>()
@@ -76,6 +88,38 @@ object OsmTiles {
     fun hasAnyLoaded(): Boolean = loadedOnce.get()
 
     fun resetError() { lastError = "" }
+
+    /** Wie oft ein Sperrbild kam (für die Anzeige und zum Umschalten auf offline). */
+    private val blockedKacheln = AtomicInteger(0)
+
+    fun blockedCount(): Int = blockedKacheln.get()
+
+    /**
+     * Erkennt das „Access blocked“-Bild der OSM-Sperre.
+     *
+     * Das Bild ist ein PNG mit **sehr wenigen Farben** (Gelb, Schwarz, Weiß) und viel
+     * leerer Fläche – eine echte Kartenkachel hat hunderte Farbtöne und mindestens einige
+     * tausend Byte. Geprüft wird deshalb: dekodierbar, klein in den Bytes, und beim
+     * Herunterskalieren nur eine Handvoll Farbtöne.
+     */
+    fun isBlockNotice(bytes: ByteArray): Boolean {
+        if (bytes.size > 6000) return false
+        val bmp = runCatching {
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }.getOrNull() ?: return false
+        // Sperrbild ist exakt 256×256 wie eine Kachel – entscheidend ist der Inhalt
+        val small = runCatching { Bitmap.createScaledBitmap(bmp, 16, 16, false) }.getOrNull() ?: bmp
+        val colors = HashSet<Int>(32)
+        for (y in 0 until small.height) {
+            for (x in 0 until small.width) {
+                val c = small.getPixel(x, y)
+                // auf 32 Stufen je Kanal runden, sonst zählt JPEG-Rauschen mit
+                colors.add(((c shr 16 and 0xFF) / 32 shl 10) or ((c shr 8 and 0xFF) / 32 shl 5) or (c and 0xFF) / 32)
+                if (colors.size > 24) return false
+            }
+        }
+        return true
+    }
 
     /** Höchstens 4 parallele Anfragen – so verlangt es die OSM-Nutzungsregel. */
     private val pool = Executors.newFixedThreadPool(4) { r ->
@@ -174,6 +218,13 @@ object OsmTiles {
                     // Nur echte PNG-Daten übernehmen (sonst zeichnet die Karte Müll)
                     if (!isPng(bytes)) {
                         lastError = "OSM lieferte kein PNG"
+                        return@execute
+                    }
+                    // Sperrbilder sind echte PNGs mit Text – sie werden am Inhalt erkannt
+                    // und NICHT gespeichert (sonst bleibt das „Access blocked“-Raster).
+                    if (bytes.size < 3000 && isBlockNotice(bytes)) {
+                        blockedKacheln.incrementAndGet()
+                        lastError = "Dieser Karten-Server ist für Apps gesperrt"
                         return@execute
                     }
                     val tmp = File(cacheDir(app), "$z-$x-$y.png.tmp")

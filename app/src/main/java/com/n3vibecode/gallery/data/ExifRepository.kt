@@ -245,6 +245,60 @@ object ExifRepository {
             sections += MetaSection("HEIF/AVIF-Technik", rows)
         }
 
+        // === 2b) Kopf wie in der Samsung-Galerie (1.41) ==========================
+        // Aufbau der Referenz: großes Datum, darunter Dateiname und Pfad, dann Kamera,
+        // Objektiv/Brennweite, eine Größenzeile und eine Zeile mit den Aufnahmewerten.
+        // Diese Werte stehen hier ZUSÄTZLICH als eigener Block ganz oben – die ausführlichen
+        // Kapitel darunter bleiben vollständig („alle Metadaten“).
+        run {
+            val rows = mutableListOf<MetaRow>()
+            val g = heifGeo
+            val w = if (item.width > 0) item.width else heif?.primaryWidth ?: 0
+            val h = if (item.height > 0) item.height else heif?.primaryHeight ?: 0
+            val dtOriginal = runCatching { e?.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) }.getOrNull()
+            val whenText = if (!dtOriginal.isNullOrBlank()) exifDate(dtOriginal) else Fmt.dateTime(item.time)
+            // Großes Datum: „Montag, 16. November 2026 · 17:15“
+            rows += MetaRow("Aufgenommen", Fmt.longDate(whenText, item.time))
+            rows += MetaRow("Datei", item.name)
+            if (item.path.isNotBlank()) rows += MetaRow("Pfad", item.path)
+            val camera = listOfNotNull(
+                (e?.let { rawTag(it, ExifInterface.TAG_MAKE) } ?: g?.make)?.takeIf { it.isNotBlank() },
+                (e?.let { rawTag(it, ExifInterface.TAG_MODEL) } ?: g?.model)?.takeIf { it.isNotBlank() }
+            ).joinToString(" ").replace(Regex("\\s+"), " ").trim()
+            if (camera.isNotBlank()) rows += MetaRow("Kamera", camera)
+
+            // Objektiv mit Kleinbild-Brennweite: „Ultraweitwinkel · 13 mm“
+            val focal35 = (e?.let { rawTag(it, ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM) } ?: g?.focal35?.toString())
+                ?.toIntOrNull()
+            val lensClass = focal35?.let { lensKind(it) }
+            val lensText = listOfNotNull(lensClass, focal35?.let { "$it mm" }).joinToString(" · ")
+            if (lensText.isNotBlank()) rows += MetaRow("Objektiv", lensText)
+
+            // Größenzeile: „1,33 MB | 3000×4000 | 12 MP“
+            val sizeParts = ArrayList<String>(3)
+            if (item.size > 0) sizeParts.add(Fmt.bytes(item.size))
+            if (w > 0 && h > 0) sizeParts.add("$w×$h")
+            if (w > 0 && h > 0) sizeParts.add(megapixelPrecise(w, h).replace(" MP", "MP"))
+            if (sizeParts.isNotEmpty()) rows += MetaRow("Größe", sizeParts.joinToString("  |  "))
+
+            // Aufnahmezeile: „ISO 100 | 23 mm | 0.0 ev | F1.9 | 1/51 s“
+            val shot = ArrayList<String>(5)
+            (e?.let { rawTag(it, ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY) } ?: g?.iso?.toString())
+                ?.takeIf { it.isNotBlank() }?.let { shot.add("ISO $it") }
+            (e?.let { rawTag(it, ExifInterface.TAG_FOCAL_LENGTH) }?.let { Fmt.rational(it) } ?: g?.focalLength?.let {
+                String.format(Locale.GERMAN, "%.0f", it)
+            })?.let { shot.add("$it mm") }
+            (e?.let { rawTag(it, ExifInterface.TAG_EXPOSURE_BIAS_VALUE) }?.let { Fmt.rational(it) })
+                ?.let { shot.add("$it ev") }
+            (e?.let { rawTag(it, ExifInterface.TAG_F_NUMBER) }?.toDoubleOrNull() ?: g?.fNumber)
+                ?.let { shot.add(String.format(Locale.GERMAN, "F%.1f", it)) }
+            (e?.let { rawTag(it, ExifInterface.TAG_EXPOSURE_TIME) }?.let { Fmt.rational(it) } ?: g?.exposureTime)
+                ?.let { shot.add(it) }
+            if (shot.isNotEmpty()) rows += MetaRow("Aufnahme", shot.joinToString("  |  "))
+
+            if (rows.isNotEmpty()) sections += MetaSection("Aufnahme-Daten", rows)
+        }
+
         // === 3) Kamera & Optik =================================================
         if (e != null) {
             val rows = mutableListOf<MetaRow>()
@@ -478,12 +532,33 @@ object ExifRepository {
         }
 
         // === Restliche EXIF-Felder =============================================
+        // 1.41: deutlich vollständiger als vorher – die Liste in [ExifNames] deckt die Felder
+        // ab, die auch Metadata2Go/Metapho zeigen, inklusive Apple-MakerNote und aller
+        // HEIF-Eigenheiten. Was schon in einem Kapitel steht, wird nicht wiederholt.
         val dump = mutableListOf<MetaRow>()
         if (e != null) {
-            for ((tagName, label) in ALL_TAGS) {
+            for ((tagName, label) in ExifNames.ALL) {
                 if (shownTags.contains(tagName)) continue
                 val v = Fmt.cleanExif(runCatching { e.getAttribute(tagName) }.getOrNull()) ?: continue
                 dump += MetaRow(label, v.replace('\n', ' ').take(400))
+            }
+        }
+        // Apple legt seine Zusatzdaten (Bildstil, HDR, Linsentyp …) im MakerNote ab.
+        // Diese Werte werden aus dem HEIF-Container als Klartext gelesen.
+        if (item.isHeif || item.isAvif) {
+            runCatching {
+                ctx.contentResolver.openInputStream(Uri.parse(item.uri))?.use { input ->
+                    val buf = ByteArray(512 * 1024)
+                    var n = 0
+                    while (n < buf.size) {
+                        val r = input.read(buf, n, buf.size - n)
+                        if (r < 0) break
+                        n += r
+                    }
+                    AppleMakerNote.parse(String(buf, 0, n, Charsets.ISO_8859_1))
+                }
+            }.getOrNull()?.forEach { (label, value) ->
+                dump += MetaRow(label, value)
             }
         }
         if (heif != null) {
@@ -776,37 +851,8 @@ object ExifRepository {
         out.format(inFmt.parse(v) ?: Date(0))
     }.getOrDefault(v)
 
-    private val ALL_TAGS: List<Pair<String, String>> = listOf(
-        "ImageWidth" to "Bildbreite", "ImageLength" to "Bildhöhe", "SamplesPerPixel" to "Abtastwerte",
-        "PlanarConfiguration" to "Ebenen-Konfiguration", "YCbCrSubSampling" to "YCbCr-Unterabtastung",
-        "XResolution" to "X-Auflösung", "YResolution" to "Y-Auflösung", "ResolutionUnit" to "Auflösungseinheit",
-        "DateTime" to "Datum/Uhrzeit (Datei)", "DateTimeDigitized" to "Digitalisiert",
-        "OffsetTime" to "Zeitzone (Datei)", "OffsetTimeDigitized" to "Zeitzone (digitalisiert)",
-        "SubSecTime" to "Subsekunden (Datei)", "SubSecTimeDigitized" to "Subsekunden (digitalisiert)",
-        "UserComment" to "Benutzerkommentar", "MakerNote" to "Hersteller-Notizen (MakerNote)",
-        "InteroperabilityIndex" to "Interoperabilität", "FlashpixVersion" to "FlashPix-Version",
-        "ComponentsConfiguration" to "Komponenten-Konfiguration", "PixelXDimension" to "Pixelbreite (EXIF)",
-        "PixelYDimension" to "Pixelhöhe (EXIF)", "RelatedSoundFile" to "Zugehörige Tondatei",
-        "ShutterSpeedValue" to "Verschlusszeit (APEX)", "ApertureValue" to "Blende (APEX)",
-        "BrightnessValue" to "Helligkeit (APEX)", "ExposureMode" to "Belichtungsmodus",
-        "SensitivityType" to "Empfindlichkeitstyp", "StandardOutputSensitivity" to "Standard-Empfindlichkeit",
-        "RecommendedExposureIndex" to "Empfohlener Belichtungsindex", "GainControl" to "Verstärkungsregelung",
-        "SubjectDistanceRange" to "Motivabstandsbereich", "SubjectArea" to "Motivbereich",
-        "ExposureIndex" to "Belichtungsindex", "SpectralSensitivity" to "Spektrale Empfindlichkeit",
-        "GPSVersionID" to "GPS-Version", "GPSStatus" to "GPS-Status", "GPSMeasureMode" to "GPS-Messmodus",
-        "GPSSatellites" to "GPS-Satelliten", "GPSSpeedRef" to "Geschwindigkeitseinheit",
-        "GPSTrack" to "Fahrtrichtung", "GPSImgDirectionRef" to "Blickrichtung (Referenz)",
-        "GPSMapDatum" to "Kartendatum", "GPSAreaInformation" to "GPS-Bereichsinfo",
-        "DNGPrivateData" to "DNG-Privatdaten", "OpcodeList1" to "DNG-Opcode-Liste 1",
-        "OpcodeList2" to "DNG-Opcode-Liste 2", "OpcodeList3" to "DNG-Opcode-Liste 3",
-        "NoiseProfile" to "Rauschprofil", "DefaultCropOrigin" to "Standard-Zuschnitt-Ursprung",
-        "DefaultScale" to "Standard-Skalierung", "BayerGreenSplit" to "Bayer-Grün-Split",
-        "AntiAliasStrength" to "Anti-Alias-Stärke", "ShadowScale" to "Schatten-Skalierung",
-        "BaselineNoise" to "Basis-Rauschen", "BaselineSharpness" to "Basis-Schärfe",
-        "ProfileToneCurve" to "Profil-Tonkurve", "ProfileEmbedPolicy" to "Profil-Einbettung",
-        "ProfileCopyright" to "Profil-Copyright", "PreviewDateTime" to "Vorschau erstellt",
-        "RawDataUniqueID" to "RAW-Kennung", "ThumbnailOffset" to "Miniaturbild-Offset"
-    )
+    /** Veraltetete Liste – ersetzt durch [ExifNames.ALL] (1.41). */
+    private val ALL_TAGS: List<Pair<String, String>> get() = ExifNames.ALL
 
     // ------------------------------------------------------------------ Ort ermitteln
 
@@ -889,6 +935,20 @@ object ExifRepository {
     /** Rohes EXIF-Feld, ohne Übersetzung – für Sensorangaben, die Android nicht als Konstante kennt. */
     private fun rawTag(e: ExifInterface, tag: String): String? =
         Fmt.cleanExif(runCatching { e.getAttribute(tag) }.getOrNull())
+
+    /**
+     * Objektivart aus der Kleinbild-Brennweite – so benennt es auch die Samsung-Galerie.
+     * Unter 20 mm „Ultraweitwinkel“, bis 35 mm „Weitwinkel“, bis 70 mm „Normal“, darüber
+     * „Tele“, ab 135 mm „Super-Tele“.
+     */
+    fun lensKind(focal35: Int): String? = when {
+        focal35 <= 0 -> null
+        focal35 < 20 -> "Ultraweitwinkel"
+        focal35 < 36 -> "Weitwinkel"
+        focal35 < 70 -> "Normalobjektiv"
+        focal35 < 135 -> "Tele"
+        else -> "Super-Tele"
+    }
 
     /** `4032 × 3024` → `12,19 MP` (zwei Stellen, wie Kamera-Apps es anzeigen). */
     fun megapixelPrecise(w: Int, h: Int): String {

@@ -62,6 +62,12 @@ internal class GemmaEmbedder(
         private const val CLASS_BACKEND = "com.google.ai.edge.litertlm.Backend"
         private const val CLASS_INPUT_DATA = "com.google.ai.edge.litertlm.InputData"
 
+        /**
+         * Nur NPU zulassen (Vorgabe des Nutzers). Auf `false` setzen, wenn wieder GPU/CPU
+         * erlaubt sein soll – der Code für beide Wege bleibt erhalten.
+         */
+        const val NPU_ONLY = true
+
         /** Warum das Modell nicht läuft – für die Anzeige in der Bildersuche. */
         @Volatile
         var lastFailure: String = ""
@@ -104,7 +110,7 @@ internal class GemmaEmbedder(
             // ---- Weg 0: NPU (LiteRT-LM direkt). Der UniversalEmbedder von MediaPipe kennt nur
             //      CPU/GPU; LiteRT-LM selbst hat ein NPU-Backend. Deshalb zuerst dieser Weg –
             //      er wird mit einem Testlauf geprüft und fällt still auf GPU/CPU zurück.
-            if (classOrNull(CLASS_EMBEDDING_ENGINE) != null && hasNpu()) {
+            if (classOrNull(CLASS_EMBEDDING_ENGINE) != null && (NPU_ONLY || hasNpu())) {
                 val result = runCatching { buildEngineDirect(ctx, source, "NPU") }
                 val built = result.getOrNull()
                 if (built != null) {
@@ -119,6 +125,23 @@ internal class GemmaEmbedder(
                 } else {
                     reasons.add("NPU: ${human(result.exceptionOrNull())}")
                 }
+            }
+
+            /**
+             * **Ab 1.41 gilt: nur NPU, kein stiller Rückfall.**
+             *
+             * Auf Wunsch des Nutzers soll das Modell ausschließlich auf der NPU rechnen.
+             * Ein Rückfall auf GPU/CPU würde die Suche zwar „irgendwie“ laufen lassen, aber
+             * genau das verschleiert, dass die NPU nicht genutzt wird. Deshalb wird hier
+             * abgebrochen und der Grund gemeldet – sichtbar in der Statuszeile und im
+             * Selbsttest.
+             */
+            if (NPU_ONLY) {
+                lastFailure = reasons.joinToString(" · ").ifBlank {
+                    "NPU nicht verfügbar (Backend.NPU fehlt oder Gerät ohne NPU-Treiber)"
+                }
+                Log.w(TAG, "NPU nicht nutzbar: $lastFailure")
+                return null
             }
 
             // ---- Weg 1: UniversalEmbedder (dokumentierte MediaPipe-API), GPU → CPU

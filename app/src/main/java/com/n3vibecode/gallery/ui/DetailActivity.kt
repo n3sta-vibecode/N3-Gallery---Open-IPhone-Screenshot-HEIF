@@ -276,6 +276,14 @@ class DetailActivity : AppCompatActivity() {
         })
 
         val start = intent.getIntExtra(EXTRA_POSITION, 0).coerceIn(0, list.size - 1)
+        // **Hochwischen irgendwo im Bild öffnet die Metadaten (1.41).**
+        //
+        // Vorher ging das nur über die schmale Leiste unten oder den Griff. Jetzt gilt:
+        // eine senkrechte Wischbewegung (mehr als 40 dp nach oben, deutlich senkrechter als
+        // waagerecht) öffnet das Blatt. Waagerechtes Wischen bleibt beim Bildwechsel, damit
+        // „durch die Fotos blättern“ unverändert funktioniert.
+        installSwipeUpForMeta()
+
         pager.setCurrentItem(start, false)
         onItemShown(start)
         // Nach dem Aufbau (die Seite entsteht erst mit dem Layout) das Vollbild starten
@@ -579,6 +587,55 @@ class DetailActivity : AppCompatActivity() {
                     Toast.makeText(this@DetailActivity, getString(R.string.save_failed, result.message), Toast.LENGTH_LONG).show()
                     loadMeta(item)
                 }
+            }
+        }
+    }
+
+    /**
+     * Wischgeste nach oben irgendwo auf dem Foto → Metadaten.
+     *
+     * Der Zuhörer sitzt am **Wurzel-Layout**, also über allem (Bild, Kopfzeile, Leiste).
+     * Er gibt jede Berührung sofort weiter (`false`), damit Wischen zwischen Fotos, Zoomen
+     * und Antippen unverändert bleiben; erst wenn die Bewegung klar senkrecht nach oben geht,
+     * gilt sie als „hochscrollen“.
+     */
+    private fun installSwipeUpForMeta() {
+        val root: View = findViewById(R.id.root) ?: return
+        val slop = (resources.displayMetrics.density * 40).coerceAtLeast(1f)
+        var downX = 0f
+        var downY = 0f
+        var downAt = 0L
+        var claimed = false
+
+        root.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    downX = event.rawX
+                    downY = event.rawY
+                    downAt = System.currentTimeMillis()
+                    claimed = false
+                    false
+                }
+
+                android.view.MotionEvent.ACTION_UP -> {
+                    if (claimed) {
+                        claimed = false
+                        return@setOnTouchListener true
+                    }
+                    val dx = event.rawX - downX
+                    val dy = event.rawY - downY
+                    val quick = System.currentTimeMillis() - downAt < 900
+                    val upward = dy < -slop
+                    val mostlyVertical = kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.4f
+                    if (upward && mostlyVertical && quick && behavior.state != BottomSheetBehavior.STATE_EXPANDED) {
+                        behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                        true
+                    } else {
+                        false
+                    }
+                }
+
+                else -> false
             }
         }
     }

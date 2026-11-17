@@ -16,9 +16,9 @@ Alles liegt auf der **Release-Seite** → Abschnitt *Assets*
 
 | Was | Datei | Link |
 | --- | --- | --- |
-| **App installieren** (Android 8.0+) | `N3-Gallery-1.40-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.40/N3-Gallery-1.40-release.apk) |
-| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.40-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.40/N3-Gallery-1.40-TEST.apk) |
-| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.40.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.40/N3Gallery-Projekt-1.40.zip) |
+| **App installieren** (Android 8.0+) | `N3-Gallery-1.41-release.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.41/N3-Gallery-1.41-release.apk) |
+| **App zum Testen**, läuft parallel zur normalen App | `N3-Gallery-1.41-TEST.apk` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.41/N3-Gallery-1.41-TEST.apk) |
+| **Android-Studio-Projekt** (in Android Studio öffnen) | `N3Gallery-Projekt-1.41.zip` | [direkt herunterladen](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases/download/testbuild-1.41/N3Gallery-Projekt-1.41.zip) |
 
 Alle Versionen: [Releases](https://github.com/n3sta-vibecode/N3-Gallery---Open-IPhone-Screenshot-HEIF/releases)
 
@@ -35,7 +35,22 @@ privaten Schlüssel** (z. B. für Google Play) erstellt, steht in **[SIGNIEREN.m
 Kurz: `tools/signieren.sh deine.apk` signiert mit dem Projekt-Schlüssel,
 `tools/keystore-neu.sh` erzeugt einen eigenen.
 
-## 🆕 Version 1.40 – iPhone-GPS und Sensor direkt aus dem HEIF gelesen
+## 🆕 Version 1.41 – Karte ohne Sperrbilder, nur NPU, Metadaten wie in der Samsung-Galerie
+
+* **Karte:** `tile.openstreetmap.org` und `.fr` liefern Apps ein **„Access blocked“-Bild**
+  (Politik-Sperre). Jetzt wird nur noch der für Apps freigegebene `tile.openstreetmap.de`
+  gefragt; Sperrbilder werden erkannt und nicht gespeichert.
+* **Nur NPU:** Kein stiller Rückfall auf GPU/CPU mehr. Rechnet die NPU nicht, sagt die App
+  das (Statuszeile + Modelltest) – statt mit dem Wortmodell Erfolg vorzutäuschen.
+* **Aufnahme-Kopf wie Samsung:** großes Datum, Dateiname, Pfad, Kamera, Objektivart mit
+  Kleinbild-Brennweite, Größenzeile (`1,33 MB | 3000×4000 | 12MP`) und Aufnahmezeile
+  (`ISO 100 | 23 mm | 0.0 ev | F1.9 | 1/51 s`).
+* **Alle Metadaten:** über 150 Felder (`ExifNames`) inkl. Apple-MakerNote (Bildstil, HDR,
+  Linsentyp …) und aller GPS-Felder.
+* **Hochwischen irgendwo im Foto** öffnet die Metadaten; waagerechtes Wischen bleibt der
+  Bildwechsel.
+
+## 🔧 Version 1.40 – iPhone-GPS und Sensor direkt aus dem HEIF gelesen
 
 * **Ursache gefunden:** Bei vielen iPhone-Fotos liefert `ExifInterface` **nichts** – Apple legt
   Kamera, Objektiv, ISO, Blende und **GPS** im `Exif`-Item des HEIF-Containers ab. Die App

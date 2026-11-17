@@ -396,7 +396,7 @@
      ------------------------------------------------------------------ */
   const LOG = [
     {
-      v: '1.40', de: 'GPS und Sensor aus dem iPhone-HEIF', en: 'GPS and sensor read from iPhone HEIF',
+      v: '1.41', de: 'Karte ohne Sperrbilder, nur NPU, Metadaten wie Samsung', en: 'Map without block pages, NPU only, Samsung-style metadata',
       de_items: [
         'Der eigentliche Grund für „Suchmodell läuft nicht“: tasks-retrieval 1.2.3 bringt eine zu alte LiteRT-LM mit (0.17.0-alpha1), in der die Klasse ActivationDataType fehlt. Jetzt fest auf 0.19.1 – und der Build prüft das bei jedem Lauf.',
         'Zweiter Weg ohne MediaPipe: dieselbe Datei lässt sich direkt über LiteRT-LM einbetten (CPU). Beide Wege werden mit einem Testlauf geprüft, welcher läuft steht in der Statuszeile.',
@@ -606,7 +606,7 @@
     'hero.h1a': 'Apple screenshots.',
     'hero.h1b': 'Finally on Android.',
     'hero.lead': 'N3 Gallery opens Apple’s tiled HEIC containers – including 10-bit, HDR and gain maps. Plus 35 RAW formats, AVIF, SVG and HEVC video. Entirely offline.',
-    'hero.note': 'Version 1.40 · 44 MB · open source',
+    'hero.note': 'Version 1.41 · 44 MB · open source',
     'hero.f1': 'No internet access',
     'hero.f2': 'No accounts',
     'hero.f3': 'No ads',
@@ -693,7 +693,7 @@
     'privacy.c2': 'No account, no sign-in, no cloud, no server.',
     'privacy.c3': 'No ads, no telemetry, no analytics SDK.',
     'privacy.c4': 'Notes, tags and favourites are additionally backed up outside the app – a reinstall costs nothing.',
-    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.40-release.apk | grep uses-permission</code>',
+    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.41-release.apk | grep uses-permission</code>',
     'install.kicker': 'Installation',
     'install.h2': 'Three steps onto the device.',
     'install.p': 'The app is not distributed through a store: the finished APK comes straight from the build and the signing key stays the same. That is why new versions can simply be laid over the installed one.',

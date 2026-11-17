@@ -30,6 +30,8 @@ object AiEngine {
         GPU("GPU"),
         CPU("CPU"),
         LOCAL("Wortmodell")
+
+        /** Rechnet dieses Modell auf der NPU? (ab 1.41 die einzige erlaubte Stufe) */
     }
 
     /**
@@ -149,7 +151,13 @@ object AiEngine {
                     ready = true,
                     accelerator = Accelerator.LOCAL,
                     modelName = local.modelName,
-                    detail = local.detail,
+                    // 1.41: Es soll nur die NPU rechnen. Läuft sie nicht, sagt die App das
+                    // deutlich – statt „Suche funktioniert“ mit dem Wortmodell vorzutäuschen.
+                    detail = if (GemmaEmbedder.NPU_ONLY) {
+                        "NPU nicht aktiv – es wird nur die Wortsuche benutzt"
+                    } else {
+                        local.detail
+                    },
                     modelInstalled = installed,
                     failure = if (installed) GemmaEmbedder.lastFailure else ""
                 )
