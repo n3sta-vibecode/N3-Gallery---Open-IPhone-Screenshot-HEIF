@@ -396,6 +396,25 @@
      ------------------------------------------------------------------ */
   const LOG = [
     {
+      v: '1.42', de: 'Knöpfe unten wie Samsung, Notizfeld, NPU-Modelle pro Chipsatz, stufenloses Zoomen', en: 'Bottom bar like Samsung, notes field, per-chipset NPU models, stepless zoom',
+      de_items: [
+        'Fotoansicht wie Samsung/Google/Apple: Knopfleiste unten, Hochwischen irgendwo im Foto öffnet unten die wichtigsten Metadaten – mit Notizfeld und kleiner Karte.',
+        '„Die Karte lädt nicht“ behoben: Meer-Kacheln wurden fälschlich als Sperrbilder weggeworfen; OpenStreetMap ist jetzt Standard, und fehlgeschlagene Kacheln bekommen eine Schonfrist statt einer Anfrage-Flut.',
+        'Gemma Embedding 2 läuft wirklich auf der NPU: Backend.NPU wurde korrekt gebaut (vorher scheiterte der Aufbau immer), und die App lädt automatisch die NPU-Fassung des eigenen Chipsatzes (Galaxy S25 Ultra: SM8750) – Download mit SHA-256-Prüfung.',
+        'Zweites Modell für die Personen-Klassifizierung (Text+Bild 440M oder 740M): Knopf „Personen“ zeigt Fotos mit denselben Personen. Beide Modelle rechnen nur auf der NPU.',
+        'Raster stufenlos zoombar (bis 200 Spalten, kontinuierliche Skalierung um den Fingerpunkt), genau eine Lupe im Suchfeld, Dateiformat steht nicht mehr auf den Kacheln, und HEIC heißt nur noch „Apple“, wenn die Datei wirklich von Apple ist.',
+        'Die APK wächst um die NPU-Laufzeitbibliotheken von Qualcomm (rund 63 MB) – deshalb jetzt 291 MB.'
+      ],
+      en_items: [
+        'Photo view like Samsung/Google/Apple: bottom button bar, swiping up anywhere in the photo opens the key metadata – with a notes field and a small map.',
+        '“The map doesn’t load” fixed: ocean tiles were mistakenly discarded as block notices; OpenStreetMap is now the default, and failed tiles get a grace period instead of a request flood.',
+        'Gemma Embedding 2 truly runs on the NPU: Backend.NPU is now constructed correctly (the construction always failed before), and the app automatically downloads the NPU build for your chipset (Galaxy S25 Ultra: SM8750) – with SHA-256 verification.',
+        'Second model for person classification (Text+Image 440M or 740M): the “People” button shows photos with the same people. Both models run on the NPU only.',
+        'Grid zooms steplessly (up to 200 columns, continuous scaling around the finger point), exactly one magnifier in the search field, no more file-format labels on tiles, and HEIC is only called “Apple” when the file really is from Apple.',
+        'The APK grows by Qualcomm’s NPU runtime libraries (about 63 MB) – hence 291 MB now.'
+      ]
+    },
+    {
       v: '1.41', de: 'Karte ohne Sperrbilder, nur NPU, Metadaten wie Samsung', en: 'Map without block pages, NPU only, Samsung-style metadata',
       de_items: [
         'Der eigentliche Grund für „Suchmodell läuft nicht“: tasks-retrieval 1.2.3 bringt eine zu alte LiteRT-LM mit (0.17.0-alpha1), in der die Klasse ActivationDataType fehlt. Jetzt fest auf 0.19.1 – und der Build prüft das bei jedem Lauf.',
@@ -606,7 +625,7 @@
     'hero.h1a': 'Apple screenshots.',
     'hero.h1b': 'Finally on Android.',
     'hero.lead': 'N3 Gallery opens Apple’s tiled HEIC containers – including 10-bit, HDR and gain maps. Plus 35 RAW formats, AVIF, SVG and HEVC video. Entirely offline.',
-    'hero.note': 'Version 1.41 · 44 MB · open source',
+    'hero.note': 'Version 1.42 · 291 MB · open source',
     'hero.f1': 'No internet access',
     'hero.f2': 'No accounts',
     'hero.f3': 'No ads',
@@ -693,7 +712,7 @@
     'privacy.c2': 'No account, no sign-in, no cloud, no server.',
     'privacy.c3': 'No ads, no telemetry, no analytics SDK.',
     'privacy.c4': 'Notes, tags and favourites are additionally backed up outside the app – a reinstall costs nothing.',
-    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.41-release.apk | grep uses-permission</code>',
+    'privacy.verify': 'Check for yourself: <code class="mono">aapt dump badging N3-Gallery-1.42-release.apk | grep uses-permission</code>',
     'install.kicker': 'Installation',
     'install.h2': 'Three steps onto the device.',
     'install.p': 'The app is not distributed through a store: the finished APK comes straight from the build and the signing key stays the same. That is why new versions can simply be laid over the installed one.',
