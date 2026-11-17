@@ -244,7 +244,12 @@ object HeifGeo {
             if (type == "meta") {
                 val metaLen = (size - 8).toInt().coerceIn(0, head.size - pos - 8)
                 val meta = head.copyOfRange(pos + 8, pos + 8 + metaLen)
-                val ipco = findBox(meta, "ipco", 4) ?: return null to false
+                // iprp enthält ipco, ipco enthält die Eigenschaften (irot/imir/ispe …).
+                // Vorher wurde ipco direkt in meta gesucht – dort liegt es nicht, deshalb
+                // kam nie eine Drehung an (vom Unit-Test gefunden).
+                val iprp = findBox(meta, "iprp", 4) ?: return null to false
+                val ipco = findBoxInRange(meta, "ipco", iprp.first, iprp.second)
+                    ?: return null to false
                 var p = ipco.first
                 var degrees: Int? = null
                 var mirrored = false
@@ -444,6 +449,19 @@ object HeifGeo {
             v = (v shl 8) or (b[p + i].toLong() and 0xFF)
         }
         return v
+    }
+
+    /** Sucht eine Box in einem Bereich (für verschachtelte Boxen wie iprp → ipco). */
+    private fun findBoxInRange(data: ByteArray, type: String, from: Int, to: Int): Pair<Int, Int>? {
+        var p = from
+        while (p + 8 <= to && p + 8 <= data.size) {
+            val size = u32(data, p).toInt()
+            if (size < 8) return null
+            val end = (p + size).coerceAtMost(minOf(to, data.size))
+            if (fourcc(data, p + 4) == type) return (p + 8) to end
+            p = end
+        }
+        return null
     }
 
     /** Sucht eine Box innerhalb eines Puffers (ab `from`, meist 4 = hinter version/flags). */
